@@ -15,7 +15,8 @@ Just started a few days ago.
 
 On going:
 
-Better visual for pregnancy.(plan to learn something from shapekey)
+Better visual for pregnancy.(learned lot from pregnancyplus)
+
 
 For my next plan:
 
