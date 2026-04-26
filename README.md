@@ -13,10 +13,12 @@ In UI, you can check/set pregnancy of character at this scene.
 I took some ideas from AddYotogiSlider of asyetriec. Thanks to asyetriec.
 Just started a few days ago. 
 
+On going:
+
+Better visual for pregnancy.(plan to learn something from shapekey)
+
 For my next plan:
 
 A realistic detailed period based fetility rate change.
-
-Better visual for pregnancy.(plan to learn something from shapekey)
 
 What happens in the end. A real birth scene seems too difficult for me.
