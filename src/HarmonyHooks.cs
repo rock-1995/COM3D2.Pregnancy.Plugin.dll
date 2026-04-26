@@ -13,7 +13,6 @@ namespace COM3D2.Pregnancy.Plugin
     [HarmonyPatch(typeof(YotogiPlayManager), "OnClickCommand")]
     class Patch_OnClickCommand
     {
-        // 膣挿入中フラグ（アナル除外）
         static bool _bVaginalInsert = false;
 
         static void Postfix(object[] __args)
@@ -47,16 +46,11 @@ namespace COM3D2.Pregnancy.Plugin
 
                 bool isAnal = group.Contains("アナル");
 
-                // 挿入状態を追跡（膣のみ。アナルは膣フラグに影響しない）
                 if (cmdType == "挿入" && !isAnal)
                     _bVaginalInsert = true;
                 else if (cmdType == "止める" || cmdType == "単発")
                     _bVaginalInsert = false;
 
-                // 膣内中出し判定
-                // 「中出し」コマンド実行時に膣挿入フラグが立っていれば判定
-                // アナルのみの場合はフラグが立たないので自然に除外
-                // MMF（膣+アナル同時）の場合は膣フラグが立つので対象に含まれる
                 if (cmdType == "絶頂"
                     && (name.Contains("中出し") || name.Contains("注ぎ込む"))
                     && _bVaginalInsert)
@@ -96,5 +90,50 @@ namespace COM3D2.Pregnancy.Plugin
         static void Log(string msg)
             => BepInEx.Logging.Logger.CreateLogSource("Pregnancy")
                 .LogInfo("[Pregnancy] " + msg);
+    }
+
+    // ── 衣装ロード時に孕み腹を自動適用 ───────────────────────────────
+    // sharedMesh の差し替えは行わず in-place で頂点を書き換えるため、
+    // COM3D2 側の mesh オブジェクト参照は一切変化しない。
+    // → body 可視性管理・脱衣時の挙動はすべて COM3D2 が正常に処理する。
+    [HarmonyPatch(typeof(ImportCM), "LoadSkinMesh_R")]
+    class Patch_LoadSkinMesh_R
+    {
+        static void Postfix(GameObject __result, TBodySkin __3)
+        {
+            if (__result == null || __3 == null) return;
+            try
+            {
+                Maid maid = FindMaidForBodySkin(__3);
+                if (maid == null) return;
+                if (!BellyMorphController.IsActive(maid)) return;
+
+                SkinnedMeshRenderer smr =
+                    __result.GetComponentInChildren<SkinnedMeshRenderer>(false);
+                if (smr == null) return;
+
+                BellyMorphController.ApplyFromPatch(maid, smr, __result.name);
+            }
+            catch (System.Exception e)
+            {
+                BepInEx.Logging.Logger.CreateLogSource("Pregnancy")
+                    .LogWarning("[Pregnancy] LoadSkinMesh_R patch error: " + e.Message);
+            }
+        }
+
+        public static Maid FindMaidForBodySkin(TBodySkin bodySkin)
+        {
+            var cm = GameMain.Instance?.CharacterMgr;
+            if (cm == null) return null;
+            int cnt = cm.GetStockMaidCount();
+            for (int i = 0; i < cnt; i++)
+            {
+                Maid m = cm.GetStockMaid(i);
+                if (m?.body0?.goSlot == null) continue;
+                for (int j = 0; j < m.body0.goSlot.Count; j++)
+                    if (m.body0.goSlot[j] == bodySkin) return m;
+            }
+            return null;
+        }
     }
 }
