@@ -1,54 +1,33 @@
-using System.Collections;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace COM3D2.Pregnancy.Plugin
 {
     public class SceneAutoApply : MonoBehaviour
     {
-        void OnEnable()  => SceneManager.sceneLoaded += OnSceneLoaded;
-        void OnDisable() => SceneManager.sceneLoaded -= OnSceneLoaded;
+        float _nextScanTime;
 
-        void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-            => StartCoroutine(ApplyAfterDelay());
-
-        IEnumerator ApplyAfterDelay()
+        void Update()
         {
-            // ① 先に MarkActive だけ行う
-            //    これ以降に LoadSkinMesh_R が呼ばれたとき
-            //    パッチが自動で変形を適用する
-            var cm = GameMain.Instance?.CharacterMgr;
-            if (cm != null)
-            {
-                int cnt = cm.GetMaidCount();
-                for (int i = 0; i < cnt; i++)
-                {
-                    Maid m = cm.GetMaid(i);
-                    if (m == null) continue;
-                    if (!PregnancyManager.GetPregnant(m)) continue;
-                    float progress = PregnancyManager.GetProgress(m);
-                    if (progress <= 0f) continue;
-                    BellyMorphController.MarkActive(m, progress);
-                }
-            }
+            if (PregnancyPlugin.CfgMorphTriggerMode == null) return;
+            if (PregnancyPlugin.CfgMorphTriggerMode.Value == MorphTriggerMode.ManualOnly) return;
+            if (Time.unscaledTime < _nextScanTime) return;
 
-            // ② メッシュが揃うまで待つ
-            yield return null;
-            yield return null;
-            yield return new WaitForSeconds(0.15f);
+            _nextScanTime = Time.unscaledTime + 1f;
+            AttachModeObservers();
+        }
 
-            // ③ ① より前にロード済みのメッシュに手動で適用
-            //    （LoadSkinMesh_R パッチが間に合わなかった分の補完）
-            if (cm != null)
+        void AttachModeObservers()
+        {
+            CharacterMgr cm = GameMain.Instance?.CharacterMgr;
+            if (cm == null) return;
+            int cnt = cm.GetMaidCount();
+            for (int i = 0; i < cnt; i++)
             {
-                int cnt = cm.GetMaidCount();
-                for (int i = 0; i < cnt; i++)
-                {
-                    Maid m = cm.GetMaid(i);
-                    if (!BellyMorphController.IsActive(m)) continue;
-                    float progress = BellyMorphController.GetActiveProgress(m);
-                    BellyMorphController.ApplyProgress(m, progress);
-                }
+                Maid maid = cm.GetMaid(i);
+                if (maid == null || maid.body0 == null) continue;
+
+                if (PregnancyPlugin.CfgMorphTriggerMode.Value == MorphTriggerMode.VisibilityChange)
+                    BellyMorphController.EnsureVisibilityObservers(maid);
             }
         }
     }

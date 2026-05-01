@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 using System.IO;
 using BepInEx;
@@ -14,9 +13,23 @@ namespace COM3D2.Pregnancy.Plugin
         public static void Initialize()
         {
             if (File.Exists(SettingsPath))
-                try { Settings = JsonUtility.FromJson<PregSettings>(
-                          File.ReadAllText(SettingsPath)) ?? new PregSettings(); }
+            {
+                try
+                {
+                    string json = File.ReadAllText(SettingsPath);
+                    bool hasOuterClothPregnancyScale = json.Contains("bellyOuterClothPregnancyScale");
+                    bool hasOuterClothLayerGuard = json.Contains("bellyOuterClothLayerGuard");
+                    Settings = JsonUtility.FromJson<PregSettings>(
+                        json) ?? new PregSettings();
+                    if (!hasOuterClothPregnancyScale)
+                        Settings.bellyOuterClothPregnancyScale = 1.0f;
+                    if (!hasOuterClothLayerGuard)
+                        Settings.bellyOuterClothLayerGuard = 0.0f;
+                }
                 catch { }
+            }
+
+            ApplyGlobalBellySettings();
         }
 
         public static void SaveSettings()
@@ -25,7 +38,82 @@ namespace COM3D2.Pregnancy.Plugin
             catch { }
         }
 
-        // ── ExSaveData 経由データ ──────────────────────────────────
+        public static void ApplyGlobalBellySettings()
+        {
+            BellyMorphController.InflationMultiplier = Settings.bellyInflationMultiplier;
+            BellyMorphController.InflationMoveY = Settings.bellyInflationMoveY;
+            BellyMorphController.InflationMoveZ = Settings.bellyInflationMoveZ;
+            BellyMorphController.InflationStretchX = Settings.bellyInflationStretchX;
+            BellyMorphController.InflationStretchY = Settings.bellyInflationStretchY;
+            BellyMorphController.InflationShiftY = Settings.bellyInflationShiftY;
+            BellyMorphController.InflationShiftZ = Settings.bellyInflationShiftZ;
+            BellyMorphController.InflationTaperY = Settings.bellyInflationTaperY;
+            BellyMorphController.InflationTaperZ = Settings.bellyInflationTaperZ;
+            BellyMorphController.InflationRoundness = Settings.bellyInflationRoundness;
+            BellyMorphController.InflationDrop = Settings.bellyInflationDrop;
+            BellyMorphController.InflationFatFold = Settings.bellyInflationFatFold;
+            BellyMorphController.InflationFatFoldHeight = Settings.bellyInflationFatFoldHeight;
+            BellyMorphController.InflationFatFoldGap = Settings.bellyInflationFatFoldGap;
+            BellyMorphController.RegionRadiusSide = Settings.bellyRegionRadiusSide;
+            BellyMorphController.RegionRadiusFront = Settings.bellyRegionRadiusFront;
+            BellyMorphController.RegionRadiusBack = Settings.bellyRegionRadiusBack;
+            BellyMorphController.RegionRadiusUp = Settings.bellyRegionRadiusUp;
+            BellyMorphController.RegionRadiusDown = Settings.bellyRegionRadiusDown;
+            BellyMorphController.ThighGuardSpeed = Settings.bellyThighGuardSpeed;
+            BellyMorphController.TopEdgeTaper = Settings.bellyTopEdgeTaper;
+            BellyMorphController.BottomEdgeTaper = Settings.bellyBottomEdgeTaper;
+            BellyMorphController.SideSmoothWidth = Settings.bellySideSmoothWidth;
+            BellyMorphController.SideSmoothStrength = Settings.bellySideSmoothStrength;
+            BellyMorphController.BreastGuardStrength = Settings.bellyBreastGuardStrength;
+            BellyMorphController.OuterClothPregnancyScale = Settings.bellyOuterClothPregnancyScale;
+            BellyMorphController.OuterClothSkirtDrape = Settings.bellyOuterClothSkirtDrape;
+            BellyMorphController.OuterClothLayerGuard = Settings.bellyOuterClothLayerGuard;
+            BellyMorphController.InnerClothOffset = Settings.bellyInnerClothOffset;
+            BellyMorphController.OuterClothOffset = Settings.bellyOuterClothOffset;
+            BellyMorphController.ClothThicknessPreserve = Settings.bellyClothThicknessPreserve;
+            BellyMorphController.ClothOffsetSideRatio = Settings.bellyClothOffsetSideRatio;
+            BellyMorphController.ClothBackOffsetBoost = Settings.bellyClothBackOffsetBoost;
+            BellyMorphController.ClothDepthStretch = Settings.bellyClothDepthStretch;
+        }
+
+        public static void CaptureCurrentBellySettings()
+        {
+            Settings.bellyInflationMultiplier = BellyMorphController.InflationMultiplier;
+            Settings.bellyInflationMoveY = BellyMorphController.InflationMoveY;
+            Settings.bellyInflationMoveZ = BellyMorphController.InflationMoveZ;
+            Settings.bellyInflationStretchX = BellyMorphController.InflationStretchX;
+            Settings.bellyInflationStretchY = BellyMorphController.InflationStretchY;
+            Settings.bellyInflationShiftY = BellyMorphController.InflationShiftY;
+            Settings.bellyInflationShiftZ = BellyMorphController.InflationShiftZ;
+            Settings.bellyInflationTaperY = BellyMorphController.InflationTaperY;
+            Settings.bellyInflationTaperZ = BellyMorphController.InflationTaperZ;
+            Settings.bellyInflationRoundness = BellyMorphController.InflationRoundness;
+            Settings.bellyInflationDrop = BellyMorphController.InflationDrop;
+            Settings.bellyInflationFatFold = BellyMorphController.InflationFatFold;
+            Settings.bellyInflationFatFoldHeight = BellyMorphController.InflationFatFoldHeight;
+            Settings.bellyInflationFatFoldGap = BellyMorphController.InflationFatFoldGap;
+            Settings.bellyRegionRadiusSide = BellyMorphController.RegionRadiusSide;
+            Settings.bellyRegionRadiusFront = BellyMorphController.RegionRadiusFront;
+            Settings.bellyRegionRadiusBack = BellyMorphController.RegionRadiusBack;
+            Settings.bellyRegionRadiusUp = BellyMorphController.RegionRadiusUp;
+            Settings.bellyRegionRadiusDown = BellyMorphController.RegionRadiusDown;
+            Settings.bellyThighGuardSpeed = BellyMorphController.ThighGuardSpeed;
+            Settings.bellyTopEdgeTaper = BellyMorphController.TopEdgeTaper;
+            Settings.bellyBottomEdgeTaper = BellyMorphController.BottomEdgeTaper;
+            Settings.bellySideSmoothWidth = BellyMorphController.SideSmoothWidth;
+            Settings.bellySideSmoothStrength = BellyMorphController.SideSmoothStrength;
+            Settings.bellyBreastGuardStrength = BellyMorphController.BreastGuardStrength;
+            Settings.bellyOuterClothPregnancyScale = BellyMorphController.OuterClothPregnancyScale;
+            Settings.bellyOuterClothSkirtDrape = BellyMorphController.OuterClothSkirtDrape;
+            Settings.bellyOuterClothLayerGuard = BellyMorphController.OuterClothLayerGuard;
+            Settings.bellyInnerClothOffset = BellyMorphController.InnerClothOffset;
+            Settings.bellyOuterClothOffset = BellyMorphController.OuterClothOffset;
+            Settings.bellyClothThicknessPreserve = BellyMorphController.ClothThicknessPreserve;
+            Settings.bellyClothOffsetSideRatio = BellyMorphController.ClothOffsetSideRatio;
+            Settings.bellyClothBackOffsetBoost = BellyMorphController.ClothBackOffsetBoost;
+            Settings.bellyClothDepthStretch = BellyMorphController.ClothDepthStretch;
+            SaveSettings();
+        }
 
         public static bool GetPregnant(Maid maid)
             => ExSaveDataBridge.Get(maid, "isPregnant", "false") == "true";
@@ -43,8 +131,6 @@ namespace COM3D2.Pregnancy.Plugin
         public static void SetProgress(Maid maid, float value)
             => ExSaveDataBridge.Set(maid, "progress",
                 value.ToString("F3", CultureInfo.InvariantCulture));
-
-        // ── 日付進行 ──────────────────────────────────────────────
 
         public static void AdvanceDay()
         {
