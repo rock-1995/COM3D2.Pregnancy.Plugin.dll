@@ -1,6 +1,7 @@
-using System.Reflection;
+using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
+using Yotogis;
 
 namespace COM3D2.Pregnancy.Plugin
 {
@@ -10,56 +11,62 @@ namespace COM3D2.Pregnancy.Plugin
         static void Postfix() => PregnancyManager.AdvanceDay();
     }
 
-    [HarmonyPatch(typeof(YotogiPlayManager), "OnClickCommand")]
-    class Patch_OnClickCommand
+    [HarmonyPatch(typeof(YotogiCommandFactory), "SetCommandCallback")]
+    class Patch_SetCommandCallback
     {
+        static readonly Dictionary<YotogiCommandFactory.CommandCallback, YotogiCommandFactory.CommandCallback> _wrapped
+            = new Dictionary<YotogiCommandFactory.CommandCallback, YotogiCommandFactory.CommandCallback>();
+        static readonly HashSet<YotogiCommandFactory.CommandCallback> _wrappers
+            = new HashSet<YotogiCommandFactory.CommandCallback>();
         static bool _bVaginalInsert = false;
 
-        static void Postfix(object[] __args)
+        static void Prefix(ref YotogiCommandFactory.CommandCallback __0)
+        {
+            if (__0 == null) return;
+            if (_wrappers.Contains(__0)) return;
+
+            YotogiCommandFactory.CommandCallback wrapped;
+            if (!_wrapped.TryGetValue(__0, out wrapped))
+            {
+                YotogiCommandFactory.CommandCallback original = __0;
+                wrapped = delegate(Skill.Data.Command.Data commandData)
+                {
+                    original(commandData);
+                    HandleCommand(commandData);
+                };
+                _wrapped[__0] = wrapped;
+                _wrappers.Add(wrapped);
+            }
+
+            __0 = wrapped;
+        }
+
+        static void HandleCommand(Skill.Data.Command.Data commandData)
         {
             try
             {
-                if (__args == null || __args.Length == 0) return;
-                var data = __args[0];
-                if (object.ReferenceEquals(data, null)) return;
+                if (commandData == null || commandData.basic == null) return;
 
-                var basicField = data.GetType().GetField("basic",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                if (object.ReferenceEquals(basicField, null)) return;
-                var basic = basicField.GetValue(data);
-                if (object.ReferenceEquals(basic, null)) return;
+                string cmdType = commandData.basic.command_type.ToString();
+                string name = commandData.basic.name ?? "";
+                string group = commandData.basic.group_name ?? "";
 
-                var cmdTypeField = basic.GetType().GetField("command_type",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                var nameField    = basic.GetType().GetField("name",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                var groupField   = basic.GetType().GetField("group_name",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                bool isAnal = group.Contains("\u30A2\u30CA\u30EB");
 
-                if (object.ReferenceEquals(cmdTypeField, null)) return;
-
-                string cmdType = cmdTypeField.GetValue(basic).ToString();
-                string name    = object.ReferenceEquals(nameField,  null) ? "" :
-                                 nameField.GetValue(basic)  as string ?? "";
-                string group   = object.ReferenceEquals(groupField, null) ? "" :
-                                 groupField.GetValue(basic) as string ?? "";
-
-                bool isAnal = group.Contains("アナル");
-
-                if (cmdType == "挿入" && !isAnal)
+                if (cmdType == "\u633F\u5165" && !isAnal)
                     _bVaginalInsert = true;
-                else if (cmdType == "止める" || cmdType == "単発")
+                else if (cmdType == "\u6B62\u3081\u308B" || cmdType == "\u5358\u767A")
                     _bVaginalInsert = false;
 
-                if (cmdType == "絶頂"
-                    && (name.Contains("中出し") || name.Contains("注ぎ込む"))
+                if (cmdType == "\u7D76\u9802"
+                    && (name.Contains("\u4E2D\u51FA\u3057") || name.Contains("\u6CE8\u304E\u8FBC\u3080"))
                     && _bVaginalInsert)
                 {
                     Log("Vaginal creampie detected: " + group + " / " + name);
                     CheckConception();
                 }
             }
-            catch (System.Exception e) { Log("OnClickCommand hook error: " + e.Message); }
+            catch (System.Exception e) { Log("Command callback hook error: " + e.Message); }
         }
 
         static void CheckConception()
@@ -67,12 +74,23 @@ namespace COM3D2.Pregnancy.Plugin
             var cm = GameMain.Instance?.CharacterMgr;
             if (object.ReferenceEquals(cm, null)) return;
 
+            FertilityCycleMode mode = PregnancyManager.GetCycleMode();
+            bool cyclic = PregnancyManager.IsCyclicMode(mode);
             int cnt = cm.GetMaidCount();
             for (int i = 0; i < cnt; i++)
             {
                 Maid m = cm.GetMaid(i);
                 if (object.ReferenceEquals(m, null)) continue;
                 if (PregnancyManager.GetPregnant(m)) continue;
+
+                if (cyclic)
+                {
+                    PregnancyManager.EnsureCycleProgress(m);
+                    PregnancyManager.SetFertilityCoefficient(m, 1f);
+                    Log("Creampie stored fertility coefficient: "
+                        + m.status.lastName + " " + m.status.firstName);
+                    continue;
+                }
 
                 float rate = PregnancyPlugin.CfgFertilityRate.Value;
                 if (Random.value < rate)
@@ -92,85 +110,18 @@ namespace COM3D2.Pregnancy.Plugin
                 .LogInfo("[Pregnancy] " + msg);
     }
 
-    // ── 衣装ロード時に孕み腹を自動適用 ───────────────────────────────
-    // sharedMesh の差し替えは行わず in-place で頂点を書き換えるため、
-    // COM3D2 側の mesh オブジェクト参照は一切変化しない。
-    // → body 可視性管理・脱衣時の挙動はすべて COM3D2 が正常に処理する。
-    [HarmonyPatch(typeof(ImportCM), "LoadSkinMesh_R")]
-    class Patch_LoadSkinMesh_R
+    [HarmonyPatch(typeof(TMorph), "FixBlendValues")]
+    class Patch_TMorphFixBlendValues
     {
-        static BepInEx.Logging.ManualLogSource _log =
-            BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
-
-        static void Postfix(GameObject __result, TBodySkin __3)
+        static void Postfix(TMorph __instance)
         {
-            if (__result == null || __3 == null) return;
-            try
-            {
-                if (PregnancyPlugin.CfgDebugMeshLogging == null
-                    || !PregnancyPlugin.CfgDebugMeshLogging.Value)
-                    return;
-
-                // ── SPY: log everything regardless of belly state ──────────
-                SkinnedMeshRenderer[] smrs =
-                    __result.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-                Maid maid = FindMaidForBodySkin(__3);
-                string maidStr = maid != null
-                    ? (maid.status.lastName + maid.status.firstName).Trim()
-                    : "NOT_IN_GOSLOT";
-                foreach (SkinnedMeshRenderer smrSpy in smrs)
-                {
-                    if (smrSpy == null) continue;
-
-                    // Sample up to 8 bone names
-                    var bonesSpy = smrSpy.bones;
-                    var boneNames = new System.Text.StringBuilder();
-                    int limit = bonesSpy != null ? System.Math.Min(bonesSpy.Length, 8) : 0;
-                    for (int b = 0; b < limit; b++)
-                        boneNames.Append(bonesSpy[b] != null ? bonesSpy[b].name : "null")
-                                 .Append("|");
-
-                    _log.LogInfo($"[SPY] slot={__3.m_strModelFileName ?? "?"}" +
-                        $" obj={__result.name}" +
-                        $" smr={smrSpy.name}" +
-                        $" verts={smrSpy.sharedMesh?.vertexCount ?? 0}" +
-                        $" bones={bonesSpy?.Length ?? 0}" +
-                        $" maid={maidStr}" +
-                        $" first8bones=[{boneNames}]");
-                }
-                // ── END SPY ───────────────────────────────────────────────
-
-            }
+            try { BellyMorphController.NotifyFixBlendValues(__instance); }
             catch (System.Exception e)
             {
                 BepInEx.Logging.Logger.CreateLogSource("Pregnancy")
-                    .LogWarning("[Pregnancy] LoadSkinMesh_R patch error: " + e.Message);
+                    .LogInfo("[Pregnancy] FixBlendValues hook: " + e.Message);
             }
-        }
-
-        public static Maid FindMaidForBodySkin(TBodySkin bodySkin)
-        {
-            var cm = GameMain.Instance?.CharacterMgr;
-            if (cm == null) return null;
-
-            int sceneCnt = cm.GetMaidCount();
-            for (int i = 0; i < sceneCnt; i++)
-            {
-                Maid m = cm.GetMaid(i);
-                if (m?.body0?.goSlot == null) continue;
-                for (int j = 0; j < m.body0.goSlot.Count; j++)
-                    if (m.body0.goSlot[j] == bodySkin) return m;
-            }
-
-            int stockCnt = cm.GetStockMaidCount();
-            for (int i = 0; i < stockCnt; i++)
-            {
-                Maid m = cm.GetStockMaid(i);
-                if (m?.body0?.goSlot == null) continue;
-                for (int j = 0; j < m.body0.goSlot.Count; j++)
-                    if (m.body0.goSlot[j] == bodySkin) return m;
-            }
-            return null;
         }
     }
+
 }

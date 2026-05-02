@@ -84,6 +84,7 @@ namespace COM3D2.Pregnancy.Plugin
             public Mesh Mesh;
             public Vector3[] OrigVerts;
             public Vector3[] OrigNormals;
+            public Vector3[] LastDeltaVerts;
             public int AppliedSignature;
         }
 
@@ -123,6 +124,7 @@ namespace COM3D2.Pregnancy.Plugin
         }
 
         static Dictionary<int, List<MeshRecord>> _records = new Dictionary<int, List<MeshRecord>>();
+        static readonly Dictionary<int, HashSet<TBodySkin>> _morphDirtySkins = new Dictionary<int, HashSet<TBodySkin>>();
         static BepInEx.Logging.ManualLogSource _log = BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
 
         struct LocalFrame
@@ -204,9 +206,18 @@ namespace COM3D2.Pregnancy.Plugin
             {
                 if (r.SMR != null && r.Mesh != null && r.OrigVerts != null)
                 {
-                    r.Mesh.vertices = r.OrigVerts;
-                    r.Mesh.normals = r.OrigNormals;
-                    r.Mesh.RecalculateBounds();
+                    Vector3[] currentVerts = r.Mesh.vertices;
+                    if (r.LastDeltaVerts != null
+                        && currentVerts != null
+                        && currentVerts.Length == r.LastDeltaVerts.Length
+                        && r.AppliedSignature != 0
+                        && ComputeVertexSignature(currentVerts) == r.AppliedSignature)
+                    {
+                        for (int i = 0; i < currentVerts.Length; i++)
+                            currentVerts[i] -= r.LastDeltaVerts[i];
+                        r.Mesh.vertices = currentVerts;
+                        r.Mesh.RecalculateBounds();
+                    }
                 }
             }
 
@@ -480,10 +491,103 @@ namespace COM3D2.Pregnancy.Plugin
             return mon;
         }
 
-        public static void RequestMorph(Maid maid)
+        public static void NotifyFixBlendValues(TMorph morph)
+        {
+            if (morph == null || morph.bodyskin == null) return;
+
+            Maid maid = FindMaidForBodySkin(morph.bodyskin);
+            if (!IsValid(maid)) return;
+
+            float progress = PregnancyManager.GetPregnant(maid)
+                ? PregnancyManager.GetProgress(maid)
+                : GetActiveProgress(maid);
+            if (Mathf.Clamp01(progress) <= 0f) return;
+
+            int key = maid.GetHashCode();
+            if (!_morphDirtySkins.ContainsKey(key))
+                _morphDirtySkins[key] = new HashSet<TBodySkin>();
+            _morphDirtySkins[key].Add(morph.bodyskin);
+            EnsureMonitor(maid);
+        }
+
+        internal static void FlushMorphDirty(Maid maid)
         {
             if (maid == null) return;
-            EnsureMonitor(maid).TriggerProgressReapply();
+            int key = maid.GetHashCode();
+            if (!_morphDirtySkins.TryGetValue(key, out var skins) || skins.Count == 0) return;
+
+            var toProcess = new List<TBodySkin>(skins);
+            skins.Clear();
+
+            if (!IsValid(maid)) return;
+
+            float progress = PregnancyManager.GetPregnant(maid)
+                ? PregnancyManager.GetProgress(maid)
+                : GetActiveProgress(maid);
+            progress = Mathf.Clamp01(progress);
+            if (progress <= 0f) return;
+
+            _bpWorldCached = false;
+            _bpBoneWorld.Clear();
+            PruneRecords(maid);
+
+            foreach (SkinnedMeshRenderer smr in CollectTargetRenderers(maid))
+            {
+                if (smr?.sharedMesh == null) continue;
+                if (ClassifyMesh(smr) != MeshMorphClass.Body) continue;
+                if (TryCacheBindPoseWorldRef(smr)) break;
+            }
+
+            foreach (TBodySkin skin in toProcess)
+                ApplyToBodySkin(maid, skin, progress);
+        }
+
+        static Maid FindMaidForBodySkin(TBodySkin skin)
+        {
+            if (skin == null) return null;
+
+            var cm = GameMain.Instance?.CharacterMgr;
+            if (object.ReferenceEquals(cm, null)) return null;
+
+            int cnt = cm.GetMaidCount();
+            for (int i = 0; i < cnt; i++)
+            {
+                Maid maid = cm.GetMaid(i);
+                if (maid == null || maid.body0 == null || maid.body0.goSlot == null) continue;
+
+                for (int si = 0; si < maid.body0.goSlot.Count; si++)
+                {
+                    TBodySkin slot = maid.body0.goSlot[si];
+                    if (object.ReferenceEquals(slot, skin)) return maid;
+                    if (slot != null && object.ReferenceEquals(slot.morph, skin.morph)) return maid;
+                }
+            }
+
+            return null;
+        }
+
+        static void ApplyToBodySkin(Maid maid, TBodySkin skin, float progress)
+        {
+            if (maid == null || skin == null || skin.obj == null) return;
+
+            List<SkinnedMeshRenderer> targetSmrs = new List<SkinnedMeshRenderer>();
+            HashSet<int> seenRenderers = new HashSet<int>();
+            AddRenderers(skin.obj.transform, targetSmrs, seenRenderers);
+
+            HashSet<int> appliedMeshIds = new HashSet<int>();
+            foreach (SkinnedMeshRenderer smr in targetSmrs)
+            {
+                if (smr?.sharedMesh == null) continue;
+
+                MeshMorphClass meshClass = ClassifyMesh(smr);
+                if (meshClass == MeshMorphClass.Ignore) continue;
+                if (!smr.gameObject.activeInHierarchy) continue;
+
+                int meshId = smr.sharedMesh.GetInstanceID();
+                if (!appliedMeshIds.Add(meshId)) continue;
+
+                ApplySMR(maid, smr, progress, meshClass, false);
+            }
         }
 
         public static void RequestCurrentMeshRefresh(Maid maid)
@@ -825,21 +929,26 @@ namespace COM3D2.Pregnancy.Plugin
 
             records.RemoveAll(r => r.SMR == smr && r.Mesh != mesh);
             MeshRecord rec = records.Find(r => r.SMR == smr && r.Mesh == mesh);
+            Vector3[] currentVerts = mesh.vertices;
+            Vector3[] currentNormals = mesh.normals;
             if (rec == null)
             {
                 rec = new MeshRecord
                 {
                     SMR = smr,
                     Mesh = mesh,
-                    OrigVerts = (Vector3[])mesh.vertices.Clone(),
-                    OrigNormals = (Vector3[])mesh.normals.Clone(),
+                    OrigVerts = (Vector3[])currentVerts.Clone(),
+                    OrigNormals = (Vector3[])currentNormals.Clone(),
                 };
                 records.Add(rec);
             }
-            else if (refreshBase)
+
+            rec.OrigVerts = (Vector3[])currentVerts.Clone();
+            rec.OrigNormals = (Vector3[])currentNormals.Clone();
+            if (refreshBase)
             {
-                rec.OrigVerts = (Vector3[])mesh.vertices.Clone();
-                rec.OrigNormals = (Vector3[])mesh.normals.Clone();
+                rec.LastDeltaVerts = null;
+                rec.AppliedSignature = 0;
             }
 
             bool[] mask = BuildVertexMask(smr, rec, meshClass);
@@ -880,9 +989,15 @@ namespace COM3D2.Pregnancy.Plugin
 
             string frameSource = stats.EllipsoidVerts > 0 ? "bindpose-skin" : "bindpose-skin-zero";
 
-            rec.AppliedSignature = ComputeVertexSignature(newVerts);
-            mesh.vertices = newVerts;
-            ApplySmoothedNormals(mesh, rec, newVerts);
+            Vector3[] deltaVerts = BuildDeltaVerts(rec.OrigVerts, newVerts);
+            Vector3[] appliedVerts = AddDeltaVerts(mesh.vertices, deltaVerts);
+            if (appliedVerts == null)
+                appliedVerts = newVerts;
+
+            rec.LastDeltaVerts = deltaVerts;
+            rec.AppliedSignature = ComputeVertexSignature(appliedVerts);
+            mesh.vertices = appliedVerts;
+            ApplySmoothedNormals(mesh, rec, appliedVerts);
             mesh.RecalculateBounds();
 
             LogMorphApply(
@@ -1213,6 +1328,28 @@ namespace COM3D2.Pregnancy.Plugin
             }
 
             return true;
+        }
+
+        static Vector3[] BuildDeltaVerts(Vector3[] baseVerts, Vector3[] newVerts)
+        {
+            if (baseVerts == null || newVerts == null || baseVerts.Length != newVerts.Length)
+                return null;
+
+            Vector3[] delta = new Vector3[baseVerts.Length];
+            for (int i = 0; i < delta.Length; i++)
+                delta[i] = newVerts[i] - baseVerts[i];
+            return delta;
+        }
+
+        static Vector3[] AddDeltaVerts(Vector3[] currentVerts, Vector3[] deltaVerts)
+        {
+            if (currentVerts == null || deltaVerts == null || currentVerts.Length != deltaVerts.Length)
+                return null;
+
+            Vector3[] result = new Vector3[currentVerts.Length];
+            for (int i = 0; i < currentVerts.Length; i++)
+                result[i] = currentVerts[i] + deltaVerts[i];
+            return result;
         }
 
         static Vector3 SculptBaseShapeWorld(
@@ -1796,6 +1933,7 @@ namespace COM3D2.Pregnancy.Plugin
                 CrossLayerGuardMesh entry = meshes[i];
                 if (!entry.Changed) continue;
 
+                entry.Record.LastDeltaVerts = BuildDeltaVerts(entry.Record.OrigVerts, entry.CurrentVerts);
                 entry.Record.AppliedSignature = ComputeVertexSignature(entry.CurrentVerts);
                 entry.Mesh.vertices = entry.CurrentVerts;
                 ApplySmoothedNormals(entry.Mesh, entry.Record, entry.CurrentVerts);
@@ -2184,6 +2322,22 @@ namespace COM3D2.Pregnancy.Plugin
             }
         }
 
+        public static int GetCurrentMeshSignature(Maid maid)
+        {
+            if (maid == null) return 0;
+
+            unchecked
+            {
+                int hash = 17;
+                foreach (SkinnedMeshRenderer smr in CollectRelevantRenderers(maid))
+                {
+                    hash = hash * 31 + GetRendererKey(smr);
+                    hash = hash * 31 + ComputeMeshSignature(smr);
+                }
+                return hash;
+            }
+        }
+
         static int ComputeVisibilitySignature(List<SkinnedMeshRenderer> renderers)
         {
             unchecked
@@ -2205,26 +2359,6 @@ namespace COM3D2.Pregnancy.Plugin
                     hash = hash * 31 + (smr.gameObject.activeInHierarchy ? 1 : 0);
                 }
                 return hash;
-            }
-        }
-
-        static void RestoreRecordedMeshesIfStillApplied(Maid maid)
-        {
-            if (maid == null) return;
-
-            int key = maid.GetHashCode();
-            if (!_records.TryGetValue(key, out var records)) return;
-
-            foreach (MeshRecord rec in records)
-            {
-                if (rec?.SMR == null || rec.Mesh == null || rec.OrigVerts == null) continue;
-                if (rec.SMR.sharedMesh == null || rec.SMR.sharedMesh != rec.Mesh) continue;
-                if (rec.AppliedSignature == 0) continue;
-                if (ComputeMeshSignature(rec.SMR) != rec.AppliedSignature) continue;
-
-                rec.Mesh.vertices = rec.OrigVerts;
-                rec.Mesh.normals = rec.OrigNormals;
-                rec.Mesh.RecalculateBounds();
             }
         }
 
@@ -2409,7 +2543,6 @@ namespace COM3D2.Pregnancy.Plugin
 
                         _needsFullRefresh = false;
                         _needsProgressReapply = false;
-                        RestoreRecordedMeshesIfStillApplied(_maid);
                         ForgetRecords(_maid);
                         PruneRecords(_maid);
 
@@ -2433,6 +2566,12 @@ namespace COM3D2.Pregnancy.Plugin
 
                 _isMorphing = false;
             }
+
+            void LateUpdate()
+            {
+                if (_maid == null) return;
+                BellyMorphController.FlushMorphDirty(_maid);
+            }
         }
-}
+    }
 }

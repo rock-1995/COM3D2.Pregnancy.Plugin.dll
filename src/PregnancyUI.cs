@@ -16,6 +16,7 @@ namespace COM3D2.Pregnancy.Plugin
         private Maid _curMaid = null;
         private bool _curPreg = false;
         private float _curProg = 0f;
+        private float _curCycle = 0f;
 
         private bool _dropOpen = false;
         private Rect _dropRect;
@@ -126,6 +127,7 @@ namespace COM3D2.Pregnancy.Plugin
             {
                 _curPreg = newPreg;
                 PregnancyManager.SetPregnant(_curMaid, _curPreg);
+                _curCycle = PregnancyManager.EnsureCycleProgress(_curMaid);
             }
             y += 28f;
 
@@ -140,6 +142,29 @@ namespace COM3D2.Pregnancy.Plugin
             {
                 _curProg = (float)System.Math.Round(newProg, 3);
                 PregnancyManager.SetProgress(_curMaid, _curProg);
+            }
+            y += 26f;
+
+            FertilityCycleMode mode = PregnancyManager.GetCycleMode();
+            int cycleLength = PregnancyManager.GetCycleLength(mode);
+            if (cycleLength > 0)
+            {
+                int cycleDay = PregnancyManager.GetCycleDay(_curCycle, cycleLength);
+                GUI.Label(new Rect(x, y, w, 18f),
+                    string.Format("Cycle Coefficient: {0:F3}  (day {1}/{2})", _curCycle, cycleDay, cycleLength));
+            }
+            else
+            {
+                GUI.Label(new Rect(x, y, w, 18f),
+                    string.Format("Cycle Coefficient: {0:F3}", _curCycle));
+            }
+            y += 20f;
+
+            float newCycle = GUI.HorizontalSlider(new Rect(x, y, w, 18f), _curCycle, 0f, 1f);
+            if (Mathf.Abs(newCycle - _curCycle) > 0.0005f)
+            {
+                _curCycle = (float)System.Math.Round(newCycle, 3);
+                PregnancyManager.SetCycleProgress(_curMaid, _curCycle);
             }
             y += 26f;
 
@@ -264,6 +289,7 @@ namespace COM3D2.Pregnancy.Plugin
                     _curMaid = _maids[i];
                     _curPreg = PregnancyManager.GetPregnant(_curMaid);
                     _curProg = PregnancyManager.GetProgress(_curMaid);
+                    _curCycle = PregnancyManager.EnsureCycleProgress(_curMaid);
                     _dropOpen = false;
                 }
             }
@@ -293,6 +319,7 @@ namespace COM3D2.Pregnancy.Plugin
                 _curMaid = _maids[0];
                 _curPreg = PregnancyManager.GetPregnant(_curMaid);
                 _curProg = PregnancyManager.GetProgress(_curMaid);
+                _curCycle = PregnancyManager.EnsureCycleProgress(_curMaid);
             }
         }
 

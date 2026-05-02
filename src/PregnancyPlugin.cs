@@ -16,6 +16,7 @@ namespace COM3D2.Pregnancy.Plugin
         internal static ConfigEntry<KeyCode> CfgToggleKey;
         internal static ConfigEntry<int> CfgPregnancyWeeks;
         internal static ConfigEntry<float> CfgFertilityRate;
+        internal static ConfigEntry<FertilityCycleMode> CfgCycleMode;
         internal static ConfigEntry<MorphTriggerMode> CfgMorphTriggerMode;
         internal static ConfigEntry<bool> CfgDebugMeshLogging;
 
@@ -33,6 +34,10 @@ namespace COM3D2.Pregnancy.Plugin
             CfgFertilityRate = Config.Bind(
                 "General", "Fertility Rate", 0.3f,
                 "Base probability of conception per creampie (0.00 - 1.00).");
+
+            CfgCycleMode = Config.Bind(
+                "General", "Fertility Cycle Mode", FertilityCycleMode.Simple,
+                "Simple uses the fixed fertility rate on creampie. SevenDay and TwentyEightDay use cycle timing at day end.");
 
             CfgMorphTriggerMode = Config.Bind(
                 "General", "Morph Trigger Mode", MorphTriggerMode.ManualOnly,
@@ -65,5 +70,6 @@ namespace COM3D2.Pregnancy.Plugin
             gameObject.AddComponent<SceneAutoApply>();
             Logger.LogInfo($"{PluginName} {PluginVersion} loaded.");
         }
+
     }
 }
