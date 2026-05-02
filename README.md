@@ -4,22 +4,14 @@ To make something similar to KKpregnancy
 
 Features so far:
 
-F1 → "COM3D2 Pregnancy" → Change hotkey, pregnancy time period and fertility rate
+F1 → "COM3D2 Pregnancy" → Change hotkey, pregnancy time period, fertility rate and mode.
 
-**F8 **（hotkey by defaut）to activate UI
+**F8 **（hotkey by defaut）to activate Ui
 
-In UI, you can check/set pregnancy of character at this scene.
+In UI, you can check/set pregnancy of character at this scene, and change progress of pregnancy or time of a life cycle, and a set of parameters to change belly shape.
 
-I took some ideas from AddYotogiSlider of asyetriec. Thanks to asyetriec.
-Just started a few days ago. 
+Specially added something to keep pregnant belly with AddYotogiSlider working.
 
-On going:
+I took some ideas from AddYotogiSlider of asyetriec, and PregnancyPlus from thojmr. Thanks them.
 
-Better visual for pregnancy.(learned lot from pregnancyplus)
-
-
-For my next plan:
-
-A realistic detailed period based fetility rate change.
-
-What happens in the end. A real birth scene seems too difficult for me.
+I feel like it's almost done. I'll optimize a few things.
