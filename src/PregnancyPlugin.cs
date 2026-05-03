@@ -40,7 +40,7 @@ namespace COM3D2.Pregnancy.Plugin
                 "Simple uses the fixed fertility rate on creampie. SevenDay and TwentyEightDay use cycle timing at day end.");
 
             CfgMorphTriggerMode = Config.Bind(
-                "General", "Morph Trigger Mode", MorphTriggerMode.ManualOnly,
+                "General", "Morph Trigger Mode", MorphTriggerMode.VisibilityChange,
                 "When belly morphs are refreshed: ManualOnly or VisibilityChange.");
 
             CfgDebugMeshLogging = Config.Bind(

@@ -53,6 +53,7 @@ namespace COM3D2.Pregnancy.Plugin
             BellyMorphController.InflationMoveZ = Settings.bellyInflationMoveZ;
             BellyMorphController.InflationStretchX = Settings.bellyInflationStretchX;
             BellyMorphController.InflationStretchY = Settings.bellyInflationStretchY;
+            BellyMorphController.InflationStretchZ = Settings.bellyInflationStretchZ;
             BellyMorphController.InflationShiftY = Settings.bellyInflationShiftY;
             BellyMorphController.InflationShiftZ = Settings.bellyInflationShiftZ;
             BellyMorphController.InflationTaperY = Settings.bellyInflationTaperY;
@@ -68,6 +69,7 @@ namespace COM3D2.Pregnancy.Plugin
             BellyMorphController.RegionRadiusUp = Settings.bellyRegionRadiusUp;
             BellyMorphController.RegionRadiusDown = Settings.bellyRegionRadiusDown;
             BellyMorphController.ThighGuardSpeed = Settings.bellyThighGuardSpeed;
+            BellyMorphController.InnerThighGuardStrength = Settings.bellyInnerThighGuardStrength;
             BellyMorphController.TopEdgeTaper = Settings.bellyTopEdgeTaper;
             BellyMorphController.BottomEdgeTaper = Settings.bellyBottomEdgeTaper;
             BellyMorphController.SideSmoothWidth = Settings.bellySideSmoothWidth;
@@ -91,6 +93,7 @@ namespace COM3D2.Pregnancy.Plugin
             Settings.bellyInflationMoveZ = BellyMorphController.InflationMoveZ;
             Settings.bellyInflationStretchX = BellyMorphController.InflationStretchX;
             Settings.bellyInflationStretchY = BellyMorphController.InflationStretchY;
+            Settings.bellyInflationStretchZ = BellyMorphController.InflationStretchZ;
             Settings.bellyInflationShiftY = BellyMorphController.InflationShiftY;
             Settings.bellyInflationShiftZ = BellyMorphController.InflationShiftZ;
             Settings.bellyInflationTaperY = BellyMorphController.InflationTaperY;
@@ -106,6 +109,7 @@ namespace COM3D2.Pregnancy.Plugin
             Settings.bellyRegionRadiusUp = BellyMorphController.RegionRadiusUp;
             Settings.bellyRegionRadiusDown = BellyMorphController.RegionRadiusDown;
             Settings.bellyThighGuardSpeed = BellyMorphController.ThighGuardSpeed;
+            Settings.bellyInnerThighGuardStrength = BellyMorphController.InnerThighGuardStrength;
             Settings.bellyTopEdgeTaper = BellyMorphController.TopEdgeTaper;
             Settings.bellyBottomEdgeTaper = BellyMorphController.BottomEdgeTaper;
             Settings.bellySideSmoothWidth = BellyMorphController.SideSmoothWidth;
@@ -218,7 +222,18 @@ namespace COM3D2.Pregnancy.Plugin
 
                 bool pregnant = GetPregnant(m);
                 if (pregnant)
-                    SetProgress(m, Mathf.Clamp01(GetProgress(m) + inc));
+                {
+                    float newProgress = GetProgress(m) + inc;
+                    if (newProgress >= 1f)
+                    {
+                        SetProgress(m, newProgress - 1f);
+                        SetPregnant(m, false);
+                    }
+                    else
+                    {
+                        SetProgress(m, newProgress);
+                    }
+                }
 
                 if (cyclic)
                 {
@@ -300,7 +315,7 @@ namespace COM3D2.Pregnancy.Plugin
             return (targetDay - 1f) / cycleLength;
         }
 
-        static bool TryParseFloat(string text, out float value)
+        internal static bool TryParseFloat(string text, out float value)
         {
             return float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value)
                 || float.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value);

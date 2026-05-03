@@ -11,6 +11,8 @@ namespace COM3D2.Pregnancy.Plugin
         static MethodInfo _set;
         static bool       _initialized;
         static bool       _available;
+        static readonly BepInEx.Logging.ManualLogSource _log =
+            BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
 
         static bool Init()
         {
@@ -84,6 +86,6 @@ namespace COM3D2.Pregnancy.Plugin
         }
 
         static void Log(string msg)
-            => BepInEx.Logging.Logger.CreateLogSource("Pregnancy").LogInfo("[Pregnancy] " + msg);
+            => _log.LogInfo("[Pregnancy] " + msg);
     }
 }

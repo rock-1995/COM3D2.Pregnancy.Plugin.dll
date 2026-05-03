@@ -7,7 +7,7 @@ namespace COM3D2.Pregnancy.Plugin
     public class PregnancyUI : MonoBehaviour
     {
         private bool _visible = false;
-        private Rect _win = new Rect(120, 120, 420, 1020);
+        private Rect _win = new Rect(120, 120, 440, 800);
         private int _winId;
 
         private readonly List<Maid> _maids = new List<Maid>();
@@ -20,12 +20,14 @@ namespace COM3D2.Pregnancy.Plugin
 
         private bool _dropOpen = false;
         private Rect _dropRect;
+        private Vector2 _scrollPos = Vector2.zero;
 
-        private string _sInflationMultiplier = "0.17";
+        private string _sInflationMultiplier = "0";
         private string _sInflationMoveY = "0.025";
         private string _sInflationMoveZ = "0";
         private string _sInflationStretchX = "-0.2";
         private string _sInflationStretchY = "0";
+        private string _sInflationStretchZ = "0.13";
         private string _sInflationShiftY = "0.04";
         private string _sInflationShiftZ = "-0.3";
         private string _sInflationTaperY = "-0.03";
@@ -37,12 +39,13 @@ namespace COM3D2.Pregnancy.Plugin
         private string _sInflationFatFoldGap = "0";
         private string _sRegionRadiusSide = "0.22";
         private string _sRegionRadiusFront = "0.22";
-        private string _sRegionRadiusBack = "0.1";
+        private string _sRegionRadiusBack = "0.13";
         private string _sRegionRadiusUp = "0.26";
-        private string _sRegionRadiusDown = "0.14";
+        private string _sRegionRadiusDown = "0.18";
         private string _sThighGuardSpeed = "4";
+        private string _sInnerThighGuardStrength = "1";
         private string _sTopEdgeTaper = "-1";
-        private string _sBottomEdgeTaper = "-0.1";
+        private string _sBottomEdgeTaper = "0";
         private string _sSideSmoothWidth = "0.8";
         private string _sSideSmoothStrength = "1.4";
         private string _sBreastGuardStrength = "1";
@@ -51,10 +54,10 @@ namespace COM3D2.Pregnancy.Plugin
         private string _sOuterClothLayerGuard = "0";
         private string _sInnerClothOffset = "0";
         private string _sOuterClothOffset = "0";
-        private string _sClothThicknessPreserve = "0";
+        private string _sClothThicknessPreserve = "2";
         private string _sClothOffsetSideRatio = "0";
         private string _sClothBackOffsetBoost = "0";
-        private string _sClothDepthStretch = "0.8";
+        private string _sClothDepthStretch = "3";
 
         void Awake()
         {
@@ -92,7 +95,19 @@ namespace COM3D2.Pregnancy.Plugin
 
         void DrawWindow(int id)
         {
-            float x = 8f, y = 22f, w = _win.width - 16f;
+            GUI.DragWindow(new Rect(0, 0, _win.width, 20f));
+
+            float scrollBarW = 18f;
+            float contentW = _win.width - scrollBarW;
+            float contentH = 1078f;
+
+            _scrollPos = GUI.BeginScrollView(
+                new Rect(0, 20f, _win.width, _win.height - 20f),
+                _scrollPos,
+                new Rect(0, 0, contentW, contentH)
+            );
+
+            float x = 8f, y = 4f, w = contentW - 16f;
             float lw = 185f;
             float fx = x + lw + 2f;
             float fw = w - lw - 4f;
@@ -118,7 +133,7 @@ namespace COM3D2.Pregnancy.Plugin
             if (_curMaid == null)
             {
                 GUI.Label(new Rect(x, y, w, 18f), "No maid selected.");
-                GUI.DragWindow(new Rect(0, 0, _win.width, 20f));
+                GUI.EndScrollView();
                 return;
             }
 
@@ -176,16 +191,19 @@ namespace COM3D2.Pregnancy.Plugin
             }
             if (GUI.Button(new Rect(x + 118f, y, 80f, 24f), "Reset Belly"))
                 BellyMorphController.Reset(_curMaid);
+            if (GUI.Button(new Rect(x + 206f, y, 130f, 24f), "Reset Defaults"))
+            {
+                BellyMorphController.ResetToDefaults();
+                SyncShapeFieldsFromController();
+            }
             y += 32f;
-
-            GUI.Label(new Rect(x, y, w, 18f), "PregnancyPlus Shape Params");
-            y += 22f;
 
             DrawField(ref y, x, lw, fx, fw, "Multiplier (-2..2)", ref _sInflationMultiplier);
             DrawField(ref y, x, lw, fx, fw, "Move Y", ref _sInflationMoveY);
             DrawField(ref y, x, lw, fx, fw, "Move Z", ref _sInflationMoveZ);
             DrawField(ref y, x, lw, fx, fw, "Stretch X", ref _sInflationStretchX);
             DrawField(ref y, x, lw, fx, fw, "Stretch Y", ref _sInflationStretchY);
+            DrawField(ref y, x, lw, fx, fw, "Stretch Z", ref _sInflationStretchZ);
             DrawField(ref y, x, lw, fx, fw, "Shift Y", ref _sInflationShiftY);
             DrawField(ref y, x, lw, fx, fw, "Shift Z", ref _sInflationShiftZ);
             DrawField(ref y, x, lw, fx, fw, "Taper Y", ref _sInflationTaperY);
@@ -196,16 +214,13 @@ namespace COM3D2.Pregnancy.Plugin
             DrawField(ref y, x, lw, fx, fw, "Fat Fold Height", ref _sInflationFatFoldHeight);
             DrawField(ref y, x, lw, fx, fw, "Fat Fold Gap", ref _sInflationFatFoldGap);
 
-            y += 4f;
-            GUI.Label(new Rect(x, y, w, 18f), "Morph Region Params");
-            y += 22f;
-
             DrawField(ref y, x, lw, fx, fw, "Region Side", ref _sRegionRadiusSide);
             DrawField(ref y, x, lw, fx, fw, "Region Front", ref _sRegionRadiusFront);
             DrawField(ref y, x, lw, fx, fw, "Region Back", ref _sRegionRadiusBack);
             DrawField(ref y, x, lw, fx, fw, "Region Up", ref _sRegionRadiusUp);
             DrawField(ref y, x, lw, fx, fw, "Region Down", ref _sRegionRadiusDown);
             DrawField(ref y, x, lw, fx, fw, "Thigh Guard Speed", ref _sThighGuardSpeed);
+            DrawField(ref y, x, lw, fx, fw, "Inner Thigh Guard", ref _sInnerThighGuardStrength);
             DrawField(ref y, x, lw, fx, fw, "Top Edge Taper", ref _sTopEdgeTaper);
             DrawField(ref y, x, lw, fx, fw, "Bottom Edge Taper", ref _sBottomEdgeTaper);
             DrawField(ref y, x, lw, fx, fw, "Side Smooth Width", ref _sSideSmoothWidth);
@@ -231,6 +246,7 @@ namespace COM3D2.Pregnancy.Plugin
                 log.LogInfo("  InflationMoveZ      = " + BellyMorphController.InflationMoveZ);
                 log.LogInfo("  InflationStretchX   = " + BellyMorphController.InflationStretchX);
                 log.LogInfo("  InflationStretchY   = " + BellyMorphController.InflationStretchY);
+                log.LogInfo("  InflationStretchZ   = " + BellyMorphController.InflationStretchZ);
                 log.LogInfo("  InflationShiftY     = " + BellyMorphController.InflationShiftY);
                 log.LogInfo("  InflationShiftZ     = " + BellyMorphController.InflationShiftZ);
                 log.LogInfo("  InflationTaperY     = " + BellyMorphController.InflationTaperY);
@@ -263,7 +279,7 @@ namespace COM3D2.Pregnancy.Plugin
                 log.LogInfo("=========================");
             }
 
-            GUI.DragWindow(new Rect(0, 0, _win.width, 20f));
+            GUI.EndScrollView();
         }
 
         static void DrawField(ref float y, float x, float lw, float fx, float fw, string label, ref string value)
@@ -330,6 +346,7 @@ namespace COM3D2.Pregnancy.Plugin
             _sInflationMoveZ = FormatShape(BellyMorphController.InflationMoveZ);
             _sInflationStretchX = FormatShape(BellyMorphController.InflationStretchX);
             _sInflationStretchY = FormatShape(BellyMorphController.InflationStretchY);
+            _sInflationStretchZ = FormatShape(BellyMorphController.InflationStretchZ);
             _sInflationShiftY = FormatShape(BellyMorphController.InflationShiftY);
             _sInflationShiftZ = FormatShape(BellyMorphController.InflationShiftZ);
             _sInflationTaperY = FormatShape(BellyMorphController.InflationTaperY);
@@ -345,6 +362,7 @@ namespace COM3D2.Pregnancy.Plugin
             _sRegionRadiusUp = FormatShape(BellyMorphController.RegionRadiusUp);
             _sRegionRadiusDown = FormatShape(BellyMorphController.RegionRadiusDown);
             _sThighGuardSpeed = FormatShape(BellyMorphController.ThighGuardSpeed);
+            _sInnerThighGuardStrength = FormatShape(BellyMorphController.InnerThighGuardStrength);
             _sTopEdgeTaper = FormatShape(BellyMorphController.TopEdgeTaper);
             _sBottomEdgeTaper = FormatShape(BellyMorphController.BottomEdgeTaper);
             _sSideSmoothWidth = FormatShape(BellyMorphController.SideSmoothWidth);
@@ -361,49 +379,45 @@ namespace COM3D2.Pregnancy.Plugin
             _sClothDepthStretch = FormatShape(BellyMorphController.ClothDepthStretch);
         }
 
-        static bool TryParseShape(string text, out float value)
-        {
-            return float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value)
-                || float.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value);
-        }
-
         void ApplyShapeFieldsToController()
         {
             float v;
-            if (TryParseShape(_sInflationMultiplier, out v)) BellyMorphController.InflationMultiplier = v;
-            if (TryParseShape(_sInflationMoveY, out v)) BellyMorphController.InflationMoveY = v;
-            if (TryParseShape(_sInflationMoveZ, out v)) BellyMorphController.InflationMoveZ = v;
-            if (TryParseShape(_sInflationStretchX, out v)) BellyMorphController.InflationStretchX = v;
-            if (TryParseShape(_sInflationStretchY, out v)) BellyMorphController.InflationStretchY = v;
-            if (TryParseShape(_sInflationShiftY, out v)) BellyMorphController.InflationShiftY = v;
-            if (TryParseShape(_sInflationShiftZ, out v)) BellyMorphController.InflationShiftZ = v;
-            if (TryParseShape(_sInflationTaperY, out v)) BellyMorphController.InflationTaperY = v;
-            if (TryParseShape(_sInflationTaperZ, out v)) BellyMorphController.InflationTaperZ = v;
-            if (TryParseShape(_sInflationRoundness, out v)) BellyMorphController.InflationRoundness = v;
-            if (TryParseShape(_sInflationDrop, out v)) BellyMorphController.InflationDrop = v;
-            if (TryParseShape(_sInflationFatFold, out v)) BellyMorphController.InflationFatFold = v;
-            if (TryParseShape(_sInflationFatFoldHeight, out v)) BellyMorphController.InflationFatFoldHeight = v;
-            if (TryParseShape(_sInflationFatFoldGap, out v)) BellyMorphController.InflationFatFoldGap = v;
-            if (TryParseShape(_sRegionRadiusSide, out v)) BellyMorphController.RegionRadiusSide = v;
-            if (TryParseShape(_sRegionRadiusFront, out v)) BellyMorphController.RegionRadiusFront = v;
-            if (TryParseShape(_sRegionRadiusBack, out v)) BellyMorphController.RegionRadiusBack = v;
-            if (TryParseShape(_sRegionRadiusUp, out v)) BellyMorphController.RegionRadiusUp = v;
-            if (TryParseShape(_sRegionRadiusDown, out v)) BellyMorphController.RegionRadiusDown = v;
-            if (TryParseShape(_sThighGuardSpeed, out v)) BellyMorphController.ThighGuardSpeed = v;
-            if (TryParseShape(_sTopEdgeTaper, out v)) BellyMorphController.TopEdgeTaper = v;
-            if (TryParseShape(_sBottomEdgeTaper, out v)) BellyMorphController.BottomEdgeTaper = v;
-            if (TryParseShape(_sSideSmoothWidth, out v)) BellyMorphController.SideSmoothWidth = v;
-            if (TryParseShape(_sSideSmoothStrength, out v)) BellyMorphController.SideSmoothStrength = v;
-            if (TryParseShape(_sBreastGuardStrength, out v)) BellyMorphController.BreastGuardStrength = v;
-            if (TryParseShape(_sOuterClothPregnancyScale, out v)) BellyMorphController.OuterClothPregnancyScale = v;
+            if (PregnancyManager.TryParseFloat(_sInflationMultiplier, out v)) BellyMorphController.InflationMultiplier = v;
+            if (PregnancyManager.TryParseFloat(_sInflationMoveY, out v)) BellyMorphController.InflationMoveY = v;
+            if (PregnancyManager.TryParseFloat(_sInflationMoveZ, out v)) BellyMorphController.InflationMoveZ = v;
+            if (PregnancyManager.TryParseFloat(_sInflationStretchX, out v)) BellyMorphController.InflationStretchX = v;
+            if (PregnancyManager.TryParseFloat(_sInflationStretchY, out v)) BellyMorphController.InflationStretchY = v;
+            if (PregnancyManager.TryParseFloat(_sInflationStretchZ, out v)) BellyMorphController.InflationStretchZ = v;
+            if (PregnancyManager.TryParseFloat(_sInflationShiftY, out v)) BellyMorphController.InflationShiftY = v;
+            if (PregnancyManager.TryParseFloat(_sInflationShiftZ, out v)) BellyMorphController.InflationShiftZ = v;
+            if (PregnancyManager.TryParseFloat(_sInflationTaperY, out v)) BellyMorphController.InflationTaperY = v;
+            if (PregnancyManager.TryParseFloat(_sInflationTaperZ, out v)) BellyMorphController.InflationTaperZ = v;
+            if (PregnancyManager.TryParseFloat(_sInflationRoundness, out v)) BellyMorphController.InflationRoundness = v;
+            if (PregnancyManager.TryParseFloat(_sInflationDrop, out v)) BellyMorphController.InflationDrop = v;
+            if (PregnancyManager.TryParseFloat(_sInflationFatFold, out v)) BellyMorphController.InflationFatFold = v;
+            if (PregnancyManager.TryParseFloat(_sInflationFatFoldHeight, out v)) BellyMorphController.InflationFatFoldHeight = v;
+            if (PregnancyManager.TryParseFloat(_sInflationFatFoldGap, out v)) BellyMorphController.InflationFatFoldGap = v;
+            if (PregnancyManager.TryParseFloat(_sRegionRadiusSide, out v)) BellyMorphController.RegionRadiusSide = v;
+            if (PregnancyManager.TryParseFloat(_sRegionRadiusFront, out v)) BellyMorphController.RegionRadiusFront = v;
+            if (PregnancyManager.TryParseFloat(_sRegionRadiusBack, out v)) BellyMorphController.RegionRadiusBack = v;
+            if (PregnancyManager.TryParseFloat(_sRegionRadiusUp, out v)) BellyMorphController.RegionRadiusUp = v;
+            if (PregnancyManager.TryParseFloat(_sRegionRadiusDown, out v)) BellyMorphController.RegionRadiusDown = v;
+            if (PregnancyManager.TryParseFloat(_sThighGuardSpeed, out v)) BellyMorphController.ThighGuardSpeed = v;
+            if (PregnancyManager.TryParseFloat(_sInnerThighGuardStrength, out v)) BellyMorphController.InnerThighGuardStrength = v;
+            if (PregnancyManager.TryParseFloat(_sTopEdgeTaper, out v)) BellyMorphController.TopEdgeTaper = v;
+            if (PregnancyManager.TryParseFloat(_sBottomEdgeTaper, out v)) BellyMorphController.BottomEdgeTaper = v;
+            if (PregnancyManager.TryParseFloat(_sSideSmoothWidth, out v)) BellyMorphController.SideSmoothWidth = v;
+            if (PregnancyManager.TryParseFloat(_sSideSmoothStrength, out v)) BellyMorphController.SideSmoothStrength = v;
+            if (PregnancyManager.TryParseFloat(_sBreastGuardStrength, out v)) BellyMorphController.BreastGuardStrength = v;
+            if (PregnancyManager.TryParseFloat(_sOuterClothPregnancyScale, out v)) BellyMorphController.OuterClothPregnancyScale = v;
             BellyMorphController.OuterClothSkirtDrape = _outerClothSkirtDrape;
-            if (TryParseShape(_sOuterClothLayerGuard, out v)) BellyMorphController.OuterClothLayerGuard = v;
-            if (TryParseShape(_sInnerClothOffset, out v)) BellyMorphController.InnerClothOffset = v;
-            if (TryParseShape(_sOuterClothOffset, out v)) BellyMorphController.OuterClothOffset = v;
-            if (TryParseShape(_sClothThicknessPreserve, out v)) BellyMorphController.ClothThicknessPreserve = v;
-            if (TryParseShape(_sClothOffsetSideRatio, out v)) BellyMorphController.ClothOffsetSideRatio = v;
-            if (TryParseShape(_sClothBackOffsetBoost, out v)) BellyMorphController.ClothBackOffsetBoost = v;
-            if (TryParseShape(_sClothDepthStretch, out v)) BellyMorphController.ClothDepthStretch = v;
+            if (PregnancyManager.TryParseFloat(_sOuterClothLayerGuard, out v)) BellyMorphController.OuterClothLayerGuard = v;
+            if (PregnancyManager.TryParseFloat(_sInnerClothOffset, out v)) BellyMorphController.InnerClothOffset = v;
+            if (PregnancyManager.TryParseFloat(_sOuterClothOffset, out v)) BellyMorphController.OuterClothOffset = v;
+            if (PregnancyManager.TryParseFloat(_sClothThicknessPreserve, out v)) BellyMorphController.ClothThicknessPreserve = v;
+            if (PregnancyManager.TryParseFloat(_sClothOffsetSideRatio, out v)) BellyMorphController.ClothOffsetSideRatio = v;
+            if (PregnancyManager.TryParseFloat(_sClothBackOffsetBoost, out v)) BellyMorphController.ClothBackOffsetBoost = v;
+            if (PregnancyManager.TryParseFloat(_sClothDepthStretch, out v)) BellyMorphController.ClothDepthStretch = v;
         }
 
         public static void TriggerApplyBelly(Maid maid, float progress)

@@ -15,15 +15,16 @@ namespace COM3D2.Pregnancy.Plugin
         const float BaseRadiusDown = 0.21f;
         const float BasePushOut = 1.0f;
         const float NormalAffectedDelta = 0.0002f;
-        const int NormalAffectedExpandPasses = 2;
+        const int NormalAffectedExpandPasses = 4;
 
         public static float SpineLerpT = 1.0f;
         public static float OffsetSide = 0.0f;
-        public static float InflationMultiplier = 0.17f;
+        public static float InflationMultiplier = 0.0f;
         public static float InflationMoveY = 0.025f;
         public static float InflationMoveZ = 0.0f;
         public static float InflationStretchX = -0.2f;
         public static float InflationStretchY = 0.0f;
+        public static float InflationStretchZ = 0.13f;
         public static float InflationShiftY = 0.04f;
         public static float InflationShiftZ = -0.3f;
         public static float InflationTaperY = -0.03f;
@@ -35,12 +36,13 @@ namespace COM3D2.Pregnancy.Plugin
         public static float InflationFatFoldGap = 0.0f;
         public static float RegionRadiusSide = BaseRadiusSide;
         public static float RegionRadiusFront = BaseRadiusFront;
-        public static float RegionRadiusBack = 0.1f;
+        public static float RegionRadiusBack = 0.13f;
         public static float RegionRadiusUp = 0.26f;
-        public static float RegionRadiusDown = 0.14f;
+        public static float RegionRadiusDown = 0.18f;
         public static float ThighGuardSpeed = 4.0f;
+        public static float InnerThighGuardStrength = 1.0f;
         public static float TopEdgeTaper = -1.0f;
-        public static float BottomEdgeTaper = -0.1f;
+        public static float BottomEdgeTaper = 0.0f;
         public static float SideSmoothWidth = 0.8f;
         public static float SideSmoothStrength = 1.4f;
         public static float BreastGuardStrength = 1.0f;
@@ -51,17 +53,17 @@ namespace COM3D2.Pregnancy.Plugin
         public static float OuterClothLayerGuard = 0.0f;
         public static float InnerClothOffset = 0.0f;
         public static float OuterClothOffset = 0.0f;
-        public static float ClothThicknessPreserve = 0.0f;
+        public static float ClothThicknessPreserve = 2.0f;
         public static float ClothOffsetSideRatio = 0.0f;
         public static float ClothBackOffsetBoost = 0.0f;
-        public static float ClothDepthStretch = 0.8f;
+        public static float ClothDepthStretch = 3.0f;
 
         const float BellyEdgeBlend = 0.35f;
 
         static readonly string[] FaceKeywords =
         {
             "face", "head", "eye", "mayu", "tooth", "teeth",
-            "tongue", "lip", "hair", "nose", "ear"
+            "tongue", "lip", "nose", "ear"
         };
 
         static bool IsFaceSlot(string name)
@@ -195,10 +197,51 @@ namespace COM3D2.Pregnancy.Plugin
             if (mon != null) Object.DestroyImmediate(mon);
         }
 
+        public static void ResetToDefaults()
+        {
+            InflationMultiplier       = 0.0f;
+            InflationMoveY            = 0.025f;
+            InflationMoveZ            = 0.0f;
+            InflationStretchX         = -0.2f;
+            InflationStretchY         = 0.0f;
+            InflationStretchZ         = 0.13f;
+            InflationShiftY           = 0.04f;
+            InflationShiftZ           = -0.3f;
+            InflationTaperY           = -0.03f;
+            InflationTaperZ           = -0.05f;
+            InflationRoundness        = 0.03f;
+            InflationDrop             = 0.1f;
+            InflationFatFold          = 0.0f;
+            InflationFatFoldHeight    = 0.0f;
+            InflationFatFoldGap       = 0.0f;
+            RegionRadiusSide          = BaseRadiusSide;
+            RegionRadiusFront         = BaseRadiusFront;
+            RegionRadiusBack          = 0.13f;
+            RegionRadiusUp            = 0.26f;
+            RegionRadiusDown          = 0.18f;
+            ThighGuardSpeed           = 4.0f;
+            InnerThighGuardStrength   = 1.0f;
+            TopEdgeTaper              = -1.0f;
+            BottomEdgeTaper           = 0.0f;
+            SideSmoothWidth           = 0.8f;
+            SideSmoothStrength        = 1.4f;
+            BreastGuardStrength       = 1.0f;
+            OuterClothPregnancyScale  = 1.0f;
+            OuterClothSkirtDrape      = false;
+            OuterClothLayerGuard      = 0.0f;
+            InnerClothOffset          = 0.0f;
+            OuterClothOffset          = 0.0f;
+            ClothThicknessPreserve    = 2.0f;
+            ClothOffsetSideRatio      = 0.0f;
+            ClothBackOffsetBoost      = 0.0f;
+            ClothDepthStretch         = 3.0f;
+        }
+
         static void ResetInternal(Maid maid)
         {
             int key = maid.GetHashCode();
             _activeProgress.Remove(key);
+            _morphDirtySkins.Remove(key);
 
             if (!_records.TryGetValue(key, out var records)) return;
 
@@ -225,11 +268,6 @@ namespace COM3D2.Pregnancy.Plugin
             _records.Remove(key);
         }
 
-        public static void ApplyFromPatch(Maid maid, SkinnedMeshRenderer smr, string slotObjName)
-        {
-            // Mesh load logging stays in HarmonyHooks. Loading a mesh is not a morph trigger here.
-        }
-
         static void ApplyToSlots(Maid maid, float progress, bool includeInactive)
         {
             if (maid == null || maid.body0 == null || maid.body0.goSlot == null) return;
@@ -251,19 +289,28 @@ namespace COM3D2.Pregnancy.Plugin
                 if (smr?.sharedMesh == null) continue;
 
                 MeshMorphClass meshClass = ClassifyMesh(smr);
-                if (meshClass == MeshMorphClass.Ignore) continue;
+                if (meshClass == MeshMorphClass.Ignore)
+                {
+                    if (IsDebugMeshLoggingEnabled() && !IsFaceSlot(GetMeshId(smr)))
+                        _log.LogInfo($"[BellyDiag] unrecognized maid={GetMaidName(maid)}"
+                            + $" id={GetMeshId(smr)}"
+                            + $" verts={smr.sharedMesh.vertexCount}");
+                    continue;
+                }
 
                 AttachNotifier(smr.gameObject, maid);
 
                 bool willApply = includeInactive || smr.gameObject.activeInHierarchy;
-                LogMorphScan(maid, smr, meshClass, includeInactive, willApply);
+                if (IsDebugMeshLoggingEnabled())
+                    LogMorphScan(maid, smr, meshClass, includeInactive, willApply);
 
                 if (willApply)
                 {
                     int meshId = smr.sharedMesh.GetInstanceID();
                     if (!appliedMeshIds.Add(meshId))
                     {
-                        LogMorphSkip(maid, smr, meshClass, "duplicate-shared-mesh");
+                        if (IsDebugMeshLoggingEnabled())
+                            LogMorphSkip(maid, smr, meshClass, "duplicate-shared-mesh");
                         continue;
                     }
 
@@ -382,7 +429,7 @@ namespace COM3D2.Pregnancy.Plugin
             if (string.IsNullOrEmpty(id)) return MeshMorphClass.Ignore;
             if (IsFaceSlot(id)) return MeshMorphClass.Ignore;
             if (id.Contains("moza")) return MeshMorphClass.Ignore;
-            if (ContainsAny(id, "body", "base", "karada")) return MeshMorphClass.Body;
+            if (ContainsAny(id, "body", "base", "karada", "inmou", "nip", "under")) return MeshMorphClass.Body;
             if (ContainsAny(id, "bra", "pants", "psnts", "stkg", "mizugi", "zurashi")) return MeshMorphClass.InnerCloth;
             if (ContainsAny(id, "wear", "onep", "skrt", "zubon", "skirt", "mekure")) return MeshMorphClass.OuterCloth;
 
@@ -943,8 +990,19 @@ namespace COM3D2.Pregnancy.Plugin
                 records.Add(rec);
             }
 
-            rec.OrigVerts = (Vector3[])currentVerts.Clone();
-            rec.OrigNormals = (Vector3[])currentNormals.Clone();
+            // Guard: if current mesh already has our deformation applied, keep the stored
+            // clean base rather than overwriting it with the deformed state.
+            bool alreadyApplied = !refreshBase
+                && rec.LastDeltaVerts != null
+                && rec.AppliedSignature != 0
+                && currentVerts.Length == rec.LastDeltaVerts.Length
+                && ComputeVertexSignature(currentVerts) == rec.AppliedSignature;
+
+            if (!alreadyApplied)
+            {
+                rec.OrigVerts = (Vector3[])currentVerts.Clone();
+                rec.OrigNormals = (Vector3[])currentNormals.Clone();
+            }
             if (refreshBase)
             {
                 rec.LastDeltaVerts = null;
@@ -987,12 +1045,14 @@ namespace COM3D2.Pregnancy.Plugin
                 return;
             }
 
-            string frameSource = stats.EllipsoidVerts > 0 ? "bindpose-skin" : "bindpose-skin-zero";
-
             Vector3[] deltaVerts = BuildDeltaVerts(rec.OrigVerts, newVerts);
-            Vector3[] appliedVerts = AddDeltaVerts(mesh.vertices, deltaVerts);
-            if (appliedVerts == null)
-                appliedVerts = newVerts;
+            // When our delta is already in the mesh (alreadyApplied), newVerts is the correct
+            // target directly (computed from the clean OrigVerts base).  Otherwise accumulate
+            // onto whatever the game left in currentVerts (e.g. after FixBlendValues body-shape
+            // update) so shape-slider changes are not discarded.
+            Vector3[] appliedVerts = alreadyApplied
+                ? newVerts
+                : (AddDeltaVerts(currentVerts, deltaVerts) ?? newVerts);
 
             rec.LastDeltaVerts = deltaVerts;
             rec.AppliedSignature = ComputeVertexSignature(appliedVerts);
@@ -1000,16 +1060,20 @@ namespace COM3D2.Pregnancy.Plugin
             ApplySmoothedNormals(mesh, rec, appliedVerts);
             mesh.RecalculateBounds();
 
-            LogMorphApply(
-                maid,
-                smr,
-                meshClass,
-                frameSource,
-                refreshBase,
-                rec.OrigVerts.Length,
-                progress,
-                effectiveProgress,
-                stats);
+            if (ShouldLogMorphDiagnostics(smr, meshClass))
+            {
+                string frameSource = stats.EllipsoidVerts > 0 ? "bindpose-skin" : "bindpose-skin-zero";
+                LogMorphApply(
+                    maid,
+                    smr,
+                    meshClass,
+                    frameSource,
+                    refreshBase,
+                    rec.OrigVerts.Length,
+                    progress,
+                    effectiveProgress,
+                    stats);
+            }
         }
 
         static bool TryDeformVertsInBindPoseWorld(
@@ -1025,6 +1089,8 @@ namespace COM3D2.Pregnancy.Plugin
             stats = new DeformStats();
             if (!_bpWorldCached) return false;
             if (smr == null || smr.sharedMesh == null || rec == null || rec.OrigVerts == null) return false;
+
+            bool trackStats = IsDebugMeshLoggingEnabled();
 
             BoneWeight[] weights = smr.sharedMesh.boneWeights;
             if (weights == null || weights.Length != rec.OrigVerts.Length) return false;
@@ -1060,7 +1126,7 @@ namespace COM3D2.Pregnancy.Plugin
                 newVerts[i] = vert;
 
                 if (mask != null && (i >= mask.Length || !mask[i])) continue;
-                stats.MaskedVerts++;
+                if (trackStats) stats.MaskedVerts++;
 
                 BoneWeight weight = weights[i];
                 if (!HasValidBoneWeight(weight, boneMatrices)) continue;
@@ -1085,7 +1151,7 @@ namespace COM3D2.Pregnancy.Plugin
                     + (upDot / upRadius) * (upDot / upRadius);
                 if (ellip >= 1f) continue;
 
-                stats.EllipsoidVerts++;
+                if (trackStats) stats.EllipsoidVerts++;
 
                 float edgeRatio = Mathf.Sqrt(ellip);
                 float edgeFade = 1f - BellyEdgeCurve(edgeRatio);
@@ -1106,7 +1172,7 @@ namespace COM3D2.Pregnancy.Plugin
                 float morphWeight = shapeWeight;
                 if (morphWeight <= 0f) continue;
 
-                if (morphWeight > stats.MaxStrength) stats.MaxStrength = morphWeight;
+                if (trackStats && morphWeight > stats.MaxStrength) stats.MaxStrength = morphWeight;
 
                 Vector3 sphereTarget = regionCenter + regionDelta.normalized * directionalRadius;
                 Vector3 newWorldVert = Vector3.Lerp(worldVert, sphereTarget, morphWeight);
@@ -1137,12 +1203,13 @@ namespace COM3D2.Pregnancy.Plugin
 
                 float sx = Mathf.Max(0.05f, 1f + InflationStretchX);
                 float sy = Mathf.Max(0.05f, 1f + InflationStretchY);
-                if (sx != 1f || sy != 1f)
+                float sz = Mathf.Max(0.05f, 1f + InflationStretchZ);
+                if (sx != 1f || sy != 1f || sz != 1f)
                 {
                     Vector3 rel = newWorldVert - regionCenter;
                     float relSide = Vector3.Dot(rel, worldRight) * sx;
                     float relUp = Vector3.Dot(rel, worldUp) * sy;
-                    float relFwd = Vector3.Dot(rel, worldFwd);
+                    float relFwd = Vector3.Dot(rel, worldFwd) * sz;
                     newWorldVert = regionCenter + worldRight * relSide + worldUp * relUp + worldFwd * relFwd;
                 }
 
@@ -1294,15 +1361,22 @@ namespace COM3D2.Pregnancy.Plugin
                 if (breastRestore > 0f)
                     newWorldVert = Vector3.Lerp(newWorldVert, worldVert, breastRestore);
 
+                float innerThighRestore = InnerThighRestoreMask(weight, bones);
+                if (innerThighRestore > 0f)
+                    newWorldVert = Vector3.Lerp(newWorldVert, worldVert, innerThighRestore);
+
                 if (trackOuterClothWorld)
                     clothMorphedWorld[i] = newWorldVert;
 
                 Vector3 newLocalVert = skin.inverse.MultiplyPoint3x4(newWorldVert);
-                float moved = (newLocalVert - vert).magnitude;
-                if (moved > 0.00001f)
+                if (trackStats)
                 {
-                    stats.NonZeroVerts++;
-                    if (moved > stats.MaxDelta) stats.MaxDelta = moved;
+                    float moved = (newLocalVert - vert).magnitude;
+                    if (moved > 0.00001f)
+                    {
+                        stats.NonZeroVerts++;
+                        if (moved > stats.MaxDelta) stats.MaxDelta = moved;
+                    }
                 }
 
                 newVerts[i] = newLocalVert;
@@ -1453,7 +1527,7 @@ namespace COM3D2.Pregnancy.Plugin
             float radiusBack,
             float radiusFront)
         {
-            if (meshClass != MeshMorphClass.OuterCloth) return 0f;
+            if (meshClass == MeshMorphClass.Body || meshClass == MeshMorphClass.Ignore) return 0f;
 
             float strength = Mathf.Max(BreastGuardStrength, 0f);
             if (strength <= 0f) return 0f;
@@ -1494,6 +1568,38 @@ namespace COM3D2.Pregnancy.Plugin
                 || lower.Contains("chichi")
                 || lower.Contains("chikubi")
                 || lower.Contains("nipple");
+        }
+
+        static float InnerThighRestoreMask(BoneWeight weight, Transform[] bones)
+        {
+            float strength = Mathf.Max(InnerThighGuardStrength, 0f);
+            if (strength <= 0f) return 0f;
+
+            float thighWeight = 0f;
+            AddInnerThighBoneWeight(ref thighWeight, bones, weight.boneIndex0, weight.weight0);
+            AddInnerThighBoneWeight(ref thighWeight, bones, weight.boneIndex1, weight.weight1);
+            AddInnerThighBoneWeight(ref thighWeight, bones, weight.boneIndex2, weight.weight2);
+            AddInnerThighBoneWeight(ref thighWeight, bones, weight.boneIndex3, weight.weight3);
+            thighWeight = Mathf.Clamp01(thighWeight);
+            if (thighWeight <= 0f) return 0f;
+
+            return Mathf.Clamp01(thighWeight * 4f * strength);
+        }
+
+        static void AddInnerThighBoneWeight(ref float total, Transform[] bones, int index, float weight)
+        {
+            if (weight <= 0f || bones == null || index < 0 || index >= bones.Length) return;
+            Transform bone = bones[index];
+            if (bone == null || !IsInnerThighBoneName(bone.name)) return;
+            total += weight;
+        }
+
+        static bool IsInnerThighBoneName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            string lower = name.ToLowerInvariant();
+            return lower.Contains("momoniku")
+                || lower.Contains("momotwist");
         }
 
         const int SkirtDrapePropagatePasses = 48;
@@ -2448,16 +2554,8 @@ namespace COM3D2.Pregnancy.Plugin
             Maid _maid;
             bool _isMorphing = false;
             bool _needsFullRefresh = false;
-            bool _needsProgressReapply = false;
 
             public void SetMaid(Maid m) { _maid = m; }
-
-            public void TriggerProgressReapply()
-            {
-                if (_maid == null) return;
-                _needsProgressReapply = true;
-                EnsureRunning();
-            }
 
             public void TriggerFullRefresh()
             {
@@ -2474,7 +2572,7 @@ namespace COM3D2.Pregnancy.Plugin
 
             bool HasPendingWork()
             {
-                return _needsFullRefresh || _needsProgressReapply;
+                return _needsFullRefresh;
             }
 
             bool AreTrackedRenderersStable(List<SkinnedMeshRenderer> renderers, Dictionary<int, int> previous)
@@ -2542,7 +2640,6 @@ namespace COM3D2.Pregnancy.Plugin
                         if (_maid == null) break;
 
                         _needsFullRefresh = false;
-                        _needsProgressReapply = false;
                         ForgetRecords(_maid);
                         PruneRecords(_maid);
 
@@ -2551,16 +2648,6 @@ namespace COM3D2.Pregnancy.Plugin
                             ApplyToSlots(_maid, pFull, false);
 
                         continue;
-                    }
-
-                    if (_needsProgressReapply)
-                    {
-                        _needsProgressReapply = false;
-                        PruneRecords(_maid);
-
-                        float p = GetActiveProgress(_maid);
-                        if (p > 0f)
-                            ApplyToSlots(_maid, p, false);
                     }
                 }
 
