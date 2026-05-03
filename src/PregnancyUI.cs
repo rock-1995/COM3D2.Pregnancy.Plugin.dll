@@ -33,7 +33,7 @@ namespace COM3D2.Pregnancy.Plugin
         private string _sInflationTaperY = "-0.03";
         private string _sInflationTaperZ = "-0.05";
         private string _sInflationRoundness = "0.03";
-        private string _sInflationDrop = "0.1";
+        private string _sInflationDrop = "0.2";
         private string _sInflationFatFold = "0";
         private string _sInflationFatFoldHeight = "0";
         private string _sInflationFatFoldGap = "0";
@@ -53,11 +53,16 @@ namespace COM3D2.Pregnancy.Plugin
         private bool _outerClothSkirtDrape = false;
         private string _sOuterClothLayerGuard = "0";
         private string _sInnerClothOffset = "0";
-        private string _sOuterClothOffset = "0";
-        private string _sClothThicknessPreserve = "2";
+        private string _sOuterClothOffset = "0.006";
+        private string _sClothThicknessPreserve = "3";
         private string _sClothOffsetSideRatio = "0";
         private string _sClothBackOffsetBoost = "0";
-        private string _sClothDepthStretch = "3";
+        private string _sClothDepthStretch = "4";
+        private string _sOuterClothLowerFrontGuard  = "0";
+        private string _sClothDeformSmoothPasses     = "8";
+        private string _sClothDeformSmoothStrength   = "0.6";
+        private string _sClothDeformSmoothThreshold  = "60";
+        private string _sClothDeformSmoothRings      = "2";
 
         void Awake()
         {
@@ -99,7 +104,7 @@ namespace COM3D2.Pregnancy.Plugin
 
             float scrollBarW = 18f;
             float contentW = _win.width - scrollBarW;
-            float contentH = 1078f;
+            float contentH = 1202f;
 
             _scrollPos = GUI.BeginScrollView(
                 new Rect(0, 20f, _win.width, _win.height - 20f),
@@ -236,6 +241,11 @@ namespace COM3D2.Pregnancy.Plugin
             DrawField(ref y, x, lw, fx, fw, "Cloth Side Offset Ratio", ref _sClothOffsetSideRatio);
             DrawField(ref y, x, lw, fx, fw, "Cloth Back Offset Boost", ref _sClothBackOffsetBoost);
             DrawField(ref y, x, lw, fx, fw, "Cloth Depth Stretch", ref _sClothDepthStretch);
+            DrawField(ref y, x, lw, fx, fw, "OuterCloth Lower Front Guard", ref _sOuterClothLowerFrontGuard);
+            DrawField(ref y, x, lw, fx, fw, "Cloth Deform Smooth Passes",     ref _sClothDeformSmoothPasses);
+            DrawField(ref y, x, lw, fx, fw, "Cloth Deform Smooth Strength",   ref _sClothDeformSmoothStrength);
+            DrawField(ref y, x, lw, fx, fw, "Cloth Deform Smooth Threshold",  ref _sClothDeformSmoothThreshold);
+            DrawField(ref y, x, lw, fx, fw, "Cloth Deform Smooth Rings",      ref _sClothDeformSmoothRings);
 
             if (GUI.Button(new Rect(x, y, 120f, 22f), "Log to BepInEx"))
             {
@@ -276,6 +286,11 @@ namespace COM3D2.Pregnancy.Plugin
                 log.LogInfo("  ClothOffsetSideRatio = " + BellyMorphController.ClothOffsetSideRatio);
                 log.LogInfo("  ClothBackOffsetBoost = " + BellyMorphController.ClothBackOffsetBoost);
                 log.LogInfo("  ClothDepthStretch   = " + BellyMorphController.ClothDepthStretch);
+                log.LogInfo("  OuterClothLowerFrontGuard  = " + BellyMorphController.OuterClothLowerFrontGuard);
+                log.LogInfo("  ClothDeformSmoothPasses     = " + BellyMorphController.ClothDeformSmoothPasses);
+                log.LogInfo("  ClothDeformSmoothStrength   = " + BellyMorphController.ClothDeformSmoothStrength);
+                log.LogInfo("  ClothDeformSmoothThreshold  = " + BellyMorphController.ClothDeformSmoothThreshold);
+                log.LogInfo("  ClothDeformSmoothRings      = " + BellyMorphController.ClothDeformSmoothRings);
                 log.LogInfo("=========================");
             }
 
@@ -377,6 +392,11 @@ namespace COM3D2.Pregnancy.Plugin
             _sClothOffsetSideRatio = FormatShape(BellyMorphController.ClothOffsetSideRatio);
             _sClothBackOffsetBoost = FormatShape(BellyMorphController.ClothBackOffsetBoost);
             _sClothDepthStretch = FormatShape(BellyMorphController.ClothDepthStretch);
+            _sOuterClothLowerFrontGuard  = FormatShape(BellyMorphController.OuterClothLowerFrontGuard);
+            _sClothDeformSmoothPasses     = BellyMorphController.ClothDeformSmoothPasses.ToString(CultureInfo.InvariantCulture);
+            _sClothDeformSmoothStrength   = FormatShape(BellyMorphController.ClothDeformSmoothStrength);
+            _sClothDeformSmoothThreshold  = FormatShape(BellyMorphController.ClothDeformSmoothThreshold);
+            _sClothDeformSmoothRings      = BellyMorphController.ClothDeformSmoothRings.ToString(CultureInfo.InvariantCulture);
         }
 
         void ApplyShapeFieldsToController()
@@ -418,6 +438,13 @@ namespace COM3D2.Pregnancy.Plugin
             if (PregnancyManager.TryParseFloat(_sClothOffsetSideRatio, out v)) BellyMorphController.ClothOffsetSideRatio = v;
             if (PregnancyManager.TryParseFloat(_sClothBackOffsetBoost, out v)) BellyMorphController.ClothBackOffsetBoost = v;
             if (PregnancyManager.TryParseFloat(_sClothDepthStretch, out v)) BellyMorphController.ClothDepthStretch = v;
+            if (PregnancyManager.TryParseFloat(_sOuterClothLowerFrontGuard, out v))  BellyMorphController.OuterClothLowerFrontGuard = v;
+            int passes;
+            if (int.TryParse(_sClothDeformSmoothPasses, out passes))              BellyMorphController.ClothDeformSmoothPasses   = Mathf.Max(0, passes);
+            if (PregnancyManager.TryParseFloat(_sClothDeformSmoothStrength,  out v)) BellyMorphController.ClothDeformSmoothStrength  = v;
+            if (PregnancyManager.TryParseFloat(_sClothDeformSmoothThreshold, out v)) BellyMorphController.ClothDeformSmoothThreshold = v;
+            int rings;
+            if (int.TryParse(_sClothDeformSmoothRings, out rings))             BellyMorphController.ClothDeformSmoothRings      = Mathf.Max(0, rings);
         }
 
         public static void TriggerApplyBelly(Maid maid, float progress)

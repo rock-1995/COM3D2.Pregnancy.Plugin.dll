@@ -84,6 +84,11 @@ namespace COM3D2.Pregnancy.Plugin
             BellyMorphController.ClothOffsetSideRatio = Settings.bellyClothOffsetSideRatio;
             BellyMorphController.ClothBackOffsetBoost = Settings.bellyClothBackOffsetBoost;
             BellyMorphController.ClothDepthStretch = Settings.bellyClothDepthStretch;
+            BellyMorphController.OuterClothLowerFrontGuard  = Settings.bellyOuterClothLowerFrontGuard;
+            BellyMorphController.ClothDeformSmoothPasses     = Settings.bellyClothDeformSmoothPasses;
+            BellyMorphController.ClothDeformSmoothStrength   = Settings.bellyClothDeformSmoothStrength;
+            BellyMorphController.ClothDeformSmoothThreshold  = Settings.bellyClothDeformSmoothThreshold;
+            BellyMorphController.ClothDeformSmoothRings      = Settings.bellyClothDeformSmoothRings;
         }
 
         public static void CaptureCurrentBellySettings()
@@ -124,6 +129,11 @@ namespace COM3D2.Pregnancy.Plugin
             Settings.bellyClothOffsetSideRatio = BellyMorphController.ClothOffsetSideRatio;
             Settings.bellyClothBackOffsetBoost = BellyMorphController.ClothBackOffsetBoost;
             Settings.bellyClothDepthStretch = BellyMorphController.ClothDepthStretch;
+            Settings.bellyOuterClothLowerFrontGuard  = BellyMorphController.OuterClothLowerFrontGuard;
+            Settings.bellyClothDeformSmoothPasses     = BellyMorphController.ClothDeformSmoothPasses;
+            Settings.bellyClothDeformSmoothStrength   = BellyMorphController.ClothDeformSmoothStrength;
+            Settings.bellyClothDeformSmoothThreshold  = BellyMorphController.ClothDeformSmoothThreshold;
+            Settings.bellyClothDeformSmoothRings      = BellyMorphController.ClothDeformSmoothRings;
             SaveSettings();
         }
 

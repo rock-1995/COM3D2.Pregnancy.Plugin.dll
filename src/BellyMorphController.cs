@@ -30,7 +30,7 @@ namespace COM3D2.Pregnancy.Plugin
         public static float InflationTaperY = -0.03f;
         public static float InflationTaperZ = -0.05f;
         public static float InflationRoundness = 0.03f;
-        public static float InflationDrop = 0.1f;
+        public static float InflationDrop = 0.2f;
         public static float InflationFatFold = 0.0f;
         public static float InflationFatFoldHeight = 0.0f;
         public static float InflationFatFoldGap = 0.0f;
@@ -52,11 +52,16 @@ namespace COM3D2.Pregnancy.Plugin
         public static bool OuterClothSkirtDrape = false;
         public static float OuterClothLayerGuard = 0.0f;
         public static float InnerClothOffset = 0.0f;
-        public static float OuterClothOffset = 0.0f;
-        public static float ClothThicknessPreserve = 2.0f;
+        public static float OuterClothOffset = 0.006f;
+        public static float ClothThicknessPreserve = 3.0f;
         public static float ClothOffsetSideRatio = 0.0f;
         public static float ClothBackOffsetBoost = 0.0f;
-        public static float ClothDepthStretch = 3.0f;
+        public static float ClothDepthStretch = 4.0f;
+        public static float OuterClothLowerFrontGuard = 0.0f;
+        public static int   ClothDeformSmoothPasses    = 8;
+        public static float ClothDeformSmoothStrength  = 0.6f;
+        public static float ClothDeformSmoothThreshold = 60f;
+        public static int   ClothDeformSmoothRings     = 2;
 
         const float BellyEdgeBlend = 0.35f;
 
@@ -88,6 +93,7 @@ namespace COM3D2.Pregnancy.Plugin
             public Vector3[] OrigNormals;
             public Vector3[] LastDeltaVerts;
             public int AppliedSignature;
+            public int[][] Neighbors; // cached adjacency list, built lazily
         }
 
         class CrossLayerGuardMesh
@@ -210,7 +216,7 @@ namespace COM3D2.Pregnancy.Plugin
             InflationTaperY           = -0.03f;
             InflationTaperZ           = -0.05f;
             InflationRoundness        = 0.03f;
-            InflationDrop             = 0.1f;
+            InflationDrop             = 0.2f;
             InflationFatFold          = 0.0f;
             InflationFatFoldHeight    = 0.0f;
             InflationFatFoldGap       = 0.0f;
@@ -230,11 +236,16 @@ namespace COM3D2.Pregnancy.Plugin
             OuterClothSkirtDrape      = false;
             OuterClothLayerGuard      = 0.0f;
             InnerClothOffset          = 0.0f;
-            OuterClothOffset          = 0.0f;
-            ClothThicknessPreserve    = 2.0f;
+            OuterClothOffset          = 0.006f;
+            ClothThicknessPreserve    = 3.0f;
             ClothOffsetSideRatio      = 0.0f;
             ClothBackOffsetBoost      = 0.0f;
-            ClothDepthStretch         = 3.0f;
+            ClothDepthStretch         = 4.0f;
+            OuterClothLowerFrontGuard = 0.0f;
+            ClothDeformSmoothPasses    = 8;
+            ClothDeformSmoothStrength  = 0.6f;
+            ClothDeformSmoothThreshold = 60f;
+            ClothDeformSmoothRings     = 2;
         }
 
         static void ResetInternal(Maid maid)
@@ -320,7 +331,7 @@ namespace COM3D2.Pregnancy.Plugin
                 }
             }
 
-            if (OuterClothSkirtDrape && OuterClothLayerGuard > 0f && skirtLayerGuardCandidates.Count > 0)
+            if (OuterClothLayerGuard > 0f && skirtLayerGuardCandidates.Count > 0)
                 ApplyCrossOuterClothLayerGuard(maid, skirtLayerGuardCandidates);
         }
 
@@ -421,6 +432,15 @@ namespace COM3D2.Pregnancy.Plugin
                 mask[i] = true;
 
             return mask;
+        }
+
+        // Skirts: skirt / skrt / mekure (lifted-skirt layers)
+        // One-piece dresses: onep
+        // Excludes: wear (jackets/tops), zubon (trousers)
+        static bool IsSkirtOrDressMesh(SkinnedMeshRenderer smr)
+        {
+            string id = GetMeshId(smr);
+            return ContainsAny(id, "skirt", "skrt", "onep", "mekure");
         }
 
         static MeshMorphClass ClassifyMesh(SkinnedMeshRenderer smr)
@@ -1045,6 +1065,14 @@ namespace COM3D2.Pregnancy.Plugin
                 return;
             }
 
+            if (ClothDeformSmoothPasses > 0 && ClothDeformSmoothStrength > 0f &&
+                meshClass == MeshMorphClass.OuterCloth &&
+                IsSkirtOrDressMesh(smr))
+            {
+                Vector3 localUp = smr.transform.InverseTransformDirection(_bpWorldFrame.Up);
+                SmoothDisplacementDeltas(rec, mesh, newVerts, localUp);
+            }
+
             Vector3[] deltaVerts = BuildDeltaVerts(rec.OrigVerts, newVerts);
             // When our delta is already in the mesh (alreadyApplied), newVerts is the correct
             // target directly (computed from the clean OrigVerts base).  Otherwise accumulate
@@ -1365,6 +1393,15 @@ namespace COM3D2.Pregnancy.Plugin
                 if (innerThighRestore > 0f)
                     newWorldVert = Vector3.Lerp(newWorldVert, worldVert, innerThighRestore);
 
+                float armRestore = ArmRestoreMask(weight, bones);
+                if (armRestore > 0f)
+                    newWorldVert = Vector3.Lerp(newWorldVert, worldVert, armRestore);
+
+                float outerClothLowerFront = OuterClothLowerFrontRestoreMask(
+                    meshClass, upDot, edgeRatio, radiusDown);
+                if (outerClothLowerFront > 0f)
+                    newWorldVert = Vector3.Lerp(newWorldVert, worldVert, outerClothLowerFront);
+
                 if (trackOuterClothWorld)
                     clothMorphedWorld[i] = newWorldVert;
 
@@ -1424,6 +1461,174 @@ namespace COM3D2.Pregnancy.Plugin
             for (int i = 0; i < currentVerts.Length; i++)
                 result[i] = currentVerts[i] + deltaVerts[i];
             return result;
+        }
+
+        // Builds an adjacency list (shared-edge neighbors) from mesh triangles.
+        // Returns int[][] where [i] is an array of neighbor vertex indices for vertex i.
+        static int[][] BuildNeighborLists(int vertCount, int[] triangles)
+        {
+            // Use List<int> to collect, then convert to arrays for fast iteration.
+            var lists = new List<int>[vertCount];
+            for (int i = 0; i < vertCount; i++)
+                lists[i] = new List<int>(6);
+
+            for (int t = 0; t < triangles.Length; t += 3)
+            {
+                int a = triangles[t], b = triangles[t + 1], c = triangles[t + 2];
+                if (a < 0 || a >= vertCount || b < 0 || b >= vertCount || c < 0 || c >= vertCount)
+                    continue;
+                if (!lists[a].Contains(b)) lists[a].Add(b);
+                if (!lists[a].Contains(c)) lists[a].Add(c);
+                if (!lists[b].Contains(a)) lists[b].Add(a);
+                if (!lists[b].Contains(c)) lists[b].Add(c);
+                if (!lists[c].Contains(a)) lists[c].Add(a);
+                if (!lists[c].Contains(b)) lists[c].Add(b);
+            }
+
+            int[][] result = new int[vertCount][];
+            for (int i = 0; i < vertCount; i++)
+                result[i] = lists[i].ToArray();
+            return result;
+        }
+
+        // Laplacian smoothing of per-vertex displacements within a single mesh.
+        // Modifies newVerts in place: newVerts[i] = origVerts[i] + smoothedDelta[i].
+        // Seeds eligible set from all vertices with non-zero plugin deformation, then expands
+        // outward by ClothDeformSmoothRings rings.  Within eligible set, only vertices whose
+        // max pairwise delta difference exceeds ClothDeformSmoothThreshold are smoothed.
+        // Neighbor list is cached in rec.Neighbors and rebuilt only when mesh changes.
+        static void SmoothDisplacementDeltas(MeshRecord rec, Mesh mesh, Vector3[] newVerts, Vector3 localUp)
+        {
+            int count = rec.OrigVerts.Length;
+            if (newVerts == null || newVerts.Length != count) return;
+
+            // Rebuild neighbor cache when vertex count changes (e.g. outfit swap).
+            if (rec.Neighbors == null || rec.Neighbors.Length != count)
+            {
+                int[] tris = mesh.triangles;
+                rec.Neighbors = BuildNeighborLists(count, tris ?? new int[0]);
+            }
+
+            int[][] neighbors = rec.Neighbors;
+            int   passes    = ClothDeformSmoothPasses;
+            float strength  = Mathf.Clamp01(ClothDeformSmoothStrength);
+            // User-facing value is scaled by 1e-4 internally so that setting 1
+            // equals what used to require 0.0001, giving 10000x finer UI control.
+            float threshold = Mathf.Max(ClothDeformSmoothThreshold, 0f) * 1e-4f;
+
+            // Working delta arrays — we ping-pong to avoid read/write conflicts.
+            Vector3[] deltas  = new Vector3[count];
+            Vector3[] scratch = new Vector3[count];
+
+            for (int i = 0; i < count; i++)
+                deltas[i] = newVerts[i] - rec.OrigVerts[i];
+
+            // Seed (center points): vertices with a downward deformation component.
+            // Downward filter and threshold only apply to these seed vertices.
+            // Ring-expanded neighbors bypass both checks and are always smoothed.
+            bool[] isSeed   = new bool[count];
+            bool[] eligible = new bool[count];
+            for (int i = 0; i < count; i++)
+            {
+                bool seed = Vector3.Dot(deltas[i], localUp) < 0f;
+                isSeed[i]   = seed;
+                eligible[i] = seed;
+            }
+
+            // Expand eligible set outward by exactly ClothDeformSmoothRings rings.
+            // Use a two-buffer approach so each pass adds exactly one true ring
+            // (in-place modification would cause a single pass to flood multiple rings
+            // depending on vertex ordering).
+            int rings = Mathf.Max(ClothDeformSmoothRings, 0);
+            bool[] pending = new bool[count];
+            for (int ring = 0; ring < rings; ring++)
+            {
+                bool expanded = false;
+                for (int i = 0; i < count; i++)
+                {
+                    if (eligible[i]) continue;
+                    int[] nbrs = neighbors[i];
+                    if (nbrs == null) continue;
+                    for (int n = 0; n < nbrs.Length; n++)
+                    {
+                        if (eligible[nbrs[n]]) { pending[i] = true; expanded = true; break; }
+                    }
+                }
+                if (!expanded) break;
+                for (int i = 0; i < count; i++)
+                {
+                    if (pending[i]) { eligible[i] = true; pending[i] = false; }
+                }
+            }
+
+            for (int pass = 0; pass < passes; pass++)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    if (!eligible[i])
+                    {
+                        scratch[i] = deltas[i];
+                        continue;
+                    }
+
+                    int[] nbrs = neighbors[i];
+                    if (nbrs == null || nbrs.Length == 0)
+                    {
+                        scratch[i] = deltas[i];
+                        continue;
+                    }
+
+                    // Accumulate neighbour average and max pairwise diff simultaneously.
+                    float maxPairDiff = 0f;
+                    float ax = 0f, ay = 0f, az = 0f;
+                    for (int n = 0; n < nbrs.Length; n++)
+                    {
+                        float ddx = deltas[i].x - deltas[nbrs[n]].x;
+                        float ddy = deltas[i].y - deltas[nbrs[n]].y;
+                        float ddz = deltas[i].z - deltas[nbrs[n]].z;
+                        float pairSqr = ddx * ddx + ddy * ddy + ddz * ddz;
+                        if (pairSqr > maxPairDiff) maxPairDiff = pairSqr;
+                        ax += deltas[nbrs[n]].x;
+                        ay += deltas[nbrs[n]].y;
+                        az += deltas[nbrs[n]].z;
+                    }
+                    maxPairDiff = Mathf.Sqrt(maxPairDiff);
+
+                    // Seed (center) points must exceed threshold to be smoothed.
+                    // Ring-expanded points bypass the threshold and are always smoothed.
+                    float t;
+                    if (isSeed[i])
+                    {
+                        if (maxPairDiff <= threshold) { scratch[i] = deltas[i]; continue; }
+                        float excessRatio = (maxPairDiff - threshold) / maxPairDiff;
+                        t = excessRatio * strength;
+                    }
+                    else
+                    {
+                        t = strength;
+                    }
+
+                    // Pull delta[i] toward the neighbour average.
+                    float invN = 1f / nbrs.Length;
+                    float avgX = ax * invN, avgY = ay * invN, avgZ = az * invN;
+                    float dx = deltas[i].x - avgX;
+                    float dy = deltas[i].y - avgY;
+                    float dz = deltas[i].z - avgZ;
+                    scratch[i] = new Vector3(
+                        deltas[i].x - dx * t,
+                        deltas[i].y - dy * t,
+                        deltas[i].z - dz * t);
+                }
+
+                // Swap ping-pong buffers.
+                Vector3[] tmp = deltas;
+                deltas  = scratch;
+                scratch = tmp;
+            }
+
+            // Write smoothed result back.
+            for (int i = 0; i < count; i++)
+                newVerts[i] = rec.OrigVerts[i] + deltas[i];
         }
 
         static Vector3 SculptBaseShapeWorld(
@@ -1540,6 +1745,36 @@ namespace COM3D2.Pregnancy.Plugin
             return Mathf.Clamp01(upper * front * strength);
         }
 
+        // Prevents isolated spike vertices at the lower hem of skirts/dresses.
+        // The spike forms when a vertex near the ellipsoid boundary in the lower region
+        // gets displaced while its mesh neighbors are outside and stay put.
+        // Guard is gated on edgeRatio (proximity to ellipsoid boundary) so only those
+        // boundary vertices are suppressed; vertices deep inside the ellipsoid (the
+        // main belly area of the skirt) are unaffected and deform normally.
+        static float OuterClothLowerFrontRestoreMask(
+            MeshMorphClass meshClass,
+            float upDot,
+            float edgeRatio,
+            float radiusDown)
+        {
+            if (meshClass != MeshMorphClass.OuterCloth) return 0f;
+
+            float strength = Mathf.Max(OuterClothLowerFrontGuard, 0f);
+            if (strength <= 0f || upDot >= 0f) return 0f;
+
+            // Lower region of the belly ellipsoid
+            float lower = Smooth01(-upDot / Mathf.Max(radiusDown, 0.0001f));
+            if (lower <= 0f) return 0f;
+
+            // Near the ellipsoid boundary (outer 40%): this is where isolated
+            // spike vertices live. Deep-inside vertices (edgeRatio < 0.6) are
+            // not guarded so the skirt still follows the belly shape normally.
+            float edge = Smooth01((edgeRatio - 0.60f) / 0.40f);
+            if (edge <= 0f) return 0f;
+
+            return Mathf.Clamp01(lower * edge * strength);
+        }
+
         static float BreastBoneWeight(BoneWeight weight, Transform[] bones)
         {
             float total = 0f;
@@ -1600,6 +1835,38 @@ namespace COM3D2.Pregnancy.Plugin
             string lower = name.ToLowerInvariant();
             return lower.Contains("momoniku")
                 || lower.Contains("momotwist");
+        }
+
+        static float ArmRestoreMask(BoneWeight weight, Transform[] bones)
+        {
+            float armWeight = 0f;
+            AddArmBoneWeight(ref armWeight, bones, weight.boneIndex0, weight.weight0);
+            AddArmBoneWeight(ref armWeight, bones, weight.boneIndex1, weight.weight1);
+            AddArmBoneWeight(ref armWeight, bones, weight.boneIndex2, weight.weight2);
+            AddArmBoneWeight(ref armWeight, bones, weight.boneIndex3, weight.weight3);
+            armWeight = Mathf.Clamp01(armWeight);
+            if (armWeight <= 0f) return 0f;
+
+            return Mathf.Clamp01(armWeight * 4f);
+        }
+
+        static void AddArmBoneWeight(ref float total, Transform[] bones, int index, float weight)
+        {
+            if (weight <= 0f || bones == null || index < 0 || index >= bones.Length) return;
+            Transform bone = bones[index];
+            if (bone == null || !IsArmBoneName(bone.name)) return;
+            total += weight;
+        }
+
+        static bool IsArmBoneName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            string lower = name.ToLowerInvariant();
+            return lower.Contains("upperarm")
+                || lower.Contains("forearm")
+                || lower.Contains("clavicle")
+                || lower.Contains("腕")
+                || lower.Contains("ude");
         }
 
         const int SkirtDrapePropagatePasses = 48;
@@ -2216,7 +2483,6 @@ namespace COM3D2.Pregnancy.Plugin
             float oldCompressionFollow = Mathf.Lerp(minFollow, 1f, outerSurface);
             float stretchControl = ClothDepthStretch * Mathf.Lerp(1f, 1.35f, lower);
             float inverseCompression = (oldCompressionFollow - minFollow) / Mathf.Max(1f - minFollow, 0.0001f);
-
             return 1f + inverseCompression * stretchControl;
         }
 
