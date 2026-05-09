@@ -18,7 +18,9 @@ namespace COM3D2.Pregnancy.Plugin
         internal static ConfigEntry<float> CfgFertilityRate;
         internal static ConfigEntry<FertilityCycleMode> CfgCycleMode;
         internal static ConfigEntry<MorphTriggerMode> CfgMorphTriggerMode;
+        internal static ConfigEntry<bool> CfgMorphSpyLogging;
         internal static ConfigEntry<bool> CfgDebugMeshLogging;
+        Harmony _harmony;
 
         void Awake()
         {
@@ -43,13 +45,19 @@ namespace COM3D2.Pregnancy.Plugin
                 "General", "Morph Trigger Mode", MorphTriggerMode.VisibilityChange,
                 "When belly morphs are refreshed: ManualOnly or VisibilityChange.");
 
+            CfgMorphSpyLogging = Config.Bind(
+                "Debug", "Morph Spy Logging", true,
+                "Log TMorph runtime-base bake events used for AddYotogiSlider compatibility.");
+
             CfgDebugMeshLogging = Config.Bind(
                 "Debug", "Mesh Logging", false,
                 "Log mesh load spy and belly morph diagnostics.");
 
             try
             {
-                new Harmony(PluginGuid).PatchAll();
+                _harmony = new Harmony(PluginGuid);
+                _harmony.PatchAll();
+                BellyMorphController.PatchAysHooks(_harmony);
                 Logger.LogInfo("Harmony patches applied.");
             }
             catch (System.Exception e)
@@ -69,6 +77,22 @@ namespace COM3D2.Pregnancy.Plugin
             gameObject.AddComponent<PregnancyUI>();
             gameObject.AddComponent<SceneAutoApply>();
             Logger.LogInfo($"{PluginName} {PluginVersion} loaded.");
+        }
+
+        void Start()
+        {
+            StartCoroutine(PatchAysHookWhenAvailable());
+        }
+
+        System.Collections.IEnumerator PatchAysHookWhenAvailable()
+        {
+            for (int i = 0; i < 600; i++)
+            {
+                if (BellyMorphController.PatchAysHooks(_harmony))
+                    yield break;
+
+                yield return null;
+            }
         }
 
     }

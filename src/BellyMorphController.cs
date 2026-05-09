@@ -1,4 +1,6 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Reflection;
+using HarmonyLib;
 using UnityEngine;
 
 namespace COM3D2.Pregnancy.Plugin
@@ -30,7 +32,7 @@ namespace COM3D2.Pregnancy.Plugin
         public static float InflationTaperY = -0.03f;
         public static float InflationTaperZ = -0.05f;
         public static float InflationRoundness = 0.03f;
-        public static float InflationDrop = 0.2f;
+        public static float InflationDrop = 0.1f;
         public static float InflationFatFold = 0.0f;
         public static float InflationFatFoldHeight = 0.0f;
         public static float InflationFatFoldGap = 0.0f;
@@ -52,16 +54,11 @@ namespace COM3D2.Pregnancy.Plugin
         public static bool OuterClothSkirtDrape = false;
         public static float OuterClothLayerGuard = 0.0f;
         public static float InnerClothOffset = 0.0f;
-        public static float OuterClothOffset = 0.006f;
-        public static float ClothThicknessPreserve = 3.0f;
+        public static float OuterClothOffset = 0.0f;
+        public static float ClothThicknessPreserve = 2.0f;
         public static float ClothOffsetSideRatio = 0.0f;
         public static float ClothBackOffsetBoost = 0.0f;
-        public static float ClothDepthStretch = 4.0f;
-        public static float OuterClothLowerFrontGuard = 0.0f;
-        public static int   ClothDeformSmoothPasses    = 8;
-        public static float ClothDeformSmoothStrength  = 0.6f;
-        public static float ClothDeformSmoothThreshold = 60f;
-        public static int   ClothDeformSmoothRings     = 2;
+        public static float ClothDepthStretch = 3.0f;
 
         const float BellyEdgeBlend = 0.35f;
 
@@ -84,6 +81,8 @@ namespace COM3D2.Pregnancy.Plugin
         }
 
         static Dictionary<int, float> _activeProgress = new Dictionary<int, float>();
+        static Dictionary<int, int> _aysHaraWriteSpyCountBySession = new Dictionary<int, int>();
+        static bool _aysHooksPatched;
 
         class MeshRecord
         {
@@ -93,7 +92,24 @@ namespace COM3D2.Pregnancy.Plugin
             public Vector3[] OrigNormals;
             public Vector3[] LastDeltaVerts;
             public int AppliedSignature;
-            public int[][] Neighbors; // cached adjacency list, built lazily
+        }
+
+        class MorphBaseBakeState
+        {
+            public Maid Maid;
+            public TBodySkin Skin;
+            public SkinnedMeshRenderer Renderer;
+            public Mesh Mesh;
+            public Vector3[] OriginalVerts;
+            public Vector3[] OriginalNormals;
+            public Vector3[] BakedVerts;
+            public Vector3[] BakedNormals;
+            public int OriginalSignature;
+            public int AppliedSignature;
+            public int ShapeSignature;
+            public float Progress;
+            public int MeshInstanceId;
+            public MeshMorphClass MeshClass;
         }
 
         class CrossLayerGuardMesh
@@ -133,7 +149,14 @@ namespace COM3D2.Pregnancy.Plugin
 
         static Dictionary<int, List<MeshRecord>> _records = new Dictionary<int, List<MeshRecord>>();
         static readonly Dictionary<int, HashSet<TBodySkin>> _morphDirtySkins = new Dictionary<int, HashSet<TBodySkin>>();
+        static readonly Dictionary<int, float> _morphSpyLastLogTime = new Dictionary<int, float>();
+        static readonly Dictionary<TMorph, MorphBaseBakeState> _morphBaseBakeStates = new Dictionary<TMorph, MorphBaseBakeState>();
+        static readonly FieldInfo _blendValuesChkField = typeof(TMorph).GetField(
+            "BlendValuesCHK",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         static BepInEx.Logging.ManualLogSource _log = BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
+        static bool _suppressMorphBaseBake = false;
+        const float MorphSpyMinInterval = 0.5f;
 
         struct LocalFrame
         {
@@ -216,7 +239,7 @@ namespace COM3D2.Pregnancy.Plugin
             InflationTaperY           = -0.03f;
             InflationTaperZ           = -0.05f;
             InflationRoundness        = 0.03f;
-            InflationDrop             = 0.2f;
+            InflationDrop             = 0.1f;
             InflationFatFold          = 0.0f;
             InflationFatFoldHeight    = 0.0f;
             InflationFatFoldGap       = 0.0f;
@@ -236,16 +259,11 @@ namespace COM3D2.Pregnancy.Plugin
             OuterClothSkirtDrape      = false;
             OuterClothLayerGuard      = 0.0f;
             InnerClothOffset          = 0.0f;
-            OuterClothOffset          = 0.006f;
-            ClothThicknessPreserve    = 3.0f;
+            OuterClothOffset          = 0.0f;
+            ClothThicknessPreserve    = 2.0f;
             ClothOffsetSideRatio      = 0.0f;
             ClothBackOffsetBoost      = 0.0f;
-            ClothDepthStretch         = 4.0f;
-            OuterClothLowerFrontGuard = 0.0f;
-            ClothDeformSmoothPasses    = 8;
-            ClothDeformSmoothStrength  = 0.6f;
-            ClothDeformSmoothThreshold = 60f;
-            ClothDeformSmoothRings     = 2;
+            ClothDepthStretch         = 3.0f;
         }
 
         static void ResetInternal(Maid maid)
@@ -253,6 +271,7 @@ namespace COM3D2.Pregnancy.Plugin
             int key = maid.GetHashCode();
             _activeProgress.Remove(key);
             _morphDirtySkins.Remove(key);
+            RestoreMorphBases(maid);
 
             if (!_records.TryGetValue(key, out var records)) return;
 
@@ -331,7 +350,7 @@ namespace COM3D2.Pregnancy.Plugin
                 }
             }
 
-            if (OuterClothLayerGuard > 0f && skirtLayerGuardCandidates.Count > 0)
+            if (OuterClothSkirtDrape && OuterClothLayerGuard > 0f && skirtLayerGuardCandidates.Count > 0)
                 ApplyCrossOuterClothLayerGuard(maid, skirtLayerGuardCandidates);
         }
 
@@ -432,15 +451,6 @@ namespace COM3D2.Pregnancy.Plugin
                 mask[i] = true;
 
             return mask;
-        }
-
-        // Skirts: skirt / skrt / mekure (lifted-skirt layers)
-        // One-piece dresses: onep
-        // Excludes: wear (jackets/tops), zubon (trousers)
-        static bool IsSkirtOrDressMesh(SkinnedMeshRenderer smr)
-        {
-            string id = GetMeshId(smr);
-            return ContainsAny(id, "skirt", "skrt", "onep", "mekure");
         }
 
         static MeshMorphClass ClassifyMesh(SkinnedMeshRenderer smr)
@@ -558,9 +568,88 @@ namespace COM3D2.Pregnancy.Plugin
             return mon;
         }
 
+        public static void NotifyFixBlendValuesSpy(TMorph morph)
+        {
+            try
+            {
+                if (PregnancyPlugin.CfgMorphSpyLogging == null || !PregnancyPlugin.CfgMorphSpyLogging.Value)
+                    return;
+                if (object.ReferenceEquals(morph, null)) return;
+
+                string caller;
+                if (!TryGetAysCaller(out caller)) return;
+
+                Maid maid = null;
+                if (!object.ReferenceEquals(morph.bodyskin, null))
+                    maid = FindMaidForBodySkin(morph.bodyskin);
+
+                float progress = IsValid(maid)
+                    ? (PregnancyManager.GetPregnant(maid)
+                        ? PregnancyManager.GetProgress(maid)
+                        : GetActiveProgress(maid))
+                    : 0f;
+
+                int key = morph.GetHashCode();
+                float now = Time.unscaledTime;
+                float last;
+                if (_morphSpyLastLogTime.TryGetValue(key, out last) && now - last < MorphSpyMinInterval)
+                    return;
+                _morphSpyLastLogTime[key] = now;
+
+                string slot = "";
+                if (!object.ReferenceEquals(morph.bodyskin, null)
+                    && !object.ReferenceEquals(morph.bodyskin.obj, null))
+                    slot = morph.bodyskin.obj.name;
+
+                int oriVertId = !object.ReferenceEquals(morph.m_vOriVert, null) ? morph.m_vOriVert.GetHashCode() : 0;
+                int oriNormId = !object.ReferenceEquals(morph.m_vOriNorm, null) ? morph.m_vOriNorm.GetHashCode() : 0;
+                int blendDataCount = !object.ReferenceEquals(morph.BlendDatas, null) ? morph.BlendDatas.Count : 0;
+
+                _log.LogInfo("[MorphSpy] AYS FixBlendValues"
+                    + " maid=" + GetMaidName(maid)
+                    + " slot=" + slot
+                    + " morphId=" + morph.GetHashCode()
+                    + " oriVertId=" + oriVertId
+                    + " oriNormId=" + oriNormId
+                    + " blendDatas=" + blendDataCount
+                    + " morphCount=" + morph.MorphCount
+                    + " vCount=" + morph.VCount
+                    + " progress=" + Mathf.Clamp01(progress).ToString("0.###")
+                    + " caller=" + caller);
+            }
+            catch { }
+        }
+
+        static bool TryGetAysCaller(out string caller)
+        {
+            caller = "";
+            try
+            {
+                var frames = new System.Diagnostics.StackTrace(false).GetFrames();
+                if (frames == null) return false;
+
+                for (int i = 0; i < frames.Length; i++)
+                {
+                    var method = frames[i].GetMethod();
+                    if (object.ReferenceEquals(method, null)) continue;
+                    var type = method.DeclaringType;
+                    string fullName = !object.ReferenceEquals(type, null) ? type.FullName : "";
+                    if (fullName.IndexOf("AddYotogiSlider", System.StringComparison.OrdinalIgnoreCase) < 0)
+                        continue;
+
+                    caller = fullName + "." + method.Name;
+                    return true;
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
         public static void NotifyFixBlendValues(TMorph morph)
         {
-            if (morph == null || morph.bodyskin == null) return;
+            if (_suppressMorphBaseBake) return;
+            if (object.ReferenceEquals(morph, null) || object.ReferenceEquals(morph.bodyskin, null)) return;
 
             Maid maid = FindMaidForBodySkin(morph.bodyskin);
             if (!IsValid(maid)) return;
@@ -568,13 +657,451 @@ namespace COM3D2.Pregnancy.Plugin
             float progress = PregnancyManager.GetPregnant(maid)
                 ? PregnancyManager.GetProgress(maid)
                 : GetActiveProgress(maid);
-            if (Mathf.Clamp01(progress) <= 0f) return;
+            progress = Mathf.Clamp01(progress);
+            if (progress <= 0f)
+            {
+                RestoreMorphBase(morph, true);
+                return;
+            }
 
-            int key = maid.GetHashCode();
-            if (!_morphDirtySkins.ContainsKey(key))
-                _morphDirtySkins[key] = new HashSet<TBodySkin>();
-            _morphDirtySkins[key].Add(morph.bodyskin);
-            EnsureMonitor(maid);
+            TryBakeRuntimeMorphBase(maid, morph, progress);
+        }
+
+        static bool TryBakeRuntimeMorphBase(Maid maid, TMorph morph, float progress)
+        {
+            Vector3[] currentVerts = morph.m_vOriVert;
+            if (currentVerts == null || currentVerts.Length == 0) return false;
+
+            SkinnedMeshRenderer smr = FindRendererForMorph(maid, morph);
+            if (smr == null || smr.sharedMesh == null) return false;
+
+            MeshMorphClass meshClass = ClassifyMesh(smr);
+            if (meshClass == MeshMorphClass.Ignore) return false;
+
+            Mesh mesh = smr.sharedMesh;
+            int meshId = mesh.GetInstanceID();
+            int shapeSignature = ComputeMorphBakeSignature(progress, meshClass);
+            int currentSignature = ComputeVertexSignature(currentVerts);
+
+            MorphBaseBakeState state;
+            bool hasState = _morphBaseBakeStates.TryGetValue(morph, out state)
+                && state != null
+                && state.MeshInstanceId == meshId
+                && state.OriginalVerts != null
+                && state.OriginalVerts.Length == currentVerts.Length;
+
+            bool currentIsKnownBaked = hasState
+                && state.AppliedSignature != 0
+                && currentSignature == state.AppliedSignature;
+
+            if (currentIsKnownBaked && state.ShapeSignature == shapeSignature)
+                return false;
+
+            Vector3[] baseVerts;
+            Vector3[] baseNormals;
+            bool reusedStoredBase = false;
+            if (currentIsKnownBaked)
+            {
+                baseVerts = (Vector3[])state.OriginalVerts.Clone();
+                baseNormals = CloneVectorArray(state.OriginalNormals);
+                reusedStoredBase = true;
+            }
+            else
+            {
+                baseVerts = (Vector3[])currentVerts.Clone();
+                baseNormals = CloneNormalsForMorph(morph.m_vOriNorm, mesh, currentVerts.Length);
+            }
+
+            if (!CacheBindPoseWorldForMaid(maid)) return false;
+
+            MeshRecord rec = new MeshRecord
+            {
+                SMR = smr,
+                Mesh = mesh,
+                OrigVerts = baseVerts,
+                OrigNormals = baseNormals,
+            };
+
+            bool[] mask = BuildVertexMask(smr, rec, meshClass);
+            if (!HasAnyMaskedVertex(mask)) return false;
+
+            float effectiveProgress = GetEffectiveMorphProgress(progress, meshClass);
+            Vector3[] bakedVerts;
+            DeformStats stats;
+            if (!TryDeformVertsInBindPoseWorld(
+                smr,
+                rec,
+                mask,
+                meshClass,
+                effectiveProgress,
+                out bakedVerts,
+                out stats))
+            {
+                return false;
+            }
+
+            Vector3[] bakedNormals = BuildMorphBaseNormals(mesh, rec, bakedVerts);
+            if (bakedNormals == null || bakedNormals.Length != bakedVerts.Length)
+                bakedNormals = CloneVectorArray(baseNormals);
+
+            int originalSignature = ComputeVertexSignature(baseVerts);
+            int appliedSignature = ComputeVertexSignature(bakedVerts);
+            int oldOriVertId = currentVerts.GetHashCode();
+
+            morph.m_vOriVert = bakedVerts;
+            if (bakedNormals != null && bakedNormals.Length == bakedVerts.Length)
+                morph.m_vOriNorm = bakedNormals;
+
+            MorphBaseBakeState newState = new MorphBaseBakeState
+            {
+                Maid = maid,
+                Skin = morph.bodyskin,
+                Renderer = smr,
+                Mesh = mesh,
+                OriginalVerts = baseVerts,
+                OriginalNormals = baseNormals,
+                BakedVerts = bakedVerts,
+                BakedNormals = bakedNormals,
+                OriginalSignature = originalSignature,
+                AppliedSignature = appliedSignature,
+                ShapeSignature = shapeSignature,
+                Progress = progress,
+                MeshInstanceId = meshId,
+                MeshClass = meshClass,
+            };
+            _morphBaseBakeStates[morph] = newState;
+
+            ForceFixBlendValues(morph);
+            LogMorphBaseBake(maid, morph, smr, meshClass, progress, effectiveProgress, oldOriVertId, newState, stats, reusedStoredBase);
+
+            return true;
+        }
+
+        static SkinnedMeshRenderer FindRendererForMorph(Maid maid, TMorph morph)
+        {
+            if (object.ReferenceEquals(morph, null) || morph.m_vOriVert == null) return null;
+
+            int vertexCount = morph.m_vOriVert.Length;
+            List<SkinnedMeshRenderer> candidates = new List<SkinnedMeshRenderer>();
+            HashSet<int> seen = new HashSet<int>();
+
+            if (morph.bodyskin != null && morph.bodyskin.obj != null)
+                AddRenderers(morph.bodyskin.obj.transform, candidates, seen);
+
+            SkinnedMeshRenderer ignoredMatch = null;
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                SkinnedMeshRenderer smr = candidates[i];
+                if (smr == null || smr.sharedMesh == null) continue;
+                if (smr.sharedMesh.vertexCount != vertexCount) continue;
+
+                if (ClassifyMesh(smr) != MeshMorphClass.Ignore)
+                    return smr;
+                if (ignoredMatch == null)
+                    ignoredMatch = smr;
+            }
+
+            if (IsValid(maid))
+            {
+                List<SkinnedMeshRenderer> all = CollectTargetRenderers(maid);
+                for (int i = 0; i < all.Count; i++)
+                {
+                    SkinnedMeshRenderer smr = all[i];
+                    if (smr == null || smr.sharedMesh == null) continue;
+                    if (smr.sharedMesh.vertexCount != vertexCount) continue;
+
+                    if (ClassifyMesh(smr) != MeshMorphClass.Ignore)
+                        return smr;
+                    if (ignoredMatch == null)
+                        ignoredMatch = smr;
+                }
+            }
+
+            return ignoredMatch;
+        }
+
+        static bool CacheBindPoseWorldForMaid(Maid maid)
+        {
+            if (!IsValid(maid)) return false;
+
+            _bpWorldCached = false;
+            _bpBoneWorld.Clear();
+
+            List<SkinnedMeshRenderer> renderers = CollectTargetRenderers(maid);
+            for (int i = 0; i < renderers.Count; i++)
+            {
+                SkinnedMeshRenderer smr = renderers[i];
+                if (smr == null || smr.sharedMesh == null) continue;
+                if (ClassifyMesh(smr) != MeshMorphClass.Body) continue;
+                if (TryCacheBindPoseWorldRef(smr)) return true;
+            }
+
+            return false;
+        }
+
+        static bool HasAnyMaskedVertex(bool[] mask)
+        {
+            if (mask == null) return false;
+            for (int i = 0; i < mask.Length; i++)
+                if (mask[i]) return true;
+            return false;
+        }
+
+        static float GetEffectiveMorphProgress(float progress, MeshMorphClass meshClass)
+        {
+            if (meshClass == MeshMorphClass.InnerCloth)
+                return progress * ClothOverdrive;
+            if (meshClass == MeshMorphClass.OuterCloth)
+                return progress * OuterClothPregnancyScale;
+            return progress;
+        }
+
+        static Vector3[] CloneVectorArray(Vector3[] values)
+        {
+            return values != null ? (Vector3[])values.Clone() : null;
+        }
+
+        static Vector3[] CloneNormalsForMorph(Vector3[] morphNormals, Mesh mesh, int vertexCount)
+        {
+            if (morphNormals != null && morphNormals.Length == vertexCount)
+                return (Vector3[])morphNormals.Clone();
+
+            Vector3[] meshNormals = mesh != null ? mesh.normals : null;
+            if (meshNormals != null && meshNormals.Length == vertexCount)
+                return (Vector3[])meshNormals.Clone();
+
+            return null;
+        }
+
+        static Vector3[] BuildMorphBaseNormals(Mesh mesh, MeshRecord rec, Vector3[] bakedVerts)
+        {
+            if (mesh == null || bakedVerts == null) return null;
+
+            Vector3[] oldVerts = null;
+            Vector3[] oldNormals = null;
+            try
+            {
+                oldVerts = mesh.vertices;
+                oldNormals = mesh.normals;
+                mesh.vertices = bakedVerts;
+
+                if (rec != null
+                    && rec.OrigVerts != null
+                    && rec.OrigNormals != null
+                    && rec.OrigVerts.Length == bakedVerts.Length
+                    && rec.OrigNormals.Length == bakedVerts.Length)
+                {
+                    ApplySmoothedNormals(mesh, rec, bakedVerts);
+                }
+                else
+                {
+                    mesh.RecalculateNormals();
+                }
+
+                Vector3[] normals = mesh.normals;
+                if (normals != null && normals.Length == bakedVerts.Length)
+                    return (Vector3[])normals.Clone();
+            }
+            catch
+            {
+            }
+            finally
+            {
+                if (oldVerts != null)
+                    mesh.vertices = oldVerts;
+                if (oldNormals != null)
+                    mesh.normals = oldNormals;
+            }
+
+            return rec != null ? CloneVectorArray(rec.OrigNormals) : null;
+        }
+
+        static void ForceFixBlendValues(TMorph morph)
+        {
+            if (object.ReferenceEquals(morph, null)) return;
+
+            bool oldSuppress = _suppressMorphBaseBake;
+            _suppressMorphBaseBake = true;
+            try
+            {
+                ForceBlendValuesDirty(morph);
+                morph.FixBlendValues();
+            }
+            finally
+            {
+                _suppressMorphBaseBake = oldSuppress;
+            }
+        }
+
+        static void ForceBlendValuesDirty(TMorph morph)
+        {
+            try
+            {
+                if (object.ReferenceEquals(_blendValuesChkField, null)) return;
+                float[] chk = _blendValuesChkField.GetValue(morph) as float[];
+                if (chk != null && chk.Length > 0)
+                    chk[0] = float.NaN;
+            }
+            catch
+            {
+            }
+        }
+
+        static void RestoreMorphBases(Maid maid)
+        {
+            if (maid == null || _morphBaseBakeStates.Count == 0) return;
+
+            List<TMorph> toRestore = new List<TMorph>();
+            foreach (KeyValuePair<TMorph, MorphBaseBakeState> entry in _morphBaseBakeStates)
+            {
+                MorphBaseBakeState state = entry.Value;
+                if (state != null && object.ReferenceEquals(state.Maid, maid))
+                    toRestore.Add(entry.Key);
+            }
+
+            for (int i = 0; i < toRestore.Count; i++)
+                RestoreMorphBase(toRestore[i], true);
+        }
+
+        static void RestoreMorphBase(TMorph morph, bool forceFix)
+        {
+            if (object.ReferenceEquals(morph, null)) return;
+
+            MorphBaseBakeState state;
+            if (!_morphBaseBakeStates.TryGetValue(morph, out state) || state == null) return;
+
+            try
+            {
+                Vector3[] currentVerts = morph.m_vOriVert;
+                bool currentIsOurs = currentVerts != null
+                    && state.AppliedSignature != 0
+                    && ComputeVertexSignature(currentVerts) == state.AppliedSignature;
+
+                if (currentIsOurs && state.OriginalVerts != null)
+                {
+                    morph.m_vOriVert = (Vector3[])state.OriginalVerts.Clone();
+                    if (state.OriginalNormals != null && state.OriginalNormals.Length == state.OriginalVerts.Length)
+                        morph.m_vOriNorm = (Vector3[])state.OriginalNormals.Clone();
+                    if (forceFix)
+                        ForceFixBlendValues(morph);
+                }
+            }
+            finally
+            {
+                _morphBaseBakeStates.Remove(morph);
+            }
+        }
+
+        static int ComputeMorphBakeSignature(float progress, MeshMorphClass meshClass)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + (int)meshClass;
+                AddBakeSignatureFloat(ref hash, progress);
+                AddBakeSignatureFloat(ref hash, SpineLerpT);
+                AddBakeSignatureFloat(ref hash, OffsetSide);
+                AddBakeSignatureFloat(ref hash, InflationMultiplier);
+                AddBakeSignatureFloat(ref hash, InflationMoveY);
+                AddBakeSignatureFloat(ref hash, InflationMoveZ);
+                AddBakeSignatureFloat(ref hash, InflationStretchX);
+                AddBakeSignatureFloat(ref hash, InflationStretchY);
+                AddBakeSignatureFloat(ref hash, InflationStretchZ);
+                AddBakeSignatureFloat(ref hash, InflationShiftY);
+                AddBakeSignatureFloat(ref hash, InflationShiftZ);
+                AddBakeSignatureFloat(ref hash, InflationTaperY);
+                AddBakeSignatureFloat(ref hash, InflationTaperZ);
+                AddBakeSignatureFloat(ref hash, InflationRoundness);
+                AddBakeSignatureFloat(ref hash, InflationDrop);
+                AddBakeSignatureFloat(ref hash, InflationFatFold);
+                AddBakeSignatureFloat(ref hash, InflationFatFoldHeight);
+                AddBakeSignatureFloat(ref hash, InflationFatFoldGap);
+                AddBakeSignatureFloat(ref hash, RegionRadiusSide);
+                AddBakeSignatureFloat(ref hash, RegionRadiusFront);
+                AddBakeSignatureFloat(ref hash, RegionRadiusBack);
+                AddBakeSignatureFloat(ref hash, RegionRadiusUp);
+                AddBakeSignatureFloat(ref hash, RegionRadiusDown);
+                AddBakeSignatureFloat(ref hash, ThighGuardSpeed);
+                AddBakeSignatureFloat(ref hash, InnerThighGuardStrength);
+                AddBakeSignatureFloat(ref hash, TopEdgeTaper);
+                AddBakeSignatureFloat(ref hash, BottomEdgeTaper);
+                AddBakeSignatureFloat(ref hash, SideSmoothWidth);
+                AddBakeSignatureFloat(ref hash, SideSmoothStrength);
+                AddBakeSignatureFloat(ref hash, BreastGuardStrength);
+                AddBakeSignatureFloat(ref hash, ClothOverdrive);
+                AddBakeSignatureFloat(ref hash, OuterClothOverdrive);
+                AddBakeSignatureFloat(ref hash, OuterClothPregnancyScale);
+                hash = hash * 31 + (OuterClothSkirtDrape ? 1 : 0);
+                AddBakeSignatureFloat(ref hash, OuterClothLayerGuard);
+                AddBakeSignatureFloat(ref hash, InnerClothOffset);
+                AddBakeSignatureFloat(ref hash, OuterClothOffset);
+                AddBakeSignatureFloat(ref hash, ClothThicknessPreserve);
+                AddBakeSignatureFloat(ref hash, ClothOffsetSideRatio);
+                AddBakeSignatureFloat(ref hash, ClothBackOffsetBoost);
+                AddBakeSignatureFloat(ref hash, ClothDepthStretch);
+                return hash;
+            }
+        }
+
+        static void AddBakeSignatureFloat(ref int hash, float value)
+        {
+            hash = hash * 31 + Mathf.RoundToInt(value * 100000f);
+        }
+
+        static void LogMorphBaseBake(
+            Maid maid,
+            TMorph morph,
+            SkinnedMeshRenderer smr,
+            MeshMorphClass meshClass,
+            float progress,
+            float effectiveProgress,
+            int oldOriVertId,
+            MorphBaseBakeState state,
+            DeformStats stats,
+            bool reusedStoredBase)
+        {
+            try
+            {
+                if (PregnancyPlugin.CfgMorphSpyLogging == null || !PregnancyPlugin.CfgMorphSpyLogging.Value)
+                    return;
+
+                string caller = "";
+                TryGetAysCaller(out caller);
+
+                string slot = "";
+                if (!object.ReferenceEquals(morph, null)
+                    && morph.bodyskin != null
+                    && morph.bodyskin.obj != null)
+                    slot = morph.bodyskin.obj.name;
+
+                int oriVertId = !object.ReferenceEquals(morph, null) && morph.m_vOriVert != null ? morph.m_vOriVert.GetHashCode() : 0;
+                int oriNormId = !object.ReferenceEquals(morph, null) && morph.m_vOriNorm != null ? morph.m_vOriNorm.GetHashCode() : 0;
+                int morphId = !object.ReferenceEquals(morph, null) ? morph.GetHashCode() : 0;
+                int vertexCount = state != null && state.BakedVerts != null ? state.BakedVerts.Length : 0;
+
+                _log.LogInfo("[MorphBake] runtime base baked"
+                    + " maid=" + GetMaidName(maid)
+                    + " slot=" + slot
+                    + " id=" + GetMeshId(smr)
+                    + " class=" + meshClass
+                    + " morphId=" + morphId
+                    + " oldOriVertId=" + oldOriVertId
+                    + " oriVertId=" + oriVertId
+                    + " oriNormId=" + oriNormId
+                    + " originalSig=" + (state != null ? state.OriginalSignature : 0)
+                    + " bakedSig=" + (state != null ? state.AppliedSignature : 0)
+                    + " shapeSig=" + (state != null ? state.ShapeSignature : 0)
+                    + " verts=" + vertexCount
+                    + " moved=" + stats.NonZeroVerts
+                    + " maxDelta=" + stats.MaxDelta.ToString("0.######")
+                    + " progress=" + progress.ToString("0.###")
+                    + " effectiveProgress=" + effectiveProgress.ToString("0.###")
+                    + " source=" + (reusedStoredBase ? "stored-base" : "new-base")
+                    + " caller=" + caller);
+            }
+            catch
+            {
+            }
         }
 
         internal static void FlushMorphDirty(Maid maid)
@@ -683,6 +1210,290 @@ namespace COM3D2.Pregnancy.Plugin
             int key = maid.GetHashCode();
             if (!_pendingVisibilityApply.Add(key)) return;
             PregnancyPlugin.Instance.StartCoroutine(VisibilityApplyBellyCoroutine(maid, key));
+        }
+
+        internal static bool PatchAysHooks(Harmony harmony)
+        {
+            if (_aysHooksPatched) return true;
+            if (object.ReferenceEquals(harmony, null)) return false;
+
+            bool patched = false;
+            string[] typeNames =
+            {
+                "COM3D2.AddYotogiSliderSE.Plugin.AddYotogiSliderSE",
+                "COM3D2.AddYotogiSlider.Plugin.AddYotogiSlider"
+            };
+
+            for (int i = 0; i < typeNames.Length; i++)
+            {
+                System.Type type = AccessTools.TypeByName(typeNames[i]);
+                if (object.ReferenceEquals(type, null)) continue;
+
+                MethodInfo initOnStartSkill = AccessTools.Method(type, "initOnStartSkill");
+                MethodInfo updateMaidHaraValue = AccessTools.Method(type, "updateMaidHaraValue");
+                if (object.ReferenceEquals(initOnStartSkill, null)) continue;
+
+                try
+                {
+                    harmony.Patch(
+                        initOnStartSkill,
+                        postfix: new HarmonyMethod(typeof(BellyMorphController), nameof(AysInitOnStartSkillPostfix)));
+
+                    if (!object.ReferenceEquals(updateMaidHaraValue, null))
+                    {
+                        harmony.Patch(
+                            updateMaidHaraValue,
+                            postfix: new HarmonyMethod(typeof(BellyMorphController), nameof(AysUpdateMaidHaraValuePostfix)));
+                    }
+
+                    patched = true;
+                }
+                catch (System.Exception e)
+                {
+                    if (!object.ReferenceEquals(PregnancyPlugin.CfgMorphSpyLogging, null)
+                        && PregnancyPlugin.CfgMorphSpyLogging.Value)
+                        _log.LogInfo("[AYSHaraZero] patch failed type=" + typeNames[i]
+                            + " error=" + e.GetType().Name + ": " + e.Message);
+                }
+            }
+
+            _aysHooksPatched = patched;
+            if (patched
+                && !object.ReferenceEquals(PregnancyPlugin.CfgMorphSpyLogging, null)
+                && PregnancyPlugin.CfgMorphSpyLogging.Value)
+                _log.LogInfo("[AYSHaraZero] patched AYS initOnStartSkill");
+            return patched;
+        }
+
+        public static void AysInitOnStartSkillPostfix(object __instance)
+        {
+            if (object.ReferenceEquals(__instance, null)) return;
+            TryZeroAysHaraAfterRead(__instance, "initOnStartSkill-postfix");
+        }
+
+        public static void AysUpdateMaidHaraValuePostfix(object __instance, float value)
+        {
+            if (object.ReferenceEquals(__instance, null)) return;
+            LogAysHaraWriteSpy(__instance, value);
+        }
+
+        static bool TryZeroAysHaraAfterRead(object instance, string reason)
+        {
+            System.Type type = !object.ReferenceEquals(instance, null) ? instance.GetType() : null;
+            if (!IsAysPluginType(type)) return false;
+
+            Maid maid = GetAysMaid(instance, type);
+            if (!IsValid(maid)) return false;
+
+            float sliderValue;
+            if (!TryGetAysHaraSliderValue(instance, type, out sliderValue))
+                return false;
+
+            int sessionKey = ComputeAysSessionKey(instance, type, maid);
+            int beforeHara = GetMaidHaraValue(maid);
+            int defHara = GetAysIntField(instance, type, "iDefHara");
+            bool oldSuppress = _suppressMorphBaseBake;
+
+            try
+            {
+                _suppressMorphBaseBake = true;
+                maid.SetProp("Hara", 0, true);
+                if (!object.ReferenceEquals(maid.body0, null))
+                    maid.body0.VertexMorph_FromProcItem("hara", 0f);
+
+                LogAysHaraZero(maid, beforeHara, defHara, sliderValue, reason, sessionKey);
+                return true;
+            }
+            catch (System.Exception e)
+            {
+                LogAysHaraZeroError(maid, reason, e);
+                return false;
+            }
+            finally
+            {
+                _suppressMorphBaseBake = oldSuppress;
+            }
+        }
+
+        static int ComputeAysSessionKey(object instance, System.Type type, Maid maid)
+        {
+            object manager = null;
+            try
+            {
+                FieldInfo managerField = type.GetField(
+                    "yotogiPlayManager",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (!object.ReferenceEquals(managerField, null))
+                    manager = managerField.GetValue(instance);
+            }
+            catch
+            {
+            }
+
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 397 + (!object.ReferenceEquals(maid, null) ? maid.GetHashCode() : 0);
+                hash = hash * 397 + (!object.ReferenceEquals(instance, null) ? instance.GetHashCode() : 0);
+                hash = hash * 397 + (!object.ReferenceEquals(manager, null) ? manager.GetHashCode() : 0);
+                return hash;
+            }
+        }
+
+        static bool IsAysPluginType(System.Type type)
+        {
+            if (object.ReferenceEquals(type, null)) return false;
+            string fullName = type.FullName ?? "";
+            return fullName == "COM3D2.AddYotogiSliderSE.Plugin.AddYotogiSliderSE"
+                || fullName == "COM3D2.AddYotogiSlider.Plugin.AddYotogiSlider";
+        }
+
+        static Maid GetAysMaid(object instance, System.Type type)
+        {
+            try
+            {
+                FieldInfo maidField = type.GetField(
+                    "maid",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                return !object.ReferenceEquals(maidField, null) ? maidField.GetValue(instance) as Maid : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        static bool TryGetAysHaraSliderValue(object instance, System.Type type, out float value)
+        {
+            value = 0f;
+            try
+            {
+                FieldInfo sliderField = type.GetField(
+                    "slider",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (object.ReferenceEquals(sliderField, null)) return false;
+
+                object sliders = sliderField.GetValue(instance);
+                System.Collections.IDictionary dict = sliders as System.Collections.IDictionary;
+                if (object.ReferenceEquals(dict, null) || !dict.Contains("Hara")) return false;
+
+                object haraSlider = dict["Hara"];
+                if (object.ReferenceEquals(haraSlider, null)) return false;
+
+                PropertyInfo valueProp = haraSlider.GetType().GetProperty(
+                    "Value",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (object.ReferenceEquals(valueProp, null)) return false;
+
+                value = System.Convert.ToSingle(valueProp.GetValue(haraSlider, null));
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        static int GetAysIntField(object instance, System.Type type, string name)
+        {
+            try
+            {
+                FieldInfo field = type.GetField(
+                    name,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                return !object.ReferenceEquals(field, null) ? System.Convert.ToInt32(field.GetValue(instance)) : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        static int GetMaidHaraValue(Maid maid)
+        {
+            try
+            {
+                MaidProp prop = !object.ReferenceEquals(maid, null) ? maid.GetProp("Hara") : null;
+                return !object.ReferenceEquals(prop, null) ? prop.value : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        static void LogAysHaraWriteSpy(object instance, float value)
+        {
+            try
+            {
+                if (PregnancyPlugin.CfgMorphSpyLogging == null || !PregnancyPlugin.CfgMorphSpyLogging.Value)
+                    return;
+
+                System.Type type = !object.ReferenceEquals(instance, null) ? instance.GetType() : null;
+                if (!IsAysPluginType(type)) return;
+
+                Maid maid = GetAysMaid(instance, type);
+                int sessionKey = ComputeAysSessionKey(instance, type, maid);
+                int count;
+                _aysHaraWriteSpyCountBySession.TryGetValue(sessionKey, out count);
+                if (count >= 12) return;
+
+                count++;
+                _aysHaraWriteSpyCountBySession[sessionKey] = count;
+
+                int currentHara = GetMaidHaraValue(maid);
+                int defHara = GetAysIntField(instance, type, "iDefHara");
+                int currentAysHara = GetAysIntField(instance, type, "iCurrentHara");
+
+                _log.LogInfo("[AYSHaraWriteSpy]"
+                    + " maid=" + GetMaidName(maid)
+                    + " value=" + value.ToString("0.###")
+                    + " maidHara=" + currentHara
+                    + " defHara=" + defHara
+                    + " currentAysHara=" + currentAysHara
+                    + " session=" + sessionKey
+                    + " count=" + count);
+            }
+            catch
+            {
+            }
+        }
+
+        static void LogAysHaraZero(Maid maid, int beforeHara, int defHara, float sliderValue, string reason, int sessionKey)
+        {
+            try
+            {
+                if (PregnancyPlugin.CfgMorphSpyLogging == null || !PregnancyPlugin.CfgMorphSpyLogging.Value)
+                    return;
+
+                _log.LogInfo("[AYSHaraZero]"
+                    + " maid=" + GetMaidName(maid)
+                    + " reason=" + reason
+                    + " beforeHara=" + beforeHara
+                    + " defHara=" + defHara
+                    + " sliderHara=" + sliderValue.ToString("0.###")
+                    + " session=" + sessionKey);
+            }
+            catch
+            {
+            }
+        }
+
+        static void LogAysHaraZeroError(Maid maid, string reason, System.Exception e)
+        {
+            try
+            {
+                if (PregnancyPlugin.CfgMorphSpyLogging == null || !PregnancyPlugin.CfgMorphSpyLogging.Value)
+                    return;
+
+                _log.LogInfo("[AYSHaraZero]"
+                    + " maid=" + GetMaidName(maid)
+                    + " reason=" + reason
+                    + " error=" + e.GetType().Name + ": " + e.Message);
+            }
+            catch
+            {
+            }
         }
 
         static System.Collections.IEnumerator VisibilityApplyBellyCoroutine(Maid maid, int key)
@@ -1065,14 +1876,6 @@ namespace COM3D2.Pregnancy.Plugin
                 return;
             }
 
-            if (ClothDeformSmoothPasses > 0 && ClothDeformSmoothStrength > 0f &&
-                meshClass == MeshMorphClass.OuterCloth &&
-                IsSkirtOrDressMesh(smr))
-            {
-                Vector3 localUp = smr.transform.InverseTransformDirection(_bpWorldFrame.Up);
-                SmoothDisplacementDeltas(rec, mesh, newVerts, localUp);
-            }
-
             Vector3[] deltaVerts = BuildDeltaVerts(rec.OrigVerts, newVerts);
             // When our delta is already in the mesh (alreadyApplied), newVerts is the correct
             // target directly (computed from the clean OrigVerts base).  Otherwise accumulate
@@ -1393,15 +2196,6 @@ namespace COM3D2.Pregnancy.Plugin
                 if (innerThighRestore > 0f)
                     newWorldVert = Vector3.Lerp(newWorldVert, worldVert, innerThighRestore);
 
-                float armRestore = ArmRestoreMask(weight, bones);
-                if (armRestore > 0f)
-                    newWorldVert = Vector3.Lerp(newWorldVert, worldVert, armRestore);
-
-                float outerClothLowerFront = OuterClothLowerFrontRestoreMask(
-                    meshClass, upDot, edgeRatio, radiusDown);
-                if (outerClothLowerFront > 0f)
-                    newWorldVert = Vector3.Lerp(newWorldVert, worldVert, outerClothLowerFront);
-
                 if (trackOuterClothWorld)
                     clothMorphedWorld[i] = newWorldVert;
 
@@ -1461,174 +2255,6 @@ namespace COM3D2.Pregnancy.Plugin
             for (int i = 0; i < currentVerts.Length; i++)
                 result[i] = currentVerts[i] + deltaVerts[i];
             return result;
-        }
-
-        // Builds an adjacency list (shared-edge neighbors) from mesh triangles.
-        // Returns int[][] where [i] is an array of neighbor vertex indices for vertex i.
-        static int[][] BuildNeighborLists(int vertCount, int[] triangles)
-        {
-            // Use List<int> to collect, then convert to arrays for fast iteration.
-            var lists = new List<int>[vertCount];
-            for (int i = 0; i < vertCount; i++)
-                lists[i] = new List<int>(6);
-
-            for (int t = 0; t < triangles.Length; t += 3)
-            {
-                int a = triangles[t], b = triangles[t + 1], c = triangles[t + 2];
-                if (a < 0 || a >= vertCount || b < 0 || b >= vertCount || c < 0 || c >= vertCount)
-                    continue;
-                if (!lists[a].Contains(b)) lists[a].Add(b);
-                if (!lists[a].Contains(c)) lists[a].Add(c);
-                if (!lists[b].Contains(a)) lists[b].Add(a);
-                if (!lists[b].Contains(c)) lists[b].Add(c);
-                if (!lists[c].Contains(a)) lists[c].Add(a);
-                if (!lists[c].Contains(b)) lists[c].Add(b);
-            }
-
-            int[][] result = new int[vertCount][];
-            for (int i = 0; i < vertCount; i++)
-                result[i] = lists[i].ToArray();
-            return result;
-        }
-
-        // Laplacian smoothing of per-vertex displacements within a single mesh.
-        // Modifies newVerts in place: newVerts[i] = origVerts[i] + smoothedDelta[i].
-        // Seeds eligible set from all vertices with non-zero plugin deformation, then expands
-        // outward by ClothDeformSmoothRings rings.  Within eligible set, only vertices whose
-        // max pairwise delta difference exceeds ClothDeformSmoothThreshold are smoothed.
-        // Neighbor list is cached in rec.Neighbors and rebuilt only when mesh changes.
-        static void SmoothDisplacementDeltas(MeshRecord rec, Mesh mesh, Vector3[] newVerts, Vector3 localUp)
-        {
-            int count = rec.OrigVerts.Length;
-            if (newVerts == null || newVerts.Length != count) return;
-
-            // Rebuild neighbor cache when vertex count changes (e.g. outfit swap).
-            if (rec.Neighbors == null || rec.Neighbors.Length != count)
-            {
-                int[] tris = mesh.triangles;
-                rec.Neighbors = BuildNeighborLists(count, tris ?? new int[0]);
-            }
-
-            int[][] neighbors = rec.Neighbors;
-            int   passes    = ClothDeformSmoothPasses;
-            float strength  = Mathf.Clamp01(ClothDeformSmoothStrength);
-            // User-facing value is scaled by 1e-4 internally so that setting 1
-            // equals what used to require 0.0001, giving 10000x finer UI control.
-            float threshold = Mathf.Max(ClothDeformSmoothThreshold, 0f) * 1e-4f;
-
-            // Working delta arrays — we ping-pong to avoid read/write conflicts.
-            Vector3[] deltas  = new Vector3[count];
-            Vector3[] scratch = new Vector3[count];
-
-            for (int i = 0; i < count; i++)
-                deltas[i] = newVerts[i] - rec.OrigVerts[i];
-
-            // Seed (center points): vertices with a downward deformation component.
-            // Downward filter and threshold only apply to these seed vertices.
-            // Ring-expanded neighbors bypass both checks and are always smoothed.
-            bool[] isSeed   = new bool[count];
-            bool[] eligible = new bool[count];
-            for (int i = 0; i < count; i++)
-            {
-                bool seed = Vector3.Dot(deltas[i], localUp) < 0f;
-                isSeed[i]   = seed;
-                eligible[i] = seed;
-            }
-
-            // Expand eligible set outward by exactly ClothDeformSmoothRings rings.
-            // Use a two-buffer approach so each pass adds exactly one true ring
-            // (in-place modification would cause a single pass to flood multiple rings
-            // depending on vertex ordering).
-            int rings = Mathf.Max(ClothDeformSmoothRings, 0);
-            bool[] pending = new bool[count];
-            for (int ring = 0; ring < rings; ring++)
-            {
-                bool expanded = false;
-                for (int i = 0; i < count; i++)
-                {
-                    if (eligible[i]) continue;
-                    int[] nbrs = neighbors[i];
-                    if (nbrs == null) continue;
-                    for (int n = 0; n < nbrs.Length; n++)
-                    {
-                        if (eligible[nbrs[n]]) { pending[i] = true; expanded = true; break; }
-                    }
-                }
-                if (!expanded) break;
-                for (int i = 0; i < count; i++)
-                {
-                    if (pending[i]) { eligible[i] = true; pending[i] = false; }
-                }
-            }
-
-            for (int pass = 0; pass < passes; pass++)
-            {
-                for (int i = 0; i < count; i++)
-                {
-                    if (!eligible[i])
-                    {
-                        scratch[i] = deltas[i];
-                        continue;
-                    }
-
-                    int[] nbrs = neighbors[i];
-                    if (nbrs == null || nbrs.Length == 0)
-                    {
-                        scratch[i] = deltas[i];
-                        continue;
-                    }
-
-                    // Accumulate neighbour average and max pairwise diff simultaneously.
-                    float maxPairDiff = 0f;
-                    float ax = 0f, ay = 0f, az = 0f;
-                    for (int n = 0; n < nbrs.Length; n++)
-                    {
-                        float ddx = deltas[i].x - deltas[nbrs[n]].x;
-                        float ddy = deltas[i].y - deltas[nbrs[n]].y;
-                        float ddz = deltas[i].z - deltas[nbrs[n]].z;
-                        float pairSqr = ddx * ddx + ddy * ddy + ddz * ddz;
-                        if (pairSqr > maxPairDiff) maxPairDiff = pairSqr;
-                        ax += deltas[nbrs[n]].x;
-                        ay += deltas[nbrs[n]].y;
-                        az += deltas[nbrs[n]].z;
-                    }
-                    maxPairDiff = Mathf.Sqrt(maxPairDiff);
-
-                    // Seed (center) points must exceed threshold to be smoothed.
-                    // Ring-expanded points bypass the threshold and are always smoothed.
-                    float t;
-                    if (isSeed[i])
-                    {
-                        if (maxPairDiff <= threshold) { scratch[i] = deltas[i]; continue; }
-                        float excessRatio = (maxPairDiff - threshold) / maxPairDiff;
-                        t = excessRatio * strength;
-                    }
-                    else
-                    {
-                        t = strength;
-                    }
-
-                    // Pull delta[i] toward the neighbour average.
-                    float invN = 1f / nbrs.Length;
-                    float avgX = ax * invN, avgY = ay * invN, avgZ = az * invN;
-                    float dx = deltas[i].x - avgX;
-                    float dy = deltas[i].y - avgY;
-                    float dz = deltas[i].z - avgZ;
-                    scratch[i] = new Vector3(
-                        deltas[i].x - dx * t,
-                        deltas[i].y - dy * t,
-                        deltas[i].z - dz * t);
-                }
-
-                // Swap ping-pong buffers.
-                Vector3[] tmp = deltas;
-                deltas  = scratch;
-                scratch = tmp;
-            }
-
-            // Write smoothed result back.
-            for (int i = 0; i < count; i++)
-                newVerts[i] = rec.OrigVerts[i] + deltas[i];
         }
 
         static Vector3 SculptBaseShapeWorld(
@@ -1745,36 +2371,6 @@ namespace COM3D2.Pregnancy.Plugin
             return Mathf.Clamp01(upper * front * strength);
         }
 
-        // Prevents isolated spike vertices at the lower hem of skirts/dresses.
-        // The spike forms when a vertex near the ellipsoid boundary in the lower region
-        // gets displaced while its mesh neighbors are outside and stay put.
-        // Guard is gated on edgeRatio (proximity to ellipsoid boundary) so only those
-        // boundary vertices are suppressed; vertices deep inside the ellipsoid (the
-        // main belly area of the skirt) are unaffected and deform normally.
-        static float OuterClothLowerFrontRestoreMask(
-            MeshMorphClass meshClass,
-            float upDot,
-            float edgeRatio,
-            float radiusDown)
-        {
-            if (meshClass != MeshMorphClass.OuterCloth) return 0f;
-
-            float strength = Mathf.Max(OuterClothLowerFrontGuard, 0f);
-            if (strength <= 0f || upDot >= 0f) return 0f;
-
-            // Lower region of the belly ellipsoid
-            float lower = Smooth01(-upDot / Mathf.Max(radiusDown, 0.0001f));
-            if (lower <= 0f) return 0f;
-
-            // Near the ellipsoid boundary (outer 40%): this is where isolated
-            // spike vertices live. Deep-inside vertices (edgeRatio < 0.6) are
-            // not guarded so the skirt still follows the belly shape normally.
-            float edge = Smooth01((edgeRatio - 0.60f) / 0.40f);
-            if (edge <= 0f) return 0f;
-
-            return Mathf.Clamp01(lower * edge * strength);
-        }
-
         static float BreastBoneWeight(BoneWeight weight, Transform[] bones)
         {
             float total = 0f;
@@ -1835,38 +2431,6 @@ namespace COM3D2.Pregnancy.Plugin
             string lower = name.ToLowerInvariant();
             return lower.Contains("momoniku")
                 || lower.Contains("momotwist");
-        }
-
-        static float ArmRestoreMask(BoneWeight weight, Transform[] bones)
-        {
-            float armWeight = 0f;
-            AddArmBoneWeight(ref armWeight, bones, weight.boneIndex0, weight.weight0);
-            AddArmBoneWeight(ref armWeight, bones, weight.boneIndex1, weight.weight1);
-            AddArmBoneWeight(ref armWeight, bones, weight.boneIndex2, weight.weight2);
-            AddArmBoneWeight(ref armWeight, bones, weight.boneIndex3, weight.weight3);
-            armWeight = Mathf.Clamp01(armWeight);
-            if (armWeight <= 0f) return 0f;
-
-            return Mathf.Clamp01(armWeight * 4f);
-        }
-
-        static void AddArmBoneWeight(ref float total, Transform[] bones, int index, float weight)
-        {
-            if (weight <= 0f || bones == null || index < 0 || index >= bones.Length) return;
-            Transform bone = bones[index];
-            if (bone == null || !IsArmBoneName(bone.name)) return;
-            total += weight;
-        }
-
-        static bool IsArmBoneName(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return false;
-            string lower = name.ToLowerInvariant();
-            return lower.Contains("upperarm")
-                || lower.Contains("forearm")
-                || lower.Contains("clavicle")
-                || lower.Contains("腕")
-                || lower.Contains("ude");
         }
 
         const int SkirtDrapePropagatePasses = 48;
@@ -2483,6 +3047,7 @@ namespace COM3D2.Pregnancy.Plugin
             float oldCompressionFollow = Mathf.Lerp(minFollow, 1f, outerSurface);
             float stretchControl = ClothDepthStretch * Mathf.Lerp(1f, 1.35f, lower);
             float inverseCompression = (oldCompressionFollow - minFollow) / Mathf.Max(1f - minFollow, 0.0001f);
+
             return 1f + inverseCompression * stretchControl;
         }
 
@@ -2928,3 +3493,4 @@ namespace COM3D2.Pregnancy.Plugin
         }
     }
 }
+
