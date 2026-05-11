@@ -28,6 +28,7 @@ namespace COM3D2.Pregnancy.Plugin
         public float bellyRegionRadiusDown = 0.18f;
         public float bellyThighGuardSpeed = 4.0f;
         public float bellyInnerThighGuardStrength = 1.0f;
+        public float bellyThighGuardSmoothStrength = 0.35f;
         public float bellyTopEdgeTaper = -1.0f;
         public float bellyBottomEdgeTaper = 0.0f;
         public float bellySideSmoothWidth = 0.8f;
@@ -42,6 +43,18 @@ namespace COM3D2.Pregnancy.Plugin
         public float bellyClothOffsetSideRatio = 0.0f;
         public float bellyClothBackOffsetBoost = 0.0f;
         public float bellyClothDepthStretch = 3.0f;
+        public int bellySkirtBoundarySmoothPasses = 2;
+        public float bellySkirtBoundarySmoothStrength = 0.35f;
+        public float bellySkirtBoundaryUpOffset = 0.0f;
+        public float bellySkirtFrontPlaneFwdOffset = 0.0f;
+        public float bellySkirtTopRadiusSideScale = 1.15f;
+        public float bellySkirtTopRadiusFwdScale = 1.15f;
+        public float bellySkirtLowerTipSide = 0.0f;
+        public float bellySkirtLowerTipUp = -0.42f;
+        public float bellySkirtLowerTipFwd = 0.0f;
+        public float bellySkirtLowerRadiusSide = 1.0f;
+        public float bellySkirtLowerRadiusUp = 1.0f;
+        public float bellySkirtLowerRadiusFwd = 1.0f;
 
     }
 }

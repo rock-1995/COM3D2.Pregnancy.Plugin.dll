@@ -21,6 +21,8 @@ namespace COM3D2.Pregnancy.Plugin
         internal static ConfigEntry<bool> CfgMorphSpyLogging;
         internal static ConfigEntry<bool> CfgDebugMeshLogging;
         Harmony _harmony;
+        int _aysHookAttempts;
+        bool _aysHookReady;
 
         void Awake()
         {
@@ -81,18 +83,17 @@ namespace COM3D2.Pregnancy.Plugin
 
         void Start()
         {
-            StartCoroutine(PatchAysHookWhenAvailable());
+            _aysHookAttempts = 0;
+            _aysHookReady = BellyMorphController.PatchAysHooks(_harmony);
         }
 
-        System.Collections.IEnumerator PatchAysHookWhenAvailable()
+        void Update()
         {
-            for (int i = 0; i < 600; i++)
-            {
-                if (BellyMorphController.PatchAysHooks(_harmony))
-                    yield break;
+            if (_aysHookReady || _aysHookAttempts >= 600)
+                return;
 
-                yield return null;
-            }
+            _aysHookAttempts++;
+            _aysHookReady = BellyMorphController.PatchAysHooks(_harmony);
         }
 
     }

@@ -27,12 +27,26 @@ namespace COM3D2.Pregnancy.Plugin
                     string json = File.ReadAllText(SettingsPath);
                     bool hasOuterClothPregnancyScale = json.Contains("bellyOuterClothPregnancyScale");
                     bool hasOuterClothLayerGuard = json.Contains("bellyOuterClothLayerGuard");
+                    bool hasSkirtLowerParams = json.Contains("bellySkirtLowerTipUp");
                     Settings = JsonUtility.FromJson<PregSettings>(
                         json) ?? new PregSettings();
                     if (!hasOuterClothPregnancyScale)
                         Settings.bellyOuterClothPregnancyScale = 1.0f;
                     if (!hasOuterClothLayerGuard)
                         Settings.bellyOuterClothLayerGuard = 0.0f;
+                    if (!hasSkirtLowerParams)
+                    {
+                        Settings.bellySkirtBoundarySmoothPasses = 2;
+                        Settings.bellySkirtBoundarySmoothStrength = 0.35f;
+                        Settings.bellySkirtBoundaryUpOffset = 0.0f;
+                        Settings.bellySkirtFrontPlaneFwdOffset = 0.0f;
+                        Settings.bellySkirtLowerTipSide = 0.0f;
+                        Settings.bellySkirtLowerTipUp = -0.42f;
+                        Settings.bellySkirtLowerTipFwd = 0.0f;
+                        Settings.bellySkirtLowerRadiusSide = 1.0f;
+                        Settings.bellySkirtLowerRadiusUp = 1.0f;
+                        Settings.bellySkirtLowerRadiusFwd = 1.0f;
+                    }
                 }
                 catch { }
             }
@@ -70,6 +84,7 @@ namespace COM3D2.Pregnancy.Plugin
             BellyMorphController.RegionRadiusDown = Settings.bellyRegionRadiusDown;
             BellyMorphController.ThighGuardSpeed = Settings.bellyThighGuardSpeed;
             BellyMorphController.InnerThighGuardStrength = Settings.bellyInnerThighGuardStrength;
+            BellyMorphController.ThighGuardSmoothStrength = Settings.bellyThighGuardSmoothStrength;
             BellyMorphController.TopEdgeTaper = Settings.bellyTopEdgeTaper;
             BellyMorphController.BottomEdgeTaper = Settings.bellyBottomEdgeTaper;
             BellyMorphController.SideSmoothWidth = Settings.bellySideSmoothWidth;
@@ -84,6 +99,18 @@ namespace COM3D2.Pregnancy.Plugin
             BellyMorphController.ClothOffsetSideRatio = Settings.bellyClothOffsetSideRatio;
             BellyMorphController.ClothBackOffsetBoost = Settings.bellyClothBackOffsetBoost;
             BellyMorphController.ClothDepthStretch = Settings.bellyClothDepthStretch;
+            BellyMorphController.SkirtBoundarySmoothPasses = Settings.bellySkirtBoundarySmoothPasses;
+            BellyMorphController.SkirtBoundarySmoothStrength = Settings.bellySkirtBoundarySmoothStrength;
+            BellyMorphController.SkirtBoundaryUpOffset = Settings.bellySkirtBoundaryUpOffset;
+            BellyMorphController.SkirtFrontPlaneFwdOffset = Settings.bellySkirtFrontPlaneFwdOffset;
+            BellyMorphController.SkirtTopRadiusSideScale = Settings.bellySkirtTopRadiusSideScale;
+            BellyMorphController.SkirtTopRadiusFwdScale = Settings.bellySkirtTopRadiusFwdScale;
+            BellyMorphController.SkirtLowerTipSide = Settings.bellySkirtLowerTipSide;
+            BellyMorphController.SkirtLowerTipUp = Settings.bellySkirtLowerTipUp;
+            BellyMorphController.SkirtLowerTipFwd = Settings.bellySkirtLowerTipFwd;
+            BellyMorphController.SkirtLowerRadiusSide = Settings.bellySkirtLowerRadiusSide;
+            BellyMorphController.SkirtLowerRadiusUp = Settings.bellySkirtLowerRadiusUp;
+            BellyMorphController.SkirtLowerRadiusFwd = Settings.bellySkirtLowerRadiusFwd;
         }
 
         public static void CaptureCurrentBellySettings()
@@ -110,6 +137,7 @@ namespace COM3D2.Pregnancy.Plugin
             Settings.bellyRegionRadiusDown = BellyMorphController.RegionRadiusDown;
             Settings.bellyThighGuardSpeed = BellyMorphController.ThighGuardSpeed;
             Settings.bellyInnerThighGuardStrength = BellyMorphController.InnerThighGuardStrength;
+            Settings.bellyThighGuardSmoothStrength = BellyMorphController.ThighGuardSmoothStrength;
             Settings.bellyTopEdgeTaper = BellyMorphController.TopEdgeTaper;
             Settings.bellyBottomEdgeTaper = BellyMorphController.BottomEdgeTaper;
             Settings.bellySideSmoothWidth = BellyMorphController.SideSmoothWidth;
@@ -124,6 +152,18 @@ namespace COM3D2.Pregnancy.Plugin
             Settings.bellyClothOffsetSideRatio = BellyMorphController.ClothOffsetSideRatio;
             Settings.bellyClothBackOffsetBoost = BellyMorphController.ClothBackOffsetBoost;
             Settings.bellyClothDepthStretch = BellyMorphController.ClothDepthStretch;
+            Settings.bellySkirtBoundarySmoothPasses = BellyMorphController.SkirtBoundarySmoothPasses;
+            Settings.bellySkirtBoundarySmoothStrength = BellyMorphController.SkirtBoundarySmoothStrength;
+            Settings.bellySkirtBoundaryUpOffset = BellyMorphController.SkirtBoundaryUpOffset;
+            Settings.bellySkirtFrontPlaneFwdOffset = BellyMorphController.SkirtFrontPlaneFwdOffset;
+            Settings.bellySkirtTopRadiusSideScale = BellyMorphController.SkirtTopRadiusSideScale;
+            Settings.bellySkirtTopRadiusFwdScale = BellyMorphController.SkirtTopRadiusFwdScale;
+            Settings.bellySkirtLowerTipSide = BellyMorphController.SkirtLowerTipSide;
+            Settings.bellySkirtLowerTipUp = BellyMorphController.SkirtLowerTipUp;
+            Settings.bellySkirtLowerTipFwd = BellyMorphController.SkirtLowerTipFwd;
+            Settings.bellySkirtLowerRadiusSide = BellyMorphController.SkirtLowerRadiusSide;
+            Settings.bellySkirtLowerRadiusUp = BellyMorphController.SkirtLowerRadiusUp;
+            Settings.bellySkirtLowerRadiusFwd = BellyMorphController.SkirtLowerRadiusFwd;
             SaveSettings();
         }
 

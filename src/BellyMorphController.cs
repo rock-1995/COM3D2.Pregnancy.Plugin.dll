@@ -1,5 +1,8 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Reflection;
+using System.Text;
 using HarmonyLib;
 using UnityEngine;
 
@@ -18,6 +21,11 @@ namespace COM3D2.Pregnancy.Plugin
         const float BasePushOut = 1.0f;
         const float NormalAffectedDelta = 0.0002f;
         const int NormalAffectedExpandPasses = 4;
+        const int ThighGuardSmoothPasses = 2;
+        const float ReferenceBodyUp = 0.25f;
+        const float ReferenceBodySide = 0.25f;
+        const float MinBodyRelativeScale = 0.35f;
+        const float MaxBodyRelativeScale = 3.0f;
 
         public static float SpineLerpT = 1.0f;
         public static float OffsetSide = 0.0f;
@@ -43,6 +51,7 @@ namespace COM3D2.Pregnancy.Plugin
         public static float RegionRadiusDown = 0.18f;
         public static float ThighGuardSpeed = 4.0f;
         public static float InnerThighGuardStrength = 1.0f;
+        public static float ThighGuardSmoothStrength = 0.35f;
         public static float TopEdgeTaper = -1.0f;
         public static float BottomEdgeTaper = 0.0f;
         public static float SideSmoothWidth = 0.8f;
@@ -59,8 +68,24 @@ namespace COM3D2.Pregnancy.Plugin
         public static float ClothOffsetSideRatio = 0.0f;
         public static float ClothBackOffsetBoost = 0.0f;
         public static float ClothDepthStretch = 3.0f;
+        public static int SkirtBoundarySmoothPasses = 2;
+        public static float SkirtBoundarySmoothStrength = 0.35f;
+        public static float SkirtBoundaryUpOffset = 0.0f;
+        public static float SkirtFrontPlaneFwdOffset = 0.0f;
+        public static float SkirtTopRadiusSideScale = 1.15f;
+        public static float SkirtTopRadiusFwdScale = 1.15f;
+        public static float SkirtLowerTipSide = 0.0f;
+        public static float SkirtLowerTipUp = -0.42f;
+        public static float SkirtLowerTipFwd = 0.0f;
+        public static float SkirtLowerRadiusSide = 1.0f;
+        public static float SkirtLowerRadiusUp = 1.0f;
+        public static float SkirtLowerRadiusFwd = 1.0f;
 
         const float BellyEdgeBlend = 0.35f;
+        const float ArmDetachWeightThreshold = 0.25f;
+        const float SkirtLowerMinDelta = 0.00025f;
+        const float SkirtBoundaryFrontBand = 0.08f;
+        const float SkirtBoundaryPlaneBand = 0.16f;
 
         static readonly string[] FaceKeywords =
         {
@@ -91,7 +116,113 @@ namespace COM3D2.Pregnancy.Plugin
             public Vector3[] OrigVerts;
             public Vector3[] OrigNormals;
             public Vector3[] LastDeltaVerts;
+            public VertexMorphTrace[] LastMorphTrace;
             public int AppliedSignature;
+        }
+
+        class VertexMorphTrace
+        {
+            public bool Masked;
+            public bool SkinOk;
+            public bool InEllipsoid;
+            public bool MorphApplied;
+
+            public string StopReason;
+            public string BoneName0;
+            public string BoneName1;
+            public string BoneName2;
+            public string BoneName3;
+            public int BoneIndex0;
+            public int BoneIndex1;
+            public int BoneIndex2;
+            public int BoneIndex3;
+            public float BoneWeight0;
+            public float BoneWeight1;
+            public float BoneWeight2;
+            public float BoneWeight3;
+
+            public float EffectiveProgress;
+            public float RadiusScale;
+            public float RadiusSide;
+            public float RadiusFront;
+            public float RadiusBack;
+            public float RadiusUp;
+            public float RadiusDown;
+            public float OrigSide;
+            public float OrigUp;
+            public float OrigFwd;
+            public float FwdRadius;
+            public float UpRadius;
+            public float Ellip;
+            public float EdgeRatio;
+            public float EdgeFade;
+            public float TopEdgeStrength;
+            public float ShapeWeight;
+            public float MorphWeight;
+            public float OriginalRadius;
+            public float DirectionalRadius;
+
+            public float LowerBodyRestore;
+            public float BreastRestore;
+            public float InnerThighRestore;
+            public float BottomTaperInfluence;
+            public float BottomTaperLower;
+            public float BottomTaperFront;
+            public float BottomTaperGuardKeep;
+            public float ClothDepthStretchFactor;
+            public float ClothDepthDeltaFwd;
+            public float ClothLayerDeltaFwd;
+            public bool InwardGuardApplied;
+            public float InwardGuardDeltaFwd;
+
+            public bool SkirtDrapeEnabled;
+            public bool SkirtDrapeReached;
+            public float SkirtDrapeAddFwd;
+            public string SkirtDrapeReason;
+
+            public bool SkirtLowerEnabled;
+            public float SkirtLowerBoundaryUp;
+            public float SkirtLowerLowerLimit;
+            public float SkirtLowerTopDeltaFwd;
+            public float SkirtLowerGrowth;
+            public float SkirtLowerDownT;
+            public float SkirtLowerAddFwd;
+            public string SkirtLowerReason;
+
+            public float CrossLayerGuardDeltaFwd;
+            public float ThighSmoothMask;
+            public float ThighSmoothDeltaFwd;
+
+            public float FwdBase;
+            public float FwdSphere;
+            public float FwdSculpt;
+            public float FwdShift;
+            public float FwdStretch;
+            public float FwdRoundness;
+            public float FwdTaperY;
+            public float FwdTaperZ;
+            public float FwdFatFold;
+            public float FwdDrop;
+            public float FwdSideSmooth;
+            public float FwdRibReduce;
+            public float FwdLowerRestore;
+            public float FwdDepthStretch;
+            public float FwdLayerOffset;
+            public float FwdInwardGuard;
+            public float FwdBreastRestore;
+            public float FwdInnerThighRestore;
+            public float FwdBottomTaper;
+            public float FwdSkirtDrape;
+            public float FwdSkirtLower;
+            public float FwdCrossLayerGuard;
+            public float FwdThighSmooth;
+            public float FwdFinal;
+        }
+
+        enum TraceFwdStage
+        {
+            SkirtDrape,
+            SkirtLower,
         }
 
         class MorphBaseBakeState
@@ -164,6 +295,10 @@ namespace COM3D2.Pregnancy.Plugin
             public Vector3 Up;
             public Vector3 Fwd;
             public Vector3 Right;
+            public float ScaleSide;
+            public float ScaleUp;
+            public float ScaleFwd;
+            public float ScaleGeneral;
         }
 
         struct DeformStats
@@ -250,6 +385,7 @@ namespace COM3D2.Pregnancy.Plugin
             RegionRadiusDown          = 0.18f;
             ThighGuardSpeed           = 4.0f;
             InnerThighGuardStrength   = 1.0f;
+            ThighGuardSmoothStrength  = 0.35f;
             TopEdgeTaper              = -1.0f;
             BottomEdgeTaper           = 0.0f;
             SideSmoothWidth           = 0.8f;
@@ -264,6 +400,18 @@ namespace COM3D2.Pregnancy.Plugin
             ClothOffsetSideRatio      = 0.0f;
             ClothBackOffsetBoost      = 0.0f;
             ClothDepthStretch         = 3.0f;
+            SkirtBoundarySmoothPasses = 2;
+            SkirtBoundarySmoothStrength = 0.35f;
+            SkirtBoundaryUpOffset    = 0.0f;
+            SkirtFrontPlaneFwdOffset = 0.0f;
+            SkirtTopRadiusSideScale  = 1.15f;
+            SkirtTopRadiusFwdScale   = 1.15f;
+            SkirtLowerTipSide        = 0.0f;
+            SkirtLowerTipUp          = -0.42f;
+            SkirtLowerTipFwd         = 0.0f;
+            SkirtLowerRadiusSide     = 1.0f;
+            SkirtLowerRadiusUp       = 1.0f;
+            SkirtLowerRadiusFwd      = 1.0f;
         }
 
         static void ResetInternal(Maid maid)
@@ -345,7 +493,7 @@ namespace COM3D2.Pregnancy.Plugin
                     }
 
                     ApplySMR(maid, smr, progress, meshClass, false);
-                    if (meshClass == MeshMorphClass.OuterCloth)
+                    if (meshClass == MeshMorphClass.OuterCloth && IsSkirtLikeMesh(smr))
                         skirtLayerGuardCandidates.Add(smr);
                 }
             }
@@ -447,8 +595,11 @@ namespace COM3D2.Pregnancy.Plugin
             if (meshClass == MeshMorphClass.Ignore)
                 return mask;
 
+            Mesh mesh = smr != null ? smr.sharedMesh : null;
+            BoneWeight[] weights = mesh != null ? mesh.boneWeights : null;
+            Transform[] bones = smr != null ? smr.bones : null;
             for (int i = 0; i < count; i++)
-                mask[i] = true;
+                mask[i] = !IsArmDetachVertex(weights, bones, i);
 
             return mask;
         }
@@ -464,6 +615,59 @@ namespace COM3D2.Pregnancy.Plugin
             if (ContainsAny(id, "wear", "onep", "skrt", "zubon", "skirt", "mekure")) return MeshMorphClass.OuterCloth;
 
             return MeshMorphClass.Ignore;
+        }
+
+        static bool IsSkirtLikeMesh(SkinnedMeshRenderer smr)
+        {
+            string id = GetMeshId(smr);
+            if (string.IsNullOrEmpty(id)) return false;
+            return ContainsAny(id, "skrt", "skirt", "onep", "mekure");
+        }
+
+        static bool IsArmDetachVertex(BoneWeight[] weights, Transform[] bones, int index)
+        {
+            if (weights == null || bones == null || index < 0 || index >= weights.Length)
+                return false;
+
+            float armWeight = 0f;
+            AddArmDetachBoneWeight(ref armWeight, bones, weights[index].boneIndex0, weights[index].weight0);
+            AddArmDetachBoneWeight(ref armWeight, bones, weights[index].boneIndex1, weights[index].weight1);
+            AddArmDetachBoneWeight(ref armWeight, bones, weights[index].boneIndex2, weights[index].weight2);
+            AddArmDetachBoneWeight(ref armWeight, bones, weights[index].boneIndex3, weights[index].weight3);
+            return armWeight >= ArmDetachWeightThreshold;
+        }
+
+        static void AddArmDetachBoneWeight(ref float total, Transform[] bones, int index, float weight)
+        {
+            if (weight <= 0f || bones == null || index < 0 || index >= bones.Length) return;
+            Transform bone = bones[index];
+            if (bone == null || !IsArmDetachBoneName(bone.name)) return;
+            total += weight;
+        }
+
+        static bool IsArmDetachBoneName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            return name == "Bip01 L UpperArm"
+                || name == "Bip01 L UpperArm_SCL_"
+                || name == "Bip01 L Forearm"
+                || name == "Bip01 L Forearm_SCL_"
+                || name == "Bip01 L Hand"
+                || name == "Bip01 L Hand_SCL_"
+                || name == "Uppertwist_L"
+                || name == "Uppertwist1_L"
+                || name == "Foretwist_L"
+                || name == "Foretwist1_L"
+                || name == "Bip01 R UpperArm"
+                || name == "Bip01 R UpperArm_SCL_"
+                || name == "Bip01 R Forearm"
+                || name == "Bip01 R Forearm_SCL_"
+                || name == "Bip01 R Hand"
+                || name == "Bip01 R Hand_SCL_"
+                || name == "Uppertwist_R"
+                || name == "Uppertwist1_R"
+                || name == "Foretwist_R"
+                || name == "Foretwist1_R";
         }
 
         static bool ShouldLogMorphDiagnostics(SkinnedMeshRenderer smr, MeshMorphClass meshClass)
@@ -847,6 +1051,155 @@ namespace COM3D2.Pregnancy.Plugin
             return false;
         }
 
+        static float RelSide(float value)
+            => value * (_bpWorldCached ? Mathf.Max(_bpWorldFrame.ScaleSide, MinBodyRelativeScale) : 1f);
+
+        static float RelUp(float value)
+            => value * (_bpWorldCached ? Mathf.Max(_bpWorldFrame.ScaleUp, MinBodyRelativeScale) : 1f);
+
+        static float RelFwd(float value)
+            => value * (_bpWorldCached ? Mathf.Max(_bpWorldFrame.ScaleFwd, MinBodyRelativeScale) : 1f);
+
+        static float RelGeneral(float value)
+            => value * (_bpWorldCached ? Mathf.Max(_bpWorldFrame.ScaleGeneral, MinBodyRelativeScale) : 1f);
+
+        static float TraceFwd(Vector3 worldPoint, Vector3 center, Vector3 fwd)
+        {
+            return Vector3.Dot(worldPoint - center, fwd);
+        }
+
+        static string GetBoneName(Transform[] bones, int index)
+        {
+            if (bones == null || index < 0 || index >= bones.Length || bones[index] == null)
+                return string.Empty;
+            return bones[index].name ?? string.Empty;
+        }
+
+        static void FillTraceBoneInfo(VertexMorphTrace trace, BoneWeight weight, Transform[] bones)
+        {
+            if (trace == null) return;
+
+            trace.BoneIndex0 = weight.boneIndex0;
+            trace.BoneIndex1 = weight.boneIndex1;
+            trace.BoneIndex2 = weight.boneIndex2;
+            trace.BoneIndex3 = weight.boneIndex3;
+            trace.BoneWeight0 = weight.weight0;
+            trace.BoneWeight1 = weight.weight1;
+            trace.BoneWeight2 = weight.weight2;
+            trace.BoneWeight3 = weight.weight3;
+            trace.BoneName0 = GetBoneName(bones, weight.boneIndex0);
+            trace.BoneName1 = GetBoneName(bones, weight.boneIndex1);
+            trace.BoneName2 = GetBoneName(bones, weight.boneIndex2);
+            trace.BoneName3 = GetBoneName(bones, weight.boneIndex3);
+        }
+
+        static void InitializeTraceFwd(VertexMorphTrace trace, float fwd)
+        {
+            if (trace == null) return;
+
+            trace.FwdBase = fwd;
+            trace.FwdSphere = fwd;
+            trace.FwdSculpt = fwd;
+            trace.FwdShift = fwd;
+            trace.FwdStretch = fwd;
+            trace.FwdRoundness = fwd;
+            trace.FwdTaperY = fwd;
+            trace.FwdTaperZ = fwd;
+            trace.FwdFatFold = fwd;
+            trace.FwdDrop = fwd;
+            trace.FwdSideSmooth = fwd;
+            trace.FwdRibReduce = fwd;
+            trace.FwdLowerRestore = fwd;
+            trace.FwdDepthStretch = fwd;
+            trace.FwdLayerOffset = fwd;
+            trace.FwdInwardGuard = fwd;
+            trace.FwdBreastRestore = fwd;
+            trace.FwdInnerThighRestore = fwd;
+            trace.FwdBottomTaper = fwd;
+            trace.FwdSkirtDrape = fwd;
+            trace.FwdSkirtLower = fwd;
+            trace.FwdCrossLayerGuard = fwd;
+            trace.FwdThighSmooth = fwd;
+            trace.FwdFinal = fwd;
+        }
+
+        static void CaptureTraceWorldFwd(
+            VertexMorphTrace[] traces,
+            Vector3[] worldVerts,
+            bool[] valid,
+            Vector3 center,
+            Vector3 fwd,
+            TraceFwdStage stage)
+        {
+            if (traces == null || worldVerts == null || valid == null) return;
+
+            int count = Mathf.Min(traces.Length, Mathf.Min(worldVerts.Length, valid.Length));
+            for (int i = 0; i < count; i++)
+            {
+                VertexMorphTrace trace = traces[i];
+                if (trace == null || !valid[i]) continue;
+
+                float value = TraceFwd(worldVerts[i], center, fwd);
+                if (stage == TraceFwdStage.SkirtDrape)
+                    trace.FwdSkirtDrape = value;
+                else if (stage == TraceFwdStage.SkirtLower)
+                    trace.FwdSkirtLower = value;
+            }
+        }
+
+        static void CaptureTraceFinalLocalFwd(
+            VertexMorphTrace[] traces,
+            Vector3[] finalLocalVerts,
+            Vector3[] beforeSmoothLocalVerts,
+            BoneWeight[] weights,
+            Matrix4x4[] boneMatrices,
+            Vector3 center,
+            Vector3 fwd)
+        {
+            if (traces == null || finalLocalVerts == null || weights == null || boneMatrices == null) return;
+
+            int count = Mathf.Min(traces.Length, Mathf.Min(finalLocalVerts.Length, weights.Length));
+            for (int i = 0; i < count; i++)
+            {
+                VertexMorphTrace trace = traces[i];
+                if (trace == null || !trace.SkinOk || !HasValidBoneWeight(weights[i], boneMatrices)) continue;
+
+                Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
+                if (beforeSmoothLocalVerts != null && i < beforeSmoothLocalVerts.Length)
+                {
+                    float beforeFwd = TraceFwd(skin.MultiplyPoint3x4(beforeSmoothLocalVerts[i]), center, fwd);
+                    float afterFwd = TraceFwd(skin.MultiplyPoint3x4(finalLocalVerts[i]), center, fwd);
+                    trace.ThighSmoothMask = Mathf.Max(trace.LowerBodyRestore, trace.InnerThighRestore);
+                    trace.ThighSmoothDeltaFwd = afterFwd - beforeFwd;
+                    if (Mathf.Abs(trace.CrossLayerGuardDeltaFwd) <= 1e-8f)
+                        trace.FwdCrossLayerGuard = trace.FwdSkirtLower;
+                    trace.FwdThighSmooth = afterFwd;
+                    trace.FwdFinal = afterFwd;
+                }
+                else
+                {
+                    float finalFwd = TraceFwd(skin.MultiplyPoint3x4(finalLocalVerts[i]), center, fwd);
+                    if (Mathf.Abs(trace.CrossLayerGuardDeltaFwd) <= 1e-8f)
+                        trace.FwdCrossLayerGuard = trace.FwdSkirtLower;
+                    trace.FwdThighSmooth = finalFwd;
+                    trace.FwdFinal = finalFwd;
+                }
+            }
+        }
+
+        static void SetSkirtLowerTraceReason(VertexMorphTrace[] traces, bool[] valid, string reason)
+        {
+            if (traces == null) return;
+
+            int count = valid != null ? Mathf.Min(traces.Length, valid.Length) : traces.Length;
+            for (int i = 0; i < count; i++)
+            {
+                if (valid != null && !valid[i]) continue;
+                if (traces[i] != null)
+                    traces[i].SkirtLowerReason = reason;
+            }
+        }
+
         static float GetEffectiveMorphProgress(float progress, MeshMorphClass meshClass)
         {
             if (meshClass == MeshMorphClass.InnerCloth)
@@ -1023,6 +1376,7 @@ namespace COM3D2.Pregnancy.Plugin
                 AddBakeSignatureFloat(ref hash, RegionRadiusDown);
                 AddBakeSignatureFloat(ref hash, ThighGuardSpeed);
                 AddBakeSignatureFloat(ref hash, InnerThighGuardStrength);
+                AddBakeSignatureFloat(ref hash, ThighGuardSmoothStrength);
                 AddBakeSignatureFloat(ref hash, TopEdgeTaper);
                 AddBakeSignatureFloat(ref hash, BottomEdgeTaper);
                 AddBakeSignatureFloat(ref hash, SideSmoothWidth);
@@ -1039,6 +1393,18 @@ namespace COM3D2.Pregnancy.Plugin
                 AddBakeSignatureFloat(ref hash, ClothOffsetSideRatio);
                 AddBakeSignatureFloat(ref hash, ClothBackOffsetBoost);
                 AddBakeSignatureFloat(ref hash, ClothDepthStretch);
+                hash = hash * 31 + SkirtBoundarySmoothPasses;
+                AddBakeSignatureFloat(ref hash, SkirtBoundarySmoothStrength);
+                AddBakeSignatureFloat(ref hash, SkirtBoundaryUpOffset);
+                AddBakeSignatureFloat(ref hash, SkirtFrontPlaneFwdOffset);
+                AddBakeSignatureFloat(ref hash, SkirtTopRadiusSideScale);
+                AddBakeSignatureFloat(ref hash, SkirtTopRadiusFwdScale);
+                AddBakeSignatureFloat(ref hash, SkirtLowerTipSide);
+                AddBakeSignatureFloat(ref hash, SkirtLowerTipUp);
+                AddBakeSignatureFloat(ref hash, SkirtLowerTipFwd);
+                AddBakeSignatureFloat(ref hash, SkirtLowerRadiusSide);
+                AddBakeSignatureFloat(ref hash, SkirtLowerRadiusUp);
+                AddBakeSignatureFloat(ref hash, SkirtLowerRadiusFwd);
                 return hash;
             }
         }
@@ -1209,7 +1575,7 @@ namespace COM3D2.Pregnancy.Plugin
 
             int key = maid.GetHashCode();
             if (!_pendingVisibilityApply.Add(key)) return;
-            PregnancyPlugin.Instance.StartCoroutine(VisibilityApplyBellyCoroutine(maid, key));
+            EnsureMonitor(maid).RequestVisibilityApply(key);
         }
 
         internal static bool PatchAysHooks(Harmony harmony)
@@ -1496,54 +1862,6 @@ namespace COM3D2.Pregnancy.Plugin
             }
         }
 
-        static System.Collections.IEnumerator VisibilityApplyBellyCoroutine(Maid maid, int key)
-        {
-            try
-            {
-                while (maid != null && (maid.body0 == null || !maid.body0.isLoadedBody))
-                    yield return null;
-
-                if (maid == null) yield break;
-
-                int stableFrames = 0;
-                int previousSignature = 0;
-                bool hasPrevious = false;
-
-                while (maid != null && stableFrames < AutoMorphStableFrames)
-                {
-                    yield return new WaitForEndOfFrame();
-                    yield return null;
-
-                    while (maid != null && (maid.body0 == null || !maid.body0.isLoadedBody))
-                        yield return null;
-
-                    if (maid == null) yield break;
-
-                    int currentSignature = ComputeVisibilitySignature(CollectRelevantRenderers(maid));
-                    if (hasPrevious && currentSignature == previousSignature)
-                        stableFrames++;
-                    else
-                        stableFrames = 0;
-
-                    previousSignature = currentSignature;
-                    hasPrevious = true;
-                }
-
-                if (maid == null) yield break;
-                if (CurrentTriggerMode != MorphTriggerMode.VisibilityChange) yield break;
-                if (!PregnancyManager.GetPregnant(maid)) yield break;
-
-                float progress = PregnancyManager.GetProgress(maid);
-                if (progress <= 0f) yield break;
-
-                PregnancyUI.TriggerApplyBelly(maid, progress);
-            }
-            finally
-            {
-                _pendingVisibilityApply.Remove(key);
-            }
-        }
-
         static bool TryCacheBindPoseWorldRef(SkinnedMeshRenderer smr)
         {
             if (!TryBuildBindPoseWorldRef(smr, out LocalFrame frame, out Dictionary<string, Matrix4x4> boneWorld))
@@ -1658,10 +1976,16 @@ namespace COM3D2.Pregnancy.Plugin
             Vector3 lateralMid = (leftRefW + rightRefW) * 0.5f;
             worldBase += right * Vector3.Dot(lateralMid - worldBase, right);
 
-            frame.Center = worldBase + right * OffsetSide;
             frame.Up = up;
             frame.Fwd = fwd;
             frame.Right = right;
+            float upLen = Vector3.Distance(pelvisW, spineW);
+            float sideLen = Vector3.Distance(leftRefW, rightRefW);
+            frame.ScaleUp = Mathf.Clamp(upLen / ReferenceBodyUp, MinBodyRelativeScale, MaxBodyRelativeScale);
+            frame.ScaleSide = Mathf.Clamp(sideLen / ReferenceBodySide, MinBodyRelativeScale, MaxBodyRelativeScale);
+            frame.ScaleFwd = Mathf.Clamp((frame.ScaleUp + frame.ScaleSide) * 0.5f, MinBodyRelativeScale, MaxBodyRelativeScale);
+            frame.ScaleGeneral = Mathf.Clamp((frame.ScaleUp + frame.ScaleSide + frame.ScaleFwd) / 3f, MinBodyRelativeScale, MaxBodyRelativeScale);
+            frame.Center = worldBase + right * (OffsetSide * frame.ScaleSide);
             return true;
         }
 
@@ -1837,6 +2161,7 @@ namespace COM3D2.Pregnancy.Plugin
             if (refreshBase)
             {
                 rec.LastDeltaVerts = null;
+                rec.LastMorphTrace = null;
                 rec.AppliedSignature = 0;
             }
 
@@ -1918,6 +2243,8 @@ namespace COM3D2.Pregnancy.Plugin
         {
             newVerts = null;
             stats = new DeformStats();
+            if (rec != null)
+                rec.LastMorphTrace = null;
             if (!_bpWorldCached) return false;
             if (smr == null || smr.sharedMesh == null || rec == null || rec.OrigVerts == null) return false;
 
@@ -1931,11 +2258,11 @@ namespace COM3D2.Pregnancy.Plugin
             if (!TryBuildBindPoseSkinMatrices(smr, out boneMatrices)) return false;
 
             float radiusScale = Mathf.Max(0.05f, 1f + InflationMultiplier);
-            float radiusSide = Mathf.Max(RegionRadiusSide * radiusScale, 0.0001f);
-            float radiusFront = Mathf.Max(RegionRadiusFront * radiusScale, 0.0001f);
-            float radiusBack = Mathf.Max(RegionRadiusBack * radiusScale, 0.0001f);
-            float radiusUp = Mathf.Max(RegionRadiusUp * radiusScale, 0.0001f);
-            float radiusDown = Mathf.Max(RegionRadiusDown * radiusScale, 0.0001f);
+            float radiusSide = Mathf.Max(RelSide(RegionRadiusSide) * radiusScale, RelGeneral(0.0001f));
+            float radiusFront = Mathf.Max(RelFwd(RegionRadiusFront) * radiusScale, RelGeneral(0.0001f));
+            float radiusBack = Mathf.Max(RelFwd(RegionRadiusBack) * radiusScale, RelGeneral(0.0001f));
+            float radiusUp = Mathf.Max(RelUp(RegionRadiusUp) * radiusScale, RelGeneral(0.0001f));
+            float radiusDown = Mathf.Max(RelUp(RegionRadiusDown) * radiusScale, RelGeneral(0.0001f));
             Vector3 worldCenter = _bpWorldFrame.Center;
             Vector3 worldFwd = _bpWorldFrame.Fwd;
             Vector3 worldUp = _bpWorldFrame.Up;
@@ -1943,12 +2270,17 @@ namespace COM3D2.Pregnancy.Plugin
             if (worldRight.sqrMagnitude < 1e-8f)
                 worldRight = Vector3.Cross(worldUp, worldFwd).normalized;
             if (worldRight.sqrMagnitude < 1e-8f) worldRight = Vector3.right;
-            Vector3 regionCenter = worldCenter + worldUp * InflationMoveY + worldFwd * InflationMoveZ;
-            bool useSkirtDrape = meshClass == MeshMorphClass.OuterCloth && OuterClothSkirtDrape;
-            bool trackOuterClothWorld = useSkirtDrape;
+            Vector3 regionCenter = worldCenter + worldUp * RelUp(InflationMoveY) + worldFwd * RelFwd(InflationMoveZ);
+            bool isSkirtLikeOuter = meshClass == MeshMorphClass.OuterCloth && IsSkirtLikeMesh(smr);
+            bool useSkirtDrape = isSkirtLikeOuter && OuterClothSkirtDrape;
+            bool useSkirtLowerShape = isSkirtLikeOuter;
+            bool trackOuterClothWorld = useSkirtDrape || useSkirtLowerShape;
+            VertexMorphTrace[] morphTrace = isSkirtLikeOuter ? new VertexMorphTrace[rec.OrigVerts.Length] : null;
+            rec.LastMorphTrace = morphTrace;
             Vector3[] clothOriginalWorld = trackOuterClothWorld ? new Vector3[rec.OrigVerts.Length] : null;
             Vector3[] clothMorphedWorld = trackOuterClothWorld ? new Vector3[rec.OrigVerts.Length] : null;
             bool[] clothValid = trackOuterClothWorld ? new bool[rec.OrigVerts.Length] : null;
+            float[] thighGuardSmoothMask = ThighGuardSmoothStrength > 0f ? new float[rec.OrigVerts.Length] : null;
 
             newVerts = new Vector3[rec.OrigVerts.Length];
             for (int i = 0; i < rec.OrigVerts.Length; i++)
@@ -1956,11 +2288,41 @@ namespace COM3D2.Pregnancy.Plugin
                 Vector3 vert = rec.OrigVerts[i];
                 newVerts[i] = vert;
 
-                if (mask != null && (i >= mask.Length || !mask[i])) continue;
+                VertexMorphTrace trace = null;
+                if (morphTrace != null)
+                {
+                    trace = new VertexMorphTrace
+                    {
+                        EffectiveProgress = progress,
+                        RadiusScale = radiusScale,
+                        RadiusSide = radiusSide,
+                        RadiusFront = radiusFront,
+                        RadiusBack = radiusBack,
+                        RadiusUp = radiusUp,
+                        RadiusDown = radiusDown,
+                        StopReason = "not-processed",
+                        SkirtDrapeEnabled = useSkirtDrape,
+                        SkirtLowerEnabled = useSkirtLowerShape,
+                    };
+                    morphTrace[i] = trace;
+                }
+
+                if (mask != null && (i >= mask.Length || !mask[i]))
+                {
+                    if (trace != null) trace.StopReason = "masked-out";
+                    continue;
+                }
+                if (trace != null) trace.Masked = true;
                 if (trackStats) stats.MaskedVerts++;
 
                 BoneWeight weight = weights[i];
-                if (!HasValidBoneWeight(weight, boneMatrices)) continue;
+                if (trace != null) FillTraceBoneInfo(trace, weight, bones);
+                if (!HasValidBoneWeight(weight, boneMatrices))
+                {
+                    if (trace != null) trace.StopReason = "invalid-skin";
+                    continue;
+                }
+                if (trace != null) trace.SkinOk = true;
 
                 Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weight);
                 Vector3 worldVert = skin.MultiplyPoint3x4(vert);
@@ -1980,17 +2342,38 @@ namespace COM3D2.Pregnancy.Plugin
                 float ellip = (sideDot / radiusSide) * (sideDot / radiusSide)
                     + (fwdDot / fwdRadius) * (fwdDot / fwdRadius)
                     + (upDot / upRadius) * (upDot / upRadius);
-                if (ellip >= 1f) continue;
+                if (trace != null)
+                {
+                    trace.OrigSide = sideDot;
+                    trace.OrigUp = upDot;
+                    trace.OrigFwd = fwdDot;
+                    trace.FwdRadius = fwdRadius;
+                    trace.UpRadius = upRadius;
+                    trace.Ellip = ellip;
+                    InitializeTraceFwd(trace, fwdDot);
+                }
+                if (ellip >= 1f)
+                {
+                    if (trace != null) trace.StopReason = "outside-ellipsoid";
+                    continue;
+                }
+                if (trace != null) trace.InEllipsoid = true;
 
                 if (trackStats) stats.EllipsoidVerts++;
 
                 float edgeRatio = Mathf.Sqrt(ellip);
                 float edgeFade = 1f - BellyEdgeCurve(edgeRatio);
-                float topBottomStrength = GetTopBottomEdgeStrength(
+                float topEdgeStrength = GetTopEdgeStrength(
                     upDot,
-                    radiusUp,
-                    radiusDown);
-                float shapeWeight = Mathf.Clamp01(progress * edgeFade * topBottomStrength * BasePushOut);
+                    radiusUp);
+                float shapeWeight = Mathf.Clamp01(progress * edgeFade * topEdgeStrength * BasePushOut);
+                if (trace != null)
+                {
+                    trace.EdgeRatio = edgeRatio;
+                    trace.EdgeFade = edgeFade;
+                    trace.TopEdgeStrength = topEdgeStrength;
+                    trace.ShapeWeight = shapeWeight;
+                }
 
                 float dist = regionDelta.magnitude;
                 if (dist < 1e-6f)
@@ -2001,12 +2384,28 @@ namespace COM3D2.Pregnancy.Plugin
 
                 float directionalRadius = dist / Mathf.Max(Mathf.Sqrt(ellip), 0.0001f);
                 float morphWeight = shapeWeight;
-                if (morphWeight <= 0f) continue;
+                if (trace != null)
+                {
+                    trace.OriginalRadius = dist;
+                    trace.DirectionalRadius = directionalRadius;
+                    trace.MorphWeight = morphWeight;
+                }
+                if (morphWeight <= 0f)
+                {
+                    if (trace != null) trace.StopReason = "zero-morph-weight";
+                    continue;
+                }
+                if (trace != null)
+                {
+                    trace.MorphApplied = true;
+                    trace.StopReason = "ok";
+                }
 
                 if (trackStats && morphWeight > stats.MaxStrength) stats.MaxStrength = morphWeight;
 
                 Vector3 sphereTarget = regionCenter + regionDelta.normalized * directionalRadius;
                 Vector3 newWorldVert = Vector3.Lerp(worldVert, sphereTarget, morphWeight);
+                if (trace != null) trace.FwdSphere = TraceFwd(newWorldVert, regionCenter, worldFwd);
                 newWorldVert = SculptBaseShapeWorld(
                     worldVert,
                     newWorldVert,
@@ -2017,24 +2416,26 @@ namespace COM3D2.Pregnancy.Plugin
                     radiusSide,
                     radiusUp,
                     radiusDown);
+                if (trace != null) trace.FwdSculpt = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 if (InflationShiftY != 0f)
                 {
                     float upLimit = upDot >= 0f ? radiusUp : radiusDown;
                     float centerYFade = Mathf.Clamp01(1f - Mathf.Abs(upDot) / Mathf.Max(upLimit * 1.8f, 0.0001f));
                     float sideLimit = Mathf.Clamp01(1f - Mathf.Abs(sideDot) / Mathf.Max(radiusSide * 3f, 0.0001f));
-                    newWorldVert += worldUp * (InflationShiftY * centerYFade * sideLimit * morphWeight);
+                    newWorldVert += worldUp * (RelUp(InflationShiftY) * centerYFade * sideLimit * morphWeight);
                 }
 
                 if (InflationShiftZ != 0f)
                 {
                     float frontFade = Mathf.Clamp01(fwdDot / Mathf.Max(radiusFront * 2f, 0.0001f));
-                    newWorldVert += worldFwd * (InflationShiftZ * frontFade * morphWeight);
+                    newWorldVert += worldFwd * (RelFwd(InflationShiftZ) * frontFade * morphWeight);
                 }
+                if (trace != null) trace.FwdShift = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
-                float sx = Mathf.Max(0.05f, 1f + InflationStretchX);
-                float sy = Mathf.Max(0.05f, 1f + InflationStretchY);
-                float sz = Mathf.Max(0.05f, 1f + InflationStretchZ);
+                float sx = Mathf.Max(0.05f, 1f + InflationStretchX * morphWeight);
+                float sy = Mathf.Max(0.05f, 1f + InflationStretchY * morphWeight);
+                float sz = Mathf.Max(0.05f, 1f + InflationStretchZ * morphWeight);
                 if (sx != 1f || sy != 1f || sz != 1f)
                 {
                     Vector3 rel = newWorldVert - regionCenter;
@@ -2043,6 +2444,7 @@ namespace COM3D2.Pregnancy.Plugin
                     float relFwd = Vector3.Dot(rel, worldFwd) * sz;
                     newWorldVert = regionCenter + worldRight * relSide + worldUp * relUp + worldFwd * relFwd;
                 }
+                if (trace != null) trace.FwdStretch = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 if (InflationRoundness != 0f)
                 {
@@ -2052,8 +2454,9 @@ namespace COM3D2.Pregnancy.Plugin
                     Vector3 roundCenter = regionCenter + worldFwd * (radiusFront / 3f);
                     Vector3 roundDir = newWorldVert - roundCenter;
                     if (roundDir.sqrMagnitude < 1e-6f) roundDir = worldFwd;
-                    newWorldVert += roundDir.normalized * (InflationRoundness * roundFade * edgeFade * progress);
+                    newWorldVert += roundDir.normalized * (RelGeneral(InflationRoundness) * roundFade * edgeFade * progress);
                 }
+                if (trace != null) trace.FwdRoundness = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 if (InflationTaperY != 0f)
                 {
@@ -2061,7 +2464,7 @@ namespace COM3D2.Pregnancy.Plugin
                     float relUp = Vector3.Dot(rel, worldUp);
                     float relSide = Vector3.Dot(rel, worldRight);
                     float relUpRadius = relUp >= 0f ? radiusUp : radiusDown;
-                    float taper = InflationTaperY
+                    float taper = RelSide(InflationTaperY)
                         * Mathf.Clamp01(Mathf.Abs(relUp) / Mathf.Max(relUpRadius, 0.0001f))
                         * Mathf.Clamp01(Mathf.Abs(relSide) / Mathf.Max(radiusSide, 0.0001f))
                         * morphWeight;
@@ -2069,6 +2472,7 @@ namespace COM3D2.Pregnancy.Plugin
                     if (relUp < 0f) taper = -taper;
                     newWorldVert += worldRight * taper;
                 }
+                if (trace != null) trace.FwdTaperY = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 if (InflationTaperZ != 0f)
                 {
@@ -2076,13 +2480,14 @@ namespace COM3D2.Pregnancy.Plugin
                     float relUp = Vector3.Dot(rel, worldUp);
                     float relFwd = Vector3.Dot(rel, worldFwd);
                     float relUpRadius = relUp >= 0f ? radiusUp : radiusDown;
-                    float taper = InflationTaperZ
+                    float taper = RelFwd(InflationTaperZ)
                         * Mathf.Clamp01(Mathf.Abs(relUp) / Mathf.Max(relUpRadius, 0.0001f))
                         * Mathf.Clamp01((relFwd + radiusBack) / Mathf.Max(radiusFront + radiusBack, 0.0001f))
                         * morphWeight;
                     if (relUp < 0f) taper = -taper;
                     newWorldVert += worldFwd * taper;
                 }
+                if (trace != null) trace.FwdTaperZ = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 if (InflationFatFold > 0f)
                 {
@@ -2105,6 +2510,7 @@ namespace COM3D2.Pregnancy.Plugin
                         }
                     }
                 }
+                if (trace != null) trace.FwdFatFold = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 if (InflationDrop > 0f)
                 {
@@ -2112,6 +2518,7 @@ namespace COM3D2.Pregnancy.Plugin
                     float frontFade = Mathf.Clamp01(Vector3.Dot(rel, worldFwd) / Mathf.Max(radiusFront * 1.5f, 0.0001f));
                     newWorldVert -= worldUp * (radiusFront * InflationDrop * frontFade * morphWeight);
                 }
+                if (trace != null) trace.FwdDrop = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 newWorldVert = RoundToSidesWorld(
                     worldVert,
@@ -2120,6 +2527,7 @@ namespace COM3D2.Pregnancy.Plugin
                     worldFwd,
                     radiusBack,
                     radiusFront);
+                if (trace != null) trace.FwdSideSmooth = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 newWorldVert = ReduceRibStretchingWorld(
                     worldVert,
@@ -2128,6 +2536,7 @@ namespace COM3D2.Pregnancy.Plugin
                     worldUp,
                     worldFwd,
                     radiusUp);
+                if (trace != null) trace.FwdRibReduce = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 float thighRestore = LowerBodyRestoreMask(
                     upDot,
@@ -2137,9 +2546,19 @@ namespace COM3D2.Pregnancy.Plugin
                     radiusSide,
                     radiusBack,
                     radiusFront);
+                if (trace != null) trace.LowerBodyRestore = thighRestore;
                 if (thighRestore > 0f)
+                {
                     newWorldVert = Vector3.Lerp(newWorldVert, worldVert, thighRestore);
+                    if (thighGuardSmoothMask != null)
+                        thighGuardSmoothMask[i] = Mathf.Max(thighGuardSmoothMask[i], thighRestore);
+                }
+                if (trace != null) trace.FwdLowerRestore = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
+                float beforeDepthFwd = trace != null ? TraceFwd(newWorldVert, regionCenter, worldFwd) : 0f;
+                float depthStretchFactor = trace != null
+                    ? GetClothDepthStretchFactor(meshClass, dist, directionalRadius, upDot, radiusDown)
+                    : 1f;
                 newWorldVert = ApplyClothDepthStretchWorld(
                     meshClass,
                     worldVert,
@@ -2148,7 +2567,15 @@ namespace COM3D2.Pregnancy.Plugin
                     dist,
                     upDot,
                     radiusDown);
+                if (trace != null)
+                {
+                    float afterDepthFwd = TraceFwd(newWorldVert, regionCenter, worldFwd);
+                    trace.ClothDepthStretchFactor = depthStretchFactor;
+                    trace.ClothDepthDeltaFwd = afterDepthFwd - beforeDepthFwd;
+                    trace.FwdDepthStretch = afterDepthFwd;
+                }
 
+                float beforeLayerFwd = trace != null ? TraceFwd(newWorldVert, regionCenter, worldFwd) : 0f;
                 newWorldVert = ApplyClothLayerOffsetWorld(
                     meshClass,
                     worldVert,
@@ -2163,6 +2590,12 @@ namespace COM3D2.Pregnancy.Plugin
                     worldRight,
                     worldUp,
                     worldFwd);
+                if (trace != null)
+                {
+                    float afterLayerFwd = TraceFwd(newWorldVert, regionCenter, worldFwd);
+                    trace.ClothLayerDeltaFwd = afterLayerFwd - beforeLayerFwd;
+                    trace.FwdLayerOffset = afterLayerFwd;
+                }
 
                 Vector3 originalRel = worldVert - regionCenter;
                 Vector3 finalRel = newWorldVert - regionCenter;
@@ -2172,12 +2605,19 @@ namespace COM3D2.Pregnancy.Plugin
                 float finalCoreFwd = Vector3.Dot(finalRel, worldFwd);
                 float originalCoreDist = Mathf.Sqrt(originalCoreSide * originalCoreSide + originalCoreFwd * originalCoreFwd);
                 float finalCoreDist = Mathf.Sqrt(finalCoreSide * finalCoreSide + finalCoreFwd * finalCoreFwd);
+                float beforeInwardGuardFwd = trace != null ? finalCoreFwd : 0f;
                 if (finalCoreDist < originalCoreDist)
                 {
                     float finalUp = Vector3.Dot(finalRel, worldUp);
                     newWorldVert = regionCenter + worldRight * originalCoreSide + worldUp * finalUp + worldFwd * originalCoreFwd;
                     finalRel = newWorldVert - regionCenter;
                     finalCoreFwd = originalCoreFwd;
+                    if (trace != null) trace.InwardGuardApplied = true;
+                }
+                if (trace != null)
+                {
+                    trace.InwardGuardDeltaFwd = finalCoreFwd - beforeInwardGuardFwd;
+                    trace.FwdInwardGuard = finalCoreFwd;
                 }
 
                 float breastRestore = BreastRestoreMask(weight, bones);
@@ -2189,12 +2629,49 @@ namespace COM3D2.Pregnancy.Plugin
                         radiusUp,
                         radiusBack,
                         radiusFront);
+                if (trace != null) trace.BreastRestore = breastRestore;
                 if (breastRestore > 0f)
                     newWorldVert = Vector3.Lerp(newWorldVert, worldVert, breastRestore);
+                if (trace != null) trace.FwdBreastRestore = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 float innerThighRestore = InnerThighRestoreMask(weight, bones);
+                if (trace != null) trace.InnerThighRestore = innerThighRestore;
                 if (innerThighRestore > 0f)
+                {
                     newWorldVert = Vector3.Lerp(newWorldVert, worldVert, innerThighRestore);
+                    if (thighGuardSmoothMask != null)
+                        thighGuardSmoothMask[i] = Mathf.Max(thighGuardSmoothMask[i], innerThighRestore);
+                }
+                if (trace != null) trace.FwdInnerThighRestore = TraceFwd(newWorldVert, regionCenter, worldFwd);
+
+                if (trace != null)
+                {
+                    trace.BottomTaperInfluence = GetBottomEdgeTaperInfluence(
+                        upDot,
+                        fwdDot,
+                        radiusDown,
+                        radiusBack,
+                        radiusFront,
+                        morphWeight,
+                        Mathf.Max(thighRestore, innerThighRestore),
+                        out trace.BottomTaperLower,
+                        out trace.BottomTaperFront,
+                        out trace.BottomTaperGuardKeep);
+                }
+                newWorldVert = ApplyBottomEdgeTaperWorld(
+                    worldVert,
+                    newWorldVert,
+                    regionCenter,
+                    worldUp,
+                    worldFwd,
+                    upDot,
+                    fwdDot,
+                    radiusDown,
+                    radiusBack,
+                    radiusFront,
+                    morphWeight,
+                    Mathf.Max(thighRestore, innerThighRestore));
+                if (trace != null) trace.FwdBottomTaper = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 if (trackOuterClothWorld)
                     clothMorphedWorld[i] = newWorldVert;
@@ -2224,13 +2701,53 @@ namespace COM3D2.Pregnancy.Plugin
                     clothMorphedWorld,
                     clothValid,
                     newVerts,
+                    worldCenter,
                     regionCenter,
                     worldRight,
                     worldUp,
                     worldFwd,
                     radiusSide,
-                    radiusDown);
+                    radiusDown,
+                    morphTrace);
             }
+
+            if (morphTrace != null && trackOuterClothWorld)
+                CaptureTraceWorldFwd(morphTrace, clothMorphedWorld, clothValid, regionCenter, worldFwd, TraceFwdStage.SkirtDrape);
+
+            if (useSkirtLowerShape)
+            {
+                ApplySkirtLowerShapeToMesh(
+                    smr.sharedMesh,
+                    rec.OrigVerts,
+                    weights,
+                    boneMatrices,
+                    clothOriginalWorld,
+                    clothMorphedWorld,
+                    clothValid,
+                    newVerts,
+                    worldCenter,
+                    regionCenter,
+                    worldRight,
+                    worldUp,
+                    worldFwd,
+                    radiusSide,
+                    radiusFront,
+                    radiusBack,
+                    radiusUp,
+                    radiusDown,
+                    morphTrace);
+            }
+
+            if (morphTrace != null && trackOuterClothWorld)
+                CaptureTraceWorldFwd(morphTrace, clothMorphedWorld, clothValid, regionCenter, worldFwd, TraceFwdStage.SkirtLower);
+
+            Vector3[] beforeThighSmoothVerts = morphTrace != null && thighGuardSmoothMask != null
+                ? (Vector3[])newVerts.Clone()
+                : null;
+            SmoothThighGuardAffectedVerts(smr.sharedMesh, rec.OrigVerts, newVerts, thighGuardSmoothMask);
+
+            if (morphTrace != null)
+                CaptureTraceFinalLocalFwd(morphTrace, newVerts, beforeThighSmoothVerts, weights, boneMatrices, regionCenter, worldFwd);
 
             return true;
         }
@@ -2244,6 +2761,522 @@ namespace COM3D2.Pregnancy.Plugin
             for (int i = 0; i < delta.Length; i++)
                 delta[i] = newVerts[i] - baseVerts[i];
             return delta;
+        }
+
+        public static string ExportSkirtVertexMorphDump(Maid maid)
+        {
+            if (!IsValid(maid)) return string.Empty;
+
+            PruneRecords(maid);
+            EnsureBindPoseWorldForDump(maid);
+
+            string root = BepInEx.Paths.BepInExRootPath;
+            if (string.IsNullOrEmpty(root))
+                root = System.Environment.CurrentDirectory;
+
+            string dir = Path.Combine(root, "PregnancySkirtDumps");
+            Directory.CreateDirectory(dir);
+
+            string maidName = SafeDumpName(GetMaidName(maid));
+            string fileName = "skirt_vertices_"
+                + maidName
+                + "_"
+                + System.DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture)
+                + ".tsv";
+            string path = Path.Combine(dir, fileName);
+
+            int meshCount = 0;
+            int vertexCount = 0;
+            Vector3 frameCenter = _bpWorldCached ? _bpWorldFrame.Center : Vector3.zero;
+            Vector3 frameUp = _bpWorldCached ? _bpWorldFrame.Up : Vector3.up;
+            Vector3 frameFwd = _bpWorldCached ? _bpWorldFrame.Fwd : Vector3.forward;
+            Vector3 frameRight = _bpWorldCached ? _bpWorldFrame.Right : Vector3.right;
+            Vector3 regionCenter = frameCenter + frameUp * RelUp(InflationMoveY) + frameFwd * RelFwd(InflationMoveZ);
+
+            using (StreamWriter writer = new StreamWriter(path, false, Encoding.UTF8))
+            {
+                writer.WriteLine("# COM3D2 Pregnancy skirt vertex morph dump");
+                writer.WriteLine("# maid=" + EscapeDumpCell(GetMaidName(maid)));
+                writer.WriteLine("# activeProgress=" + F(GetActiveProgress(maid)));
+                writer.WriteLine("# frameCached=" + (_bpWorldCached ? "1" : "0"));
+                writer.WriteLine("# columns are tab-separated; delta columns are the plugin morph amount from stored base to plugin target");
+                writer.WriteLine("# traceParams=" + EscapeDumpCell(BuildTraceParamString()));
+                writer.WriteLine(
+                    "meshId\trenderer\tmeshInstance\tvertex\trecordOk\tdeltaOk\tskinOk"
+                    + "\torigLocalX\torigLocalY\torigLocalZ"
+                    + "\tcurrentLocalX\tcurrentLocalY\tcurrentLocalZ"
+                    + "\ttargetLocalX\ttargetLocalY\ttargetLocalZ"
+                    + "\tdeltaLocalX\tdeltaLocalY\tdeltaLocalZ\tdeltaLocalLen"
+                    + "\torigWorldX\torigWorldY\torigWorldZ"
+                    + "\tcurrentWorldX\tcurrentWorldY\tcurrentWorldZ"
+                    + "\ttargetWorldX\ttargetWorldY\ttargetWorldZ"
+                    + "\tdeltaWorldX\tdeltaWorldY\tdeltaWorldZ\tdeltaWorldLen"
+                    + "\torigSide\torigUp\torigFwd"
+                    + "\tdeltaSide\tdeltaUp\tdeltaFwd"
+                    + "\ttraceOk\ttraceReason\ttraceSteps"
+                    + "\tbone0\tboneW0\tbone1\tboneW1\tbone2\tboneW2\tbone3\tboneW3"
+                    + "\teffectiveProgress\tradiusScale\tradiusSide\tradiusFront\tradiusBack\tradiusUp\tradiusDown"
+                    + "\tfwdRadius\tupRadius\tellip\tedgeRatio\tedgeFade\ttopEdgeStrength\tshapeWeight\tmorphWeight\toriginalRadius\tdirectionalRadius"
+                    + "\tlowerBodyRestore\tinnerThighRestore\tbreastRestore\tbottomTaperInfluence\tbottomTaperLower\tbottomTaperFront\tbottomTaperGuardKeep"
+                    + "\tclothDepthFactor\tclothDepthDeltaFwd\tclothLayerDeltaFwd\tinwardGuardApplied\tinwardGuardDeltaFwd"
+                    + "\tskirtDrapeEnabled\tskirtDrapeReached\tskirtDrapeAddFwd\tskirtDrapeReason"
+                    + "\tskirtLowerEnabled\tskirtLowerBoundaryUp\tskirtLowerLowerLimit\tskirtLowerTopDeltaFwd\tskirtLowerGrowth\tskirtLowerDownT\tskirtLowerAddFwd\tskirtLowerReason"
+                    + "\tcrossLayerGuardDeltaFwd\tthighSmoothMask\tthighSmoothDeltaFwd"
+                    + "\tfwdBase\tfwdSphere\tfwdSculpt\tfwdShift\tfwdStretch\tfwdRoundness\tfwdTaperY\tfwdTaperZ\tfwdFatFold\tfwdDrop"
+                    + "\tfwdSideSmooth\tfwdRibReduce\tfwdLowerRestore\tfwdDepthStretch\tfwdLayerOffset\tfwdInwardGuard\tfwdBreastRestore\tfwdInnerThighRestore"
+                    + "\tfwdBottomTaper\tfwdSkirtDrape\tfwdSkirtLower\tfwdCrossLayerGuard\tfwdThighSmooth\tfwdFinal");
+
+                List<SkinnedMeshRenderer> renderers = CollectTargetRenderers(maid);
+                foreach (SkinnedMeshRenderer smr in renderers)
+                {
+                    if (smr == null || smr.sharedMesh == null) continue;
+                    if (ClassifyMesh(smr) != MeshMorphClass.OuterCloth) continue;
+                    if (!IsSkirtLikeMesh(smr)) continue;
+
+                    Mesh mesh = smr.sharedMesh;
+                    Vector3[] currentVerts = mesh.vertices;
+                    BoneWeight[] weights = mesh.boneWeights;
+                    int count = mesh.vertexCount;
+                    if (count <= 0) continue;
+
+                    MeshRecord rec = FindRecord(maid, smr);
+                    bool recordOk = rec != null
+                        && rec.Mesh == mesh
+                        && rec.OrigVerts != null
+                        && rec.OrigVerts.Length == count;
+                    bool deltaOk = recordOk
+                        && rec.LastDeltaVerts != null
+                        && rec.LastDeltaVerts.Length == count;
+                    VertexMorphTrace[] traces = recordOk && rec.LastMorphTrace != null && rec.LastMorphTrace.Length == count
+                        ? rec.LastMorphTrace
+                        : null;
+                    bool currentOk = currentVerts != null && currentVerts.Length == count;
+                    bool weightsOk = weights != null && weights.Length == count;
+
+                    Matrix4x4[] boneMatrices = null;
+                    bool skinOk = weightsOk && TryBuildBindPoseSkinMatrices(smr, out boneMatrices);
+
+                    meshCount++;
+                    for (int i = 0; i < count; i++)
+                    {
+                        Vector3 origLocal = recordOk ? rec.OrigVerts[i] : (currentOk ? currentVerts[i] : Vector3.zero);
+                        Vector3 deltaLocal = deltaOk ? rec.LastDeltaVerts[i] : Vector3.zero;
+                        Vector3 targetLocal = origLocal + deltaLocal;
+                        Vector3 currentLocal = currentOk ? currentVerts[i] : targetLocal;
+
+                        bool vertexSkinOk = skinOk && HasValidBoneWeight(weights[i], boneMatrices);
+                        Vector3 origWorld;
+                        Vector3 targetWorld;
+                        Vector3 currentWorld;
+                        if (vertexSkinOk)
+                        {
+                            Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
+                            origWorld = skin.MultiplyPoint3x4(origLocal);
+                            targetWorld = skin.MultiplyPoint3x4(targetLocal);
+                            currentWorld = skin.MultiplyPoint3x4(currentLocal);
+                        }
+                        else
+                        {
+                            origWorld = smr.transform.TransformPoint(origLocal);
+                            targetWorld = smr.transform.TransformPoint(targetLocal);
+                            currentWorld = smr.transform.TransformPoint(currentLocal);
+                        }
+
+                        Vector3 deltaWorld = targetWorld - origWorld;
+                        Vector3 rel = origWorld - regionCenter;
+                        float origSide = Vector3.Dot(rel, frameRight);
+                        float origUp = Vector3.Dot(rel, frameUp);
+                        float origFwd = Vector3.Dot(rel, frameFwd);
+                        float deltaSide = Vector3.Dot(deltaWorld, frameRight);
+                        float deltaUp = Vector3.Dot(deltaWorld, frameUp);
+                        float deltaFwd = Vector3.Dot(deltaWorld, frameFwd);
+
+                        bool first = true;
+                        WriteCell(writer, ref first, GetMeshId(smr));
+                        WriteCell(writer, ref first, smr.name);
+                        WriteCell(writer, ref first, mesh.GetInstanceID().ToString(CultureInfo.InvariantCulture));
+                        WriteCell(writer, ref first, i.ToString(CultureInfo.InvariantCulture));
+                        WriteCell(writer, ref first, recordOk ? "1" : "0");
+                        WriteCell(writer, ref first, deltaOk ? "1" : "0");
+                        WriteCell(writer, ref first, vertexSkinOk ? "1" : "0");
+                        WriteVectorCells(writer, ref first, origLocal);
+                        WriteVectorCells(writer, ref first, currentLocal);
+                        WriteVectorCells(writer, ref first, targetLocal);
+                        WriteVectorCells(writer, ref first, deltaLocal);
+                        WriteCell(writer, ref first, F(deltaLocal.magnitude));
+                        WriteVectorCells(writer, ref first, origWorld);
+                        WriteVectorCells(writer, ref first, currentWorld);
+                        WriteVectorCells(writer, ref first, targetWorld);
+                        WriteVectorCells(writer, ref first, deltaWorld);
+                        WriteCell(writer, ref first, F(deltaWorld.magnitude));
+                        WriteCell(writer, ref first, F(origSide));
+                        WriteCell(writer, ref first, F(origUp));
+                        WriteCell(writer, ref first, F(origFwd));
+                        WriteCell(writer, ref first, F(deltaSide));
+                        WriteCell(writer, ref first, F(deltaUp));
+                        WriteCell(writer, ref first, F(deltaFwd));
+                        WriteTraceCells(writer, ref first, traces != null ? traces[i] : null);
+                        writer.WriteLine();
+
+                        vertexCount++;
+                    }
+                }
+
+                writer.WriteLine("# meshCount=" + meshCount.ToString(CultureInfo.InvariantCulture));
+                writer.WriteLine("# vertexCount=" + vertexCount.ToString(CultureInfo.InvariantCulture));
+            }
+
+            _log.LogInfo("[Pregnancy] Skirt vertex dump written: " + path);
+            return path;
+        }
+
+        static void EnsureBindPoseWorldForDump(Maid maid)
+        {
+            if (_bpWorldCached || maid == null) return;
+
+            _bpBoneWorld.Clear();
+            List<SkinnedMeshRenderer> renderers = CollectTargetRenderers(maid);
+            foreach (SkinnedMeshRenderer smr in renderers)
+            {
+                if (smr == null || smr.sharedMesh == null) continue;
+                if (ClassifyMesh(smr) != MeshMorphClass.Body) continue;
+                if (TryCacheBindPoseWorldRef(smr)) return;
+            }
+        }
+
+        static string SafeDumpName(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "maid";
+
+            char[] invalid = Path.GetInvalidFileNameChars();
+            StringBuilder sb = new StringBuilder(value.Length);
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                bool bad = false;
+                for (int j = 0; j < invalid.Length; j++)
+                {
+                    if (c == invalid[j])
+                    {
+                        bad = true;
+                        break;
+                    }
+                }
+                sb.Append(bad ? '_' : c);
+            }
+            return sb.Length > 0 ? sb.ToString() : "maid";
+        }
+
+        static string F(float value)
+        {
+            return value.ToString("0.######", CultureInfo.InvariantCulture);
+        }
+
+        static void WriteVectorCells(TextWriter writer, ref bool first, Vector3 v)
+        {
+            WriteCell(writer, ref first, F(v.x));
+            WriteCell(writer, ref first, F(v.y));
+            WriteCell(writer, ref first, F(v.z));
+        }
+
+        static string BuildTraceParamString()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("InflationMultiplier=").Append(F(InflationMultiplier));
+            sb.Append(";InflationMoveY=").Append(F(InflationMoveY));
+            sb.Append(";InflationMoveZ=").Append(F(InflationMoveZ));
+            sb.Append(";InflationStretchX=").Append(F(InflationStretchX));
+            sb.Append(";InflationStretchY=").Append(F(InflationStretchY));
+            sb.Append(";InflationStretchZ=").Append(F(InflationStretchZ));
+            sb.Append(";InflationShiftY=").Append(F(InflationShiftY));
+            sb.Append(";InflationShiftZ=").Append(F(InflationShiftZ));
+            sb.Append(";InflationTaperY=").Append(F(InflationTaperY));
+            sb.Append(";InflationTaperZ=").Append(F(InflationTaperZ));
+            sb.Append(";InflationRoundness=").Append(F(InflationRoundness));
+            sb.Append(";InflationDrop=").Append(F(InflationDrop));
+            sb.Append(";InflationFatFold=").Append(F(InflationFatFold));
+            sb.Append(";InflationFatFoldHeight=").Append(F(InflationFatFoldHeight));
+            sb.Append(";InflationFatFoldGap=").Append(F(InflationFatFoldGap));
+            sb.Append(";RegionRadiusSide=").Append(F(RegionRadiusSide));
+            sb.Append(";RegionRadiusFront=").Append(F(RegionRadiusFront));
+            sb.Append(";RegionRadiusBack=").Append(F(RegionRadiusBack));
+            sb.Append(";RegionRadiusUp=").Append(F(RegionRadiusUp));
+            sb.Append(";RegionRadiusDown=").Append(F(RegionRadiusDown));
+            sb.Append(";ThighGuardSpeed=").Append(F(ThighGuardSpeed));
+            sb.Append(";InnerThighGuardStrength=").Append(F(InnerThighGuardStrength));
+            sb.Append(";ThighGuardSmoothStrength=").Append(F(ThighGuardSmoothStrength));
+            sb.Append(";TopEdgeTaper=").Append(F(TopEdgeTaper));
+            sb.Append(";BottomEdgeTaper=").Append(F(BottomEdgeTaper));
+            sb.Append(";SideSmoothWidth=").Append(F(SideSmoothWidth));
+            sb.Append(";SideSmoothStrength=").Append(F(SideSmoothStrength));
+            sb.Append(";BreastGuardStrength=").Append(F(BreastGuardStrength));
+            sb.Append(";OuterClothPregnancyScale=").Append(F(OuterClothPregnancyScale));
+            sb.Append(";OuterClothSkirtDrape=").Append(OuterClothSkirtDrape ? "1" : "0");
+            sb.Append(";OuterClothLayerGuard=").Append(F(OuterClothLayerGuard));
+            sb.Append(";InnerClothOffset=").Append(F(InnerClothOffset));
+            sb.Append(";OuterClothOffset=").Append(F(OuterClothOffset));
+            sb.Append(";ClothThicknessPreserve=").Append(F(ClothThicknessPreserve));
+            sb.Append(";ClothOffsetSideRatio=").Append(F(ClothOffsetSideRatio));
+            sb.Append(";ClothBackOffsetBoost=").Append(F(ClothBackOffsetBoost));
+            sb.Append(";ClothDepthStretch=").Append(F(ClothDepthStretch));
+            sb.Append(";SkirtBoundarySmoothPasses=").Append(SkirtBoundarySmoothPasses.ToString(CultureInfo.InvariantCulture));
+            sb.Append(";SkirtBoundarySmoothStrength=").Append(F(SkirtBoundarySmoothStrength));
+            sb.Append(";SkirtBoundaryUpOffset=").Append(F(SkirtBoundaryUpOffset));
+            sb.Append(";SkirtFrontPlaneFwdOffset=").Append(F(SkirtFrontPlaneFwdOffset));
+            sb.Append(";SkirtTopRadiusSideScale=").Append(F(SkirtTopRadiusSideScale));
+            sb.Append(";SkirtTopRadiusFwdScale=").Append(F(SkirtTopRadiusFwdScale));
+            sb.Append(";SkirtLowerTipSide=").Append(F(SkirtLowerTipSide));
+            sb.Append(";SkirtLowerTipUp=").Append(F(SkirtLowerTipUp));
+            sb.Append(";SkirtLowerTipFwd=").Append(F(SkirtLowerTipFwd));
+            sb.Append(";SkirtLowerRadiusSide=").Append(F(SkirtLowerRadiusSide));
+            sb.Append(";SkirtLowerRadiusUp=").Append(F(SkirtLowerRadiusUp));
+            sb.Append(";SkirtLowerRadiusFwd=").Append(F(SkirtLowerRadiusFwd));
+            return sb.ToString();
+        }
+
+        static string BuildTraceSteps(VertexMorphTrace trace)
+        {
+            if (trace == null) return string.Empty;
+
+            StringBuilder sb = new StringBuilder();
+            if (!trace.Masked)
+                AppendTraceStep(sb, trace.StopReason);
+            else if (!trace.SkinOk)
+                AppendTraceStep(sb, trace.StopReason);
+            else if (!trace.InEllipsoid)
+                AppendTraceStep(sb, "outside ellipsoid=" + F(trace.Ellip));
+            else
+            {
+                AppendTraceStep(sb, "ellipsoid=" + F(trace.Ellip)
+                    + " edgeFade=" + F(trace.EdgeFade)
+                    + " morphWeight=" + F(trace.MorphWeight));
+                AppendTraceDelta(sb, "sphere", trace.FwdSphere - trace.FwdBase);
+                AppendTraceDelta(sb, "sculpt", trace.FwdSculpt - trace.FwdSphere);
+                AppendTraceDelta(sb, "shiftY/Z", trace.FwdShift - trace.FwdSculpt);
+                AppendTraceDelta(sb, "stretch X/Y/Z=" + F(InflationStretchX) + "/" + F(InflationStretchY) + "/" + F(InflationStretchZ), trace.FwdStretch - trace.FwdShift);
+                AppendTraceDelta(sb, "roundness=" + F(InflationRoundness), trace.FwdRoundness - trace.FwdStretch);
+                AppendTraceDelta(sb, "taperY=" + F(InflationTaperY), trace.FwdTaperY - trace.FwdRoundness);
+                AppendTraceDelta(sb, "taperZ=" + F(InflationTaperZ), trace.FwdTaperZ - trace.FwdTaperY);
+                AppendTraceDelta(sb, "fatFold=" + F(InflationFatFold), trace.FwdFatFold - trace.FwdTaperZ);
+                AppendTraceDelta(sb, "drop=" + F(InflationDrop), trace.FwdDrop - trace.FwdFatFold);
+                AppendTraceDelta(sb, "sideSmooth width/strength=" + F(SideSmoothWidth) + "/" + F(SideSmoothStrength), trace.FwdSideSmooth - trace.FwdDrop);
+                AppendTraceDelta(sb, "ribReduce", trace.FwdRibReduce - trace.FwdSideSmooth);
+                if (trace.LowerBodyRestore > 0f)
+                    AppendTraceStep(sb, "lowerBodyRestore=" + F(trace.LowerBodyRestore) + " speed=" + F(ThighGuardSpeed));
+                AppendTraceDelta(sb, "lowerBodyRestore", trace.FwdLowerRestore - trace.FwdRibReduce);
+                AppendTraceDelta(sb, "clothDepthStretch factor=" + F(trace.ClothDepthStretchFactor), trace.ClothDepthDeltaFwd);
+                AppendTraceDelta(sb, "clothLayerOffset", trace.ClothLayerDeltaFwd);
+                if (trace.InwardGuardApplied)
+                    AppendTraceStep(sb, "inwardGuard dFwd=" + F(trace.InwardGuardDeltaFwd));
+                if (trace.BreastRestore > 0f)
+                    AppendTraceStep(sb, "breastRestore=" + F(trace.BreastRestore));
+                AppendTraceDelta(sb, "breastRestore", trace.FwdBreastRestore - trace.FwdInwardGuard);
+                if (trace.InnerThighRestore > 0f)
+                    AppendTraceStep(sb, "innerThighRestore=" + F(trace.InnerThighRestore));
+                AppendTraceDelta(sb, "innerThighRestore", trace.FwdInnerThighRestore - trace.FwdBreastRestore);
+                if (trace.BottomTaperInfluence > 0f)
+                    AppendTraceStep(sb, "bottomTaper influence=" + F(trace.BottomTaperInfluence)
+                        + " lower=" + F(trace.BottomTaperLower)
+                        + " front=" + F(trace.BottomTaperFront));
+                AppendTraceDelta(sb, "bottomTaper", trace.FwdBottomTaper - trace.FwdInnerThighRestore);
+                if (trace.SkirtDrapeEnabled)
+                    AppendTraceStep(sb, trace.SkirtDrapeReason);
+                AppendTraceDelta(sb, "skirtDrape", trace.FwdSkirtDrape - trace.FwdBottomTaper);
+                if (trace.SkirtLowerEnabled)
+                    AppendTraceStep(sb, trace.SkirtLowerReason);
+                AppendTraceDelta(sb, "skirtLower", trace.FwdSkirtLower - trace.FwdSkirtDrape);
+                AppendTraceDelta(sb, "crossLayerGuard", trace.CrossLayerGuardDeltaFwd);
+                AppendTraceDelta(sb, "thighSmooth", trace.ThighSmoothDeltaFwd);
+            }
+
+            return sb.ToString();
+        }
+
+        static void AppendTraceDelta(StringBuilder sb, string label, float delta)
+        {
+            if (Mathf.Abs(delta) <= 0.000001f) return;
+            AppendTraceStep(sb, label + " dFwd=" + F(delta));
+        }
+
+        static void AppendTraceStep(StringBuilder sb, string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            if (sb.Length > 0) sb.Append("; ");
+            sb.Append(text);
+        }
+
+        static void WriteTraceCells(TextWriter writer, ref bool first, VertexMorphTrace trace)
+        {
+            const int blankColumnsAfterSteps = 76;
+            if (trace == null)
+            {
+                WriteCell(writer, ref first, "0");
+                WriteCell(writer, ref first, "no-trace");
+                WriteCell(writer, ref first, string.Empty);
+                for (int i = 0; i < blankColumnsAfterSteps; i++)
+                    WriteCell(writer, ref first, string.Empty);
+                return;
+            }
+
+            WriteCell(writer, ref first, "1");
+            WriteCell(writer, ref first, trace.StopReason ?? string.Empty);
+            WriteCell(writer, ref first, BuildTraceSteps(trace));
+
+            WriteCell(writer, ref first, FormatBoneCell(trace.BoneName0, trace.BoneIndex0));
+            WriteCell(writer, ref first, F(trace.BoneWeight0));
+            WriteCell(writer, ref first, FormatBoneCell(trace.BoneName1, trace.BoneIndex1));
+            WriteCell(writer, ref first, F(trace.BoneWeight1));
+            WriteCell(writer, ref first, FormatBoneCell(trace.BoneName2, trace.BoneIndex2));
+            WriteCell(writer, ref first, F(trace.BoneWeight2));
+            WriteCell(writer, ref first, FormatBoneCell(trace.BoneName3, trace.BoneIndex3));
+            WriteCell(writer, ref first, F(trace.BoneWeight3));
+
+            WriteCell(writer, ref first, F(trace.EffectiveProgress));
+            WriteCell(writer, ref first, F(trace.RadiusScale));
+            WriteCell(writer, ref first, F(trace.RadiusSide));
+            WriteCell(writer, ref first, F(trace.RadiusFront));
+            WriteCell(writer, ref first, F(trace.RadiusBack));
+            WriteCell(writer, ref first, F(trace.RadiusUp));
+            WriteCell(writer, ref first, F(trace.RadiusDown));
+
+            WriteCell(writer, ref first, F(trace.FwdRadius));
+            WriteCell(writer, ref first, F(trace.UpRadius));
+            WriteCell(writer, ref first, F(trace.Ellip));
+            WriteCell(writer, ref first, F(trace.EdgeRatio));
+            WriteCell(writer, ref first, F(trace.EdgeFade));
+            WriteCell(writer, ref first, F(trace.TopEdgeStrength));
+            WriteCell(writer, ref first, F(trace.ShapeWeight));
+            WriteCell(writer, ref first, F(trace.MorphWeight));
+            WriteCell(writer, ref first, F(trace.OriginalRadius));
+            WriteCell(writer, ref first, F(trace.DirectionalRadius));
+
+            WriteCell(writer, ref first, F(trace.LowerBodyRestore));
+            WriteCell(writer, ref first, F(trace.InnerThighRestore));
+            WriteCell(writer, ref first, F(trace.BreastRestore));
+            WriteCell(writer, ref first, F(trace.BottomTaperInfluence));
+            WriteCell(writer, ref first, F(trace.BottomTaperLower));
+            WriteCell(writer, ref first, F(trace.BottomTaperFront));
+            WriteCell(writer, ref first, F(trace.BottomTaperGuardKeep));
+
+            WriteCell(writer, ref first, F(trace.ClothDepthStretchFactor));
+            WriteCell(writer, ref first, F(trace.ClothDepthDeltaFwd));
+            WriteCell(writer, ref first, F(trace.ClothLayerDeltaFwd));
+            WriteCell(writer, ref first, trace.InwardGuardApplied ? "1" : "0");
+            WriteCell(writer, ref first, F(trace.InwardGuardDeltaFwd));
+
+            WriteCell(writer, ref first, trace.SkirtDrapeEnabled ? "1" : "0");
+            WriteCell(writer, ref first, trace.SkirtDrapeReached ? "1" : "0");
+            WriteCell(writer, ref first, F(trace.SkirtDrapeAddFwd));
+            WriteCell(writer, ref first, trace.SkirtDrapeReason ?? string.Empty);
+
+            WriteCell(writer, ref first, trace.SkirtLowerEnabled ? "1" : "0");
+            WriteCell(writer, ref first, F(trace.SkirtLowerBoundaryUp));
+            WriteCell(writer, ref first, F(trace.SkirtLowerLowerLimit));
+            WriteCell(writer, ref first, F(trace.SkirtLowerTopDeltaFwd));
+            WriteCell(writer, ref first, F(trace.SkirtLowerGrowth));
+            WriteCell(writer, ref first, F(trace.SkirtLowerDownT));
+            WriteCell(writer, ref first, F(trace.SkirtLowerAddFwd));
+            WriteCell(writer, ref first, trace.SkirtLowerReason ?? string.Empty);
+
+            WriteCell(writer, ref first, F(trace.CrossLayerGuardDeltaFwd));
+            WriteCell(writer, ref first, F(trace.ThighSmoothMask));
+            WriteCell(writer, ref first, F(trace.ThighSmoothDeltaFwd));
+
+            WriteCell(writer, ref first, F(trace.FwdBase));
+            WriteCell(writer, ref first, F(trace.FwdSphere));
+            WriteCell(writer, ref first, F(trace.FwdSculpt));
+            WriteCell(writer, ref first, F(trace.FwdShift));
+            WriteCell(writer, ref first, F(trace.FwdStretch));
+            WriteCell(writer, ref first, F(trace.FwdRoundness));
+            WriteCell(writer, ref first, F(trace.FwdTaperY));
+            WriteCell(writer, ref first, F(trace.FwdTaperZ));
+            WriteCell(writer, ref first, F(trace.FwdFatFold));
+            WriteCell(writer, ref first, F(trace.FwdDrop));
+            WriteCell(writer, ref first, F(trace.FwdSideSmooth));
+            WriteCell(writer, ref first, F(trace.FwdRibReduce));
+            WriteCell(writer, ref first, F(trace.FwdLowerRestore));
+            WriteCell(writer, ref first, F(trace.FwdDepthStretch));
+            WriteCell(writer, ref first, F(trace.FwdLayerOffset));
+            WriteCell(writer, ref first, F(trace.FwdInwardGuard));
+            WriteCell(writer, ref first, F(trace.FwdBreastRestore));
+            WriteCell(writer, ref first, F(trace.FwdInnerThighRestore));
+            WriteCell(writer, ref first, F(trace.FwdBottomTaper));
+            WriteCell(writer, ref first, F(trace.FwdSkirtDrape));
+            WriteCell(writer, ref first, F(trace.FwdSkirtLower));
+            WriteCell(writer, ref first, F(trace.FwdCrossLayerGuard));
+            WriteCell(writer, ref first, F(trace.FwdThighSmooth));
+            WriteCell(writer, ref first, F(trace.FwdFinal));
+        }
+
+        static string FormatBoneCell(string boneName, int boneIndex)
+        {
+            if (string.IsNullOrEmpty(boneName))
+                return boneIndex.ToString(CultureInfo.InvariantCulture);
+            return boneName + "#" + boneIndex.ToString(CultureInfo.InvariantCulture);
+        }
+
+        static void WriteCell(TextWriter writer, ref bool first, string value)
+        {
+            if (!first) writer.Write('\t');
+            writer.Write(EscapeDumpCell(value));
+            first = false;
+        }
+
+        static string EscapeDumpCell(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            return value.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
+        }
+
+        static void SmoothThighGuardAffectedVerts(
+            Mesh mesh,
+            Vector3[] originalVerts,
+            Vector3[] verts,
+            float[] guardMask)
+        {
+            float smooth = Mathf.Clamp01(ThighGuardSmoothStrength);
+            if (smooth <= 0f || mesh == null || originalVerts == null || verts == null || guardMask == null)
+                return;
+
+            int count = verts.Length;
+            if (originalVerts.Length != count || guardMask.Length != count)
+                return;
+
+            List<int>[] neighbors = BuildMeshNeighbors(mesh, count);
+            if (neighbors == null)
+                return;
+
+            for (int pass = 0; pass < ThighGuardSmoothPasses; pass++)
+            {
+                Vector3[] next = (Vector3[])verts.Clone();
+
+                for (int i = 0; i < count; i++)
+                {
+                    float influence = Mathf.Clamp01(guardMask[i]);
+                    if (influence <= 0f) continue;
+
+                    Vector3 sumDelta = (verts[i] - originalVerts[i]) * 2f;
+                    float sumWeight = 2f;
+                    List<int> ns = neighbors[i];
+                    for (int n = 0; n < ns.Count; n++)
+                    {
+                        int j = ns[n];
+                        if (j < 0 || j >= count) continue;
+
+                        float neighborGuard = Mathf.Clamp01(guardMask[j]);
+                        float neighborWeight = Mathf.Lerp(0.35f, 1f, neighborGuard);
+                        sumDelta += (verts[j] - originalVerts[j]) * neighborWeight;
+                        sumWeight += neighborWeight;
+                    }
+
+                    if (sumWeight <= 0f) continue;
+                    Vector3 smoothed = originalVerts[i] + sumDelta / sumWeight;
+                    next[i] = Vector3.Lerp(verts[i], smoothed, smooth * influence);
+                }
+
+                for (int i = 0; i < count; i++)
+                    verts[i] = next[i];
+            }
         }
 
         static Vector3[] AddDeltaVerts(Vector3[] currentVerts, Vector3[] deltaVerts)
@@ -2287,17 +3320,97 @@ namespace COM3D2.Pregnancy.Plugin
             return center + right * limitedSide + up * limitedUp + fwd * smoothedFwd;
         }
 
-        static float GetTopBottomEdgeStrength(
+        static float GetTopEdgeStrength(
             float upDot,
-            float radiusUp,
-            float radiusDown)
+            float radiusUp)
         {
             if (upDot > 0f && TopEdgeTaper != 0f)
                 return EdgeTaperStrength(TopEdgeTaper, upDot / Mathf.Max(radiusUp, 0.0001f));
-            if (upDot < 0f && BottomEdgeTaper != 0f)
-                return EdgeTaperStrength(BottomEdgeTaper, -upDot / Mathf.Max(radiusDown, 0.0001f));
 
             return 1f;
+        }
+
+        static float GetBottomEdgeTaperInfluence(
+            float upDot,
+            float fwdDot,
+            float radiusDown,
+            float radiusBack,
+            float radiusFront,
+            float morphWeight,
+            float lowerGuardRestore,
+            out float lower,
+            out float front,
+            out float guardKeep)
+        {
+            lower = 0f;
+            front = 0f;
+            guardKeep = 1f - Mathf.Clamp01(lowerGuardRestore);
+
+            float strength = Mathf.Clamp01(Mathf.Abs(BottomEdgeTaper)) * Smooth01(morphWeight);
+            if (strength <= 0f || upDot >= 0f)
+                return 0f;
+
+            float lowerRatio = -upDot / Mathf.Max(radiusDown, 0.0001f);
+            lower = Smooth01((lowerRatio - 0.12f) / 0.88f);
+            if (lower <= 0f)
+                return 0f;
+
+            float frontRatio = (fwdDot + radiusBack) / Mathf.Max(radiusFront + radiusBack, 0.0001f);
+            front = Smooth01((frontRatio - 0.05f) / 0.55f);
+            if (front <= 0f)
+                return 0f;
+
+            return Mathf.Clamp01(strength * lower * front * guardKeep);
+        }
+
+        static Vector3 ApplyBottomEdgeTaperWorld(
+            Vector3 original,
+            Vector3 morphed,
+            Vector3 center,
+            Vector3 up,
+            Vector3 fwd,
+            float upDot,
+            float fwdDot,
+            float radiusDown,
+            float radiusBack,
+            float radiusFront,
+            float morphWeight,
+            float lowerGuardRestore)
+        {
+            float strength = Mathf.Clamp01(Mathf.Abs(BottomEdgeTaper)) * Smooth01(morphWeight);
+            if (strength <= 0f || upDot >= 0f)
+                return morphed;
+
+            float lowerRatio = -upDot / Mathf.Max(radiusDown, 0.0001f);
+            float lower = Smooth01((lowerRatio - 0.12f) / 0.88f);
+            if (lower <= 0f)
+                return morphed;
+
+            float frontRatio = (fwdDot + radiusBack) / Mathf.Max(radiusFront + radiusBack, 0.0001f);
+            float front = Smooth01((frontRatio - 0.05f) / 0.55f);
+            if (front <= 0f)
+                return morphed;
+
+            float guardKeep = 1f - Mathf.Clamp01(lowerGuardRestore);
+            float influence = Mathf.Clamp01(strength * lower * front * guardKeep);
+            if (influence <= 0f)
+                return morphed;
+
+            Vector3 originalRel = original - center;
+            Vector3 morphedRel = morphed - center;
+            float originalUp = Vector3.Dot(originalRel, up);
+            float morphedUp = Vector3.Dot(morphedRel, up);
+            float originalFwd = Vector3.Dot(originalRel, fwd);
+            float morphedFwd = Vector3.Dot(morphedRel, fwd);
+
+            float endBlend = Smooth01((lowerRatio - 0.55f) / 0.45f);
+            float upTarget = Mathf.Lerp(morphedUp, originalUp, Mathf.Lerp(0.35f, 0.95f, endBlend));
+            float fwdTarget = Mathf.Lerp(morphedFwd, originalFwd, Mathf.Lerp(0.20f, 0.75f, endBlend));
+            Vector3 target = morphed
+                + up * (upTarget - morphedUp)
+                + fwd * (fwdTarget - morphedFwd);
+
+            return Vector3.Lerp(morphed, target, influence);
         }
 
         static float EdgeTaperStrength(float taper, float edgeRatio)
@@ -2448,12 +3561,14 @@ namespace COM3D2.Pregnancy.Plugin
             Vector3[] morphedWorldVerts,
             bool[] valid,
             Vector3[] newLocalVerts,
+            Vector3 spineCenter,
             Vector3 center,
             Vector3 right,
             Vector3 up,
             Vector3 fwd,
             float radiusSide,
-            float radiusDown)
+            float radiusDown,
+            VertexMorphTrace[] traces)
         {
             if (mesh == null || localOriginalVerts == null || weights == null || boneMatrices == null)
                 return;
@@ -2498,16 +3613,30 @@ namespace COM3D2.Pregnancy.Plugin
             for (int i = 0; i < count; i++)
             {
                 if (!valid[i]) continue;
-                if (!reached[i] || propagatedDelta[i].sqrMagnitude <= 1e-8f) continue;
+                VertexMorphTrace trace = traces != null && i < traces.Length ? traces[i] : null;
+                if (!reached[i] || propagatedDelta[i].sqrMagnitude <= 1e-8f)
+                {
+                    if (trace != null) trace.SkirtDrapeReason = "drape:not-reached";
+                    continue;
+                }
+                if (trace != null) trace.SkirtDrapeReached = true;
 
                 Vector3 originalRel = originalWorldVerts[i] - center;
                 float originalUp = Vector3.Dot(originalRel, up);
                 float originalRight = Vector3.Dot(originalRel, right);
                 float originalFwd = Vector3.Dot(originalRel, fwd);
-                if (originalFwd <= 0f) continue;
+                if (originalFwd <= 0f)
+                {
+                    if (trace != null) trace.SkirtDrapeReason = "drape:not-front";
+                    continue;
+                }
 
                 Vector2 delta = propagatedDelta[i] * SkirtDrapeDeltaBoost;
-                if (delta.y <= 0f) continue;
+                if (delta.y <= 0f)
+                {
+                    if (trace != null) trace.SkirtDrapeReason = "drape:no-forward-delta";
+                    continue;
+                }
 
                 float targetRight = originalRight + delta.x;
                 float targetFwd = originalFwd + delta.y;
@@ -2516,12 +3645,374 @@ namespace COM3D2.Pregnancy.Plugin
                 float addRight = targetRight - finalRight;
                 float addFwd = Mathf.Max(0f, targetFwd - finalFwd);
                 if (Mathf.Abs(addRight) <= 1e-5f && addFwd <= 1e-5f)
+                {
+                    if (trace != null) trace.SkirtDrapeReason = "drape:already-forward-enough";
                     continue;
+                }
 
                 Vector3 adjustedWorld = morphedWorldVerts[i] + right * addRight + fwd * addFwd;
                 Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
                 newLocalVerts[i] = skin.inverse.MultiplyPoint3x4(adjustedWorld);
                 morphedWorldVerts[i] = adjustedWorld;
+                if (trace != null)
+                {
+                    trace.SkirtDrapeAddFwd = addFwd;
+                    trace.SkirtDrapeReason = "drape:applied";
+                }
+            }
+        }
+
+        static void ApplySkirtLowerShapeToMesh(
+            Mesh mesh,
+            Vector3[] localOriginalVerts,
+            BoneWeight[] weights,
+            Matrix4x4[] boneMatrices,
+            Vector3[] originalWorldVerts,
+            Vector3[] morphedWorldVerts,
+            bool[] valid,
+            Vector3[] newLocalVerts,
+            Vector3 spineCenter,
+            Vector3 center,
+            Vector3 right,
+            Vector3 up,
+            Vector3 fwd,
+            float radiusSide,
+            float radiusFront,
+            float radiusBack,
+            float radiusUp,
+            float radiusDown,
+            VertexMorphTrace[] traces)
+        {
+            if (mesh == null || localOriginalVerts == null || weights == null || boneMatrices == null)
+                return;
+            if (originalWorldVerts == null || morphedWorldVerts == null || valid == null || newLocalVerts == null)
+                return;
+
+            int count = newLocalVerts.Length;
+            if (localOriginalVerts.Length != count || weights.Length != count
+                || originalWorldVerts.Length != count || morphedWorldVerts.Length != count || valid.Length != count)
+                return;
+
+            List<int>[] neighbors = BuildMeshNeighbors(mesh, count);
+            if (neighbors == null)
+            {
+                SetSkirtLowerTraceReason(traces, valid, "lower:no-neighbors");
+                return;
+            }
+
+            SetSkirtLowerTraceReason(traces, valid, "lower:not-evaluated");
+
+            float[] side = new float[count];
+            float[] originalUp = new float[count];
+            float[] originalFwd = new float[count];
+            float[] spineFwd = new float[count];
+            float[] strength = new float[count];
+            Vector3[] deltaWorld = new Vector3[count];
+            float[] morphedFwd = new float[count];
+            float maxFront = float.MinValue;
+            float minDelta = RelGeneral(SkirtLowerMinDelta);
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i]) continue;
+
+                Vector3 rel = originalWorldVerts[i] - center;
+                side[i] = Vector3.Dot(rel, right);
+                originalUp[i] = Vector3.Dot(rel, up);
+                originalFwd[i] = Vector3.Dot(rel, fwd);
+                spineFwd[i] = Vector3.Dot(originalWorldVerts[i] - spineCenter, fwd);
+
+                Vector3 delta = morphedWorldVerts[i] - originalWorldVerts[i];
+                float deltaSide = Vector3.Dot(delta, right);
+                float deltaFwd = Vector3.Dot(delta, fwd);
+                morphedFwd[i] = Vector3.Dot(morphedWorldVerts[i] - center, fwd);
+                if (deltaFwd <= minDelta || originalFwd[i] <= 0f)
+                    continue;
+
+                deltaWorld[i] = delta;
+                strength[i] = Mathf.Sqrt(deltaSide * deltaSide + deltaFwd * deltaFwd);
+                if (morphedFwd[i] > maxFront)
+                    maxFront = morphedFwd[i];
+            }
+
+            if (maxFront <= 0f)
+            {
+                SetSkirtLowerTraceReason(traces, valid, "lower:no-front-delta");
+                return;
+            }
+
+            float frontBand = Mathf.Max(radiusFront * SkirtBoundaryFrontBand, RelFwd(0.01f));
+            List<float> boundaryUps = new List<float>();
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i] || strength[i] <= minDelta) continue;
+                if (originalFwd[i] <= 0f) continue;
+                if (morphedFwd[i] < maxFront - frontBand) continue;
+                boundaryUps.Add(originalUp[i]);
+            }
+
+            if (boundaryUps.Count < 3)
+            {
+                SetSkirtLowerTraceReason(traces, valid, "lower:not-enough-boundary");
+                return;
+            }
+
+            float boundaryUp = MedianFloat(boundaryUps) + RelUp(SkirtBoundaryUpOffset);
+            float boundaryBand = Mathf.Max(radiusDown * SkirtBoundaryPlaneBand, RelUp(0.012f));
+            bool[] boundaryMask = new bool[count];
+            Vector3[] boundaryDelta = new Vector3[count];
+            float[] boundaryStrength = new float[count];
+            if (traces != null)
+            {
+                int traceCount = Mathf.Min(traces.Length, count);
+                for (int i = 0; i < traceCount; i++)
+                {
+                    if (traces[i] == null || !valid[i]) continue;
+                    traces[i].SkirtLowerBoundaryUp = boundaryUp;
+                    traces[i].SkirtLowerReason = string.Empty;
+                }
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i] || strength[i] <= minDelta) continue;
+                if (originalFwd[i] <= 0f) continue;
+                if (Mathf.Abs(originalUp[i] - boundaryUp) > boundaryBand) continue;
+
+                boundaryMask[i] = true;
+                boundaryDelta[i] = deltaWorld[i];
+                boundaryStrength[i] = strength[i];
+            }
+
+            SmoothSkirtBoundaryDeltas(neighbors, boundaryMask, boundaryDelta, boundaryStrength);
+
+            Vector3 topDelta = Vector3.zero;
+            float topWeight = 0f;
+            for (int i = 0; i < count; i++)
+            {
+                if (!boundaryMask[i]) continue;
+
+                float w = Mathf.Max(boundaryStrength[i], minDelta);
+                topDelta += boundaryDelta[i] * w;
+                topWeight += w;
+            }
+
+            if (topWeight <= 0f)
+            {
+                SetSkirtLowerTraceReason(traces, valid, "lower:no-top-weight");
+                return;
+            }
+
+            topDelta /= topWeight;
+
+            float topDeltaFwd = Mathf.Max(0f, Vector3.Dot(topDelta, fwd));
+            float lowerLimit = boundaryUp;
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i]) continue;
+                if (originalFwd[i] <= 0f) continue;
+                if (originalUp[i] <= boundaryUp)
+                    lowerLimit = Mathf.Min(lowerLimit, originalUp[i]);
+            }
+
+            float verticalSpan = Mathf.Max(boundaryUp - lowerLimit, RelUp(0.02f));
+            Vector3[] inheritedDelta = new Vector3[count];
+            bool[] inheritedReached = new bool[count];
+            for (int i = 0; i < count; i++)
+            {
+                if (!boundaryMask[i]) continue;
+                inheritedDelta[i] = boundaryDelta[i];
+                inheritedReached[i] = true;
+            }
+
+            PropagateSkirtLowerBoundaryDeltas(
+                neighbors,
+                valid,
+                originalUp,
+                originalFwd,
+                boundaryUp,
+                inheritedDelta,
+                inheritedReached);
+
+            float growth = topDeltaFwd / Mathf.Max(radiusFront, minDelta);
+            if (traces != null)
+            {
+                int traceCount = Mathf.Min(traces.Length, count);
+                for (int i = 0; i < traceCount; i++)
+                {
+                    if (traces[i] == null || !valid[i]) continue;
+                    traces[i].SkirtLowerLowerLimit = lowerLimit;
+                    traces[i].SkirtLowerTopDeltaFwd = topDeltaFwd;
+                    traces[i].SkirtLowerGrowth = growth;
+                }
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i]) continue;
+                VertexMorphTrace trace = traces != null && i < traces.Length ? traces[i] : null;
+                if (originalFwd[i] <= 0f)
+                {
+                    if (trace != null) trace.SkirtLowerReason = "lower:not-front";
+                    continue;
+                }
+                if (originalUp[i] > boundaryUp)
+                {
+                    if (trace != null) trace.SkirtLowerReason = "lower:above-boundary";
+                    continue;
+                }
+
+                float downT = Mathf.Clamp01((boundaryUp - originalUp[i]) / Mathf.Max(verticalSpan, 0.0001f));
+                if (trace != null) trace.SkirtLowerDownT = downT;
+                if (boundaryMask[i])
+                {
+                    if (trace != null) trace.SkirtLowerReason = "lower:boundary-kept";
+                    continue;
+                }
+                if (!inheritedReached[i])
+                {
+                    inheritedDelta[i] = topDelta;
+                    inheritedReached[i] = true;
+                }
+
+                Vector3 adjustedWorld = originalWorldVerts[i] + inheritedDelta[i];
+                Vector3 addWorld = adjustedWorld - morphedWorldVerts[i];
+                float addFwd = Vector3.Dot(addWorld, fwd);
+                if (addWorld.sqrMagnitude <= minDelta * minDelta)
+                {
+                    if (trace != null) trace.SkirtLowerReason = "lower:already-inherited";
+                    continue;
+                }
+
+                Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
+                newLocalVerts[i] = skin.inverse.MultiplyPoint3x4(adjustedWorld);
+                morphedWorldVerts[i] = adjustedWorld;
+                if (trace != null)
+                {
+                    trace.SkirtLowerAddFwd = addFwd;
+                    trace.SkirtLowerReason = "lower:inherited";
+                }
+            }
+        }
+
+        static void PropagateSkirtLowerBoundaryDeltas(
+            List<int>[] neighbors,
+            bool[] valid,
+            float[] originalUp,
+            float[] originalFwd,
+            float boundaryUp,
+            Vector3[] inheritedDelta,
+            bool[] inheritedReached)
+        {
+            if (neighbors == null || valid == null || originalUp == null || originalFwd == null
+                || inheritedDelta == null || inheritedReached == null)
+                return;
+
+            int count = Mathf.Min(
+                inheritedDelta.Length,
+                Mathf.Min(inheritedReached.Length, Mathf.Min(valid.Length, Mathf.Min(originalUp.Length, originalFwd.Length))));
+            int passes = Mathf.Min(count, 128);
+
+            for (int pass = 0; pass < passes; pass++)
+            {
+                bool changed = false;
+                Vector3[] nextDelta = (Vector3[])inheritedDelta.Clone();
+                bool[] nextReached = (bool[])inheritedReached.Clone();
+
+                for (int i = 0; i < count; i++)
+                {
+                    if (!valid[i] || inheritedReached[i]) continue;
+                    if (originalFwd[i] <= 0f || originalUp[i] > boundaryUp) continue;
+
+                    Vector3 sum = Vector3.zero;
+                    float sumWeight = 0f;
+                    List<int> ns = neighbors[i];
+                    for (int n = 0; n < ns.Count; n++)
+                    {
+                        int j = ns[n];
+                        if (j < 0 || j >= count || !inheritedReached[j]) continue;
+                        if (originalFwd[j] <= 0f) continue;
+                        if (originalUp[j] < originalUp[i] - 0.0001f) continue;
+
+                        float verticalStep = Mathf.Max(0f, originalUp[j] - originalUp[i]);
+                        float w = 1f / (1f + verticalStep * 40f);
+                        sum += inheritedDelta[j] * w;
+                        sumWeight += w;
+                    }
+
+                    if (sumWeight <= 0f) continue;
+
+                    nextDelta[i] = sum / sumWeight;
+                    nextReached[i] = true;
+                    changed = true;
+                }
+
+                for (int i = 0; i < count; i++)
+                {
+                    inheritedDelta[i] = nextDelta[i];
+                    inheritedReached[i] = nextReached[i];
+                }
+
+                if (!changed)
+                    break;
+            }
+        }
+
+        static float MedianFloat(List<float> values)
+        {
+            if (values == null || values.Count == 0) return 0f;
+            values.Sort();
+            int mid = values.Count / 2;
+            if ((values.Count & 1) == 1)
+                return values[mid];
+            return (values[mid - 1] + values[mid]) * 0.5f;
+        }
+
+        static void SmoothSkirtBoundaryDeltas(
+            List<int>[] neighbors,
+            bool[] boundaryMask,
+            Vector3[] boundaryDelta,
+            float[] boundaryStrength)
+        {
+            int passes = Mathf.Clamp(SkirtBoundarySmoothPasses, 0, 16);
+            float smooth = Mathf.Clamp01(SkirtBoundarySmoothStrength);
+            if (passes <= 0 || smooth <= 0f || neighbors == null || boundaryMask == null)
+                return;
+
+            int count = boundaryMask.Length;
+            for (int pass = 0; pass < passes; pass++)
+            {
+                Vector3[] nextDelta = (Vector3[])boundaryDelta.Clone();
+                float[] nextStrength = (float[])boundaryStrength.Clone();
+
+                for (int i = 0; i < count; i++)
+                {
+                    if (!boundaryMask[i]) continue;
+
+                    Vector3 sumDelta = boundaryDelta[i] * 2f;
+                    float sumStrength = boundaryStrength[i] * 2f;
+                    float sumWeight = 2f;
+                    List<int> ns = neighbors[i];
+                    for (int n = 0; n < ns.Count; n++)
+                    {
+                        int j = ns[n];
+                        if (j < 0 || j >= count || !boundaryMask[j]) continue;
+                        sumDelta += boundaryDelta[j];
+                        sumStrength += boundaryStrength[j];
+                        sumWeight += 1f;
+                    }
+
+                    if (sumWeight <= 2f) continue;
+                    nextDelta[i] = Vector3.Lerp(boundaryDelta[i], sumDelta / sumWeight, smooth);
+                    nextStrength[i] = Mathf.Lerp(boundaryStrength[i], sumStrength / sumWeight, smooth);
+                }
+
+                for (int i = 0; i < count; i++)
+                {
+                    boundaryDelta[i] = nextDelta[i];
+                    boundaryStrength[i] = nextStrength[i];
+                }
             }
         }
 
@@ -2619,7 +4110,7 @@ namespace COM3D2.Pregnancy.Plugin
             bool[] reached)
         {
             int count = propagatedDelta.Length;
-            float upRange = Mathf.Max(radiusDown * 0.16f, 0.01f);
+            float upRange = Mathf.Max(radiusDown * 0.16f, RelUp(0.01f));
 
             for (int pass = 0; pass < SkirtDrapeSmoothPasses; pass++)
             {
@@ -2685,20 +4176,20 @@ namespace COM3D2.Pregnancy.Plugin
                 return;
 
             float radiusScale = Mathf.Max(0.05f, 1f + InflationMultiplier);
-            float radiusSide = Mathf.Max(RegionRadiusSide * radiusScale, 0.0001f);
-            float radiusFront = Mathf.Max(RegionRadiusFront * radiusScale, 0.0001f);
-            float radiusUp = Mathf.Max(RegionRadiusUp * radiusScale, 0.0001f);
-            float radiusDown = Mathf.Max(RegionRadiusDown * radiusScale, 0.0001f);
-            Vector3 center = _bpWorldFrame.Center + _bpWorldFrame.Up * InflationMoveY + _bpWorldFrame.Fwd * InflationMoveZ;
+            float radiusSide = Mathf.Max(RelSide(RegionRadiusSide) * radiusScale, RelGeneral(0.0001f));
+            float radiusFront = Mathf.Max(RelFwd(RegionRadiusFront) * radiusScale, RelGeneral(0.0001f));
+            float radiusUp = Mathf.Max(RelUp(RegionRadiusUp) * radiusScale, RelGeneral(0.0001f));
+            float radiusDown = Mathf.Max(RelUp(RegionRadiusDown) * radiusScale, RelGeneral(0.0001f));
+            Vector3 center = _bpWorldFrame.Center + _bpWorldFrame.Up * RelUp(InflationMoveY) + _bpWorldFrame.Fwd * RelFwd(InflationMoveZ);
             Vector3 right = _bpWorldFrame.Right;
             Vector3 up = _bpWorldFrame.Up;
             Vector3 fwd = _bpWorldFrame.Fwd;
 
-            float sideRange = Mathf.Max(radiusSide * 0.18f, 0.016f);
-            float upRange = Mathf.Max((radiusUp + radiusDown) * 0.08f, 0.014f);
-            float minOriginalGap = Mathf.Max(radiusFront * 0.006f, 0.001f);
+            float sideRange = Mathf.Max(radiusSide * 0.18f, RelSide(0.016f));
+            float upRange = Mathf.Max((radiusUp + radiusDown) * 0.08f, RelUp(0.014f));
+            float minOriginalGap = Mathf.Max(radiusFront * 0.006f, RelFwd(0.001f));
             float maxOriginalGap = Mathf.Max(radiusFront * 0.80f, minOriginalGap * 2f);
-            float minFinalGap = Mathf.Max(0.001f, 0.008f * strength);
+            float minFinalGap = Mathf.Max(RelFwd(0.001f), RelFwd(0.008f) * strength);
 
             List<CrossLayerGuardMesh> meshes = new List<CrossLayerGuardMesh>();
             Dictionary<long, List<LayerGuardRef>> buckets = new Dictionary<long, List<LayerGuardRef>>();
@@ -2855,6 +4346,16 @@ namespace COM3D2.Pregnancy.Plugin
                         Vector3 adjustedWorld = entry.MorphedWorld[i] - fwd * (overrun * guardFade);
                         Matrix4x4 skin = GetWeightedSkinMatrix(entry.BoneMatrices, entry.Weights[i]);
                         entry.CurrentVerts[i] = skin.inverse.MultiplyPoint3x4(adjustedWorld);
+                        VertexMorphTrace trace = entry.Record.LastMorphTrace != null && i < entry.Record.LastMorphTrace.Length
+                            ? entry.Record.LastMorphTrace[i]
+                            : null;
+                        if (trace != null)
+                        {
+                            float adjustedFwd = Vector3.Dot(adjustedWorld - center, fwd);
+                            trace.CrossLayerGuardDeltaFwd += adjustedFwd - currentFwd;
+                            trace.FwdCrossLayerGuard = adjustedFwd;
+                            trace.FwdFinal = adjustedFwd;
+                        }
                         entry.MorphedWorld[i] = adjustedWorld;
                         entry.Changed = true;
                         changedThisPass = true;
@@ -2960,8 +4461,8 @@ namespace COM3D2.Pregnancy.Plugin
 
             bool isOuterCloth = meshClass == MeshMorphClass.OuterCloth;
             float layerOffset = meshClass == MeshMorphClass.OuterCloth
-                ? OuterClothOffset
-                : InnerClothOffset;
+                ? RelGeneral(OuterClothOffset)
+                : RelGeneral(InnerClothOffset);
             float preserve = isOuterCloth ? ClothThicknessPreserve : 0f;
 
             if (layerOffset == 0f && preserve == 0f) return morphed;
@@ -3082,9 +4583,10 @@ namespace COM3D2.Pregnancy.Plugin
         {
             int count = newVerts.Length;
             bool[] affected = new bool[count];
+            float normalDelta = RelGeneral(NormalAffectedDelta);
 
             for (int i = 0; i < count; i++)
-                affected[i] = (newVerts[i] - originalVerts[i]).sqrMagnitude >= NormalAffectedDelta * NormalAffectedDelta;
+                affected[i] = (newVerts[i] - originalVerts[i]).sqrMagnitude >= normalDelta * normalDelta;
 
             int[] triangles = null;
             try
@@ -3383,8 +4885,14 @@ namespace COM3D2.Pregnancy.Plugin
         public class BellyMonitor : MonoBehaviour
         {
             Maid _maid;
-            bool _isMorphing = false;
             bool _needsFullRefresh = false;
+            int _refreshStableFrames = 0;
+            readonly Dictionary<int, int> _refreshPreviousSignatures = new Dictionary<int, int>();
+            bool _visibilityPending = false;
+            int _visibilityKey = 0;
+            int _visibilityStableFrames = 0;
+            int _visibilityPreviousSignature = 0;
+            bool _visibilityHasPrevious = false;
 
             public void SetMaid(Maid m) { _maid = m; }
 
@@ -3392,18 +4900,33 @@ namespace COM3D2.Pregnancy.Plugin
             {
                 if (_maid == null) return;
                 _needsFullRefresh = true;
-                EnsureRunning();
+                _refreshStableFrames = 0;
+                _refreshPreviousSignatures.Clear();
             }
 
-            void EnsureRunning()
+            public void RequestVisibilityApply(int key)
             {
-                if (_isMorphing || _maid == null) return;
-                StartCoroutine(MorphCoroutine());
+                if (_maid == null)
+                {
+                    _pendingVisibilityApply.Remove(key);
+                    return;
+                }
+
+                _visibilityPending = true;
+                _visibilityKey = key;
+                _visibilityStableFrames = 0;
+                _visibilityPreviousSignature = 0;
+                _visibilityHasPrevious = false;
             }
 
-            bool HasPendingWork()
+            void ClearVisibilityApply()
             {
-                return _needsFullRefresh;
+                _pendingVisibilityApply.Remove(_visibilityKey);
+                _visibilityPending = false;
+                _visibilityKey = 0;
+                _visibilityStableFrames = 0;
+                _visibilityPreviousSignature = 0;
+                _visibilityHasPrevious = false;
             }
 
             bool AreTrackedRenderersStable(List<SkinnedMeshRenderer> renderers, Dictionary<int, int> previous)
@@ -3436,59 +4959,83 @@ namespace COM3D2.Pregnancy.Plugin
                 return stable;
             }
 
-            System.Collections.IEnumerator MorphCoroutine()
+            void ProcessFullRefresh()
             {
-                _isMorphing = true;
-                while (_maid != null && HasPendingWork())
+                if (!_needsFullRefresh)
+                    return;
+
+                if (_maid == null)
                 {
-                    while (_maid != null && (_maid.body0 == null || !_maid.body0.isLoadedBody))
-                        yield return null;
-
-                    if (_maid == null) break;
-
-                    if (_needsFullRefresh)
-                    {
-                        int stableFrames = 0;
-                        Dictionary<int, int> previousSignatures = new Dictionary<int, int>();
-
-                        while (_maid != null && stableFrames < AutoMorphStableFrames)
-                        {
-                            yield return new WaitForEndOfFrame();
-                            yield return null;
-
-                            while (_maid != null && (_maid.body0 == null || !_maid.body0.isLoadedBody))
-                                yield return null;
-
-                            if (_maid == null) break;
-
-                            List<SkinnedMeshRenderer> tracked = CollectRelevantRenderers(_maid);
-                            if (AreTrackedRenderersStable(tracked, previousSignatures))
-                                stableFrames++;
-                            else
-                                stableFrames = 0;
-                        }
-
-                        if (_maid == null) break;
-
-                        _needsFullRefresh = false;
-                        ForgetRecords(_maid);
-                        PruneRecords(_maid);
-
-                        float pFull = GetActiveProgress(_maid);
-                        if (pFull > 0f)
-                            ApplyToSlots(_maid, pFull, false);
-
-                        continue;
-                    }
+                    _needsFullRefresh = false;
+                    _refreshPreviousSignatures.Clear();
+                    return;
                 }
 
-                _isMorphing = false;
+                if (_maid.body0 == null || !_maid.body0.isLoadedBody)
+                    return;
+
+                List<SkinnedMeshRenderer> tracked = CollectRelevantRenderers(_maid);
+                if (AreTrackedRenderersStable(tracked, _refreshPreviousSignatures))
+                    _refreshStableFrames++;
+                else
+                    _refreshStableFrames = 0;
+
+                if (_refreshStableFrames < AutoMorphStableFrames)
+                    return;
+
+                _needsFullRefresh = false;
+                _refreshStableFrames = 0;
+                _refreshPreviousSignatures.Clear();
+                ForgetRecords(_maid);
+                PruneRecords(_maid);
+
+                float pFull = GetActiveProgress(_maid);
+                if (pFull > 0f)
+                    ApplyToSlots(_maid, pFull, false);
+            }
+
+            void ProcessVisibilityApply()
+            {
+                if (!_visibilityPending)
+                    return;
+
+                if (_maid == null)
+                {
+                    ClearVisibilityApply();
+                    return;
+                }
+
+                if (_maid.body0 == null || !_maid.body0.isLoadedBody)
+                    return;
+
+                int currentSignature = ComputeVisibilitySignature(CollectRelevantRenderers(_maid));
+                if (_visibilityHasPrevious && currentSignature == _visibilityPreviousSignature)
+                    _visibilityStableFrames++;
+                else
+                    _visibilityStableFrames = 0;
+
+                _visibilityPreviousSignature = currentSignature;
+                _visibilityHasPrevious = true;
+
+                if (_visibilityStableFrames < AutoMorphStableFrames)
+                    return;
+
+                ClearVisibilityApply();
+                if (CurrentTriggerMode != MorphTriggerMode.VisibilityChange) return;
+                if (!PregnancyManager.GetPregnant(_maid)) return;
+
+                float progress = PregnancyManager.GetProgress(_maid);
+                if (progress <= 0f) return;
+
+                PregnancyUI.TriggerApplyBelly(_maid, progress);
             }
 
             void LateUpdate()
             {
                 if (_maid == null) return;
                 BellyMorphController.FlushMorphDirty(_maid);
+                ProcessFullRefresh();
+                ProcessVisibilityApply();
             }
         }
     }
