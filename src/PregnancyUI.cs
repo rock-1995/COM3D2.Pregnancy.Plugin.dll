@@ -23,48 +23,41 @@ namespace COM3D2.Pregnancy.Plugin
         private Vector2 _scrollPos = Vector2.zero;
 
         private string _sInflationMultiplier = "0";
-        private string _sInflationMoveY = "0.025";
+        private string _sInflationMoveY = "0.05";
         private string _sInflationMoveZ = "0";
-        private string _sInflationStretchX = "-0.2";
+        private string _sInflationStretchX = "0.3";
         private string _sInflationStretchY = "0";
-        private string _sInflationStretchZ = "0.13";
+        private string _sInflationStretchZ = "0.5";
         private string _sInflationShiftY = "0.04";
         private string _sInflationShiftZ = "-0.3";
-        private string _sInflationTaperY = "-0.03";
+        private string _sInflationTaperY = "-0.01";
         private string _sInflationTaperZ = "-0.05";
-        private string _sInflationRoundness = "0.03";
-        private string _sInflationDrop = "0.1";
+        private string _sInflationRoundness = "0.033";
+        private string _sInflationDrop = "0.15";
         private string _sInflationFatFold = "0";
         private string _sInflationFatFoldHeight = "0";
         private string _sInflationFatFoldGap = "0";
-        private string _sRegionRadiusSide = "0.22";
-        private string _sRegionRadiusFront = "0.22";
+        private string _sRegionRadiusSide = "0.23";
+        private string _sRegionRadiusFront = "0.33";
         private string _sRegionRadiusBack = "0.13";
-        private string _sRegionRadiusUp = "0.26";
-        private string _sRegionRadiusDown = "0.18";
-        private string _sThighGuardSpeed = "4";
+        private string _sRegionRadiusUp = "0.58";
+        private string _sRegionRadiusDown = "0.35";
+        private string _sThighGuardSpeed = "3";
         private string _sInnerThighGuardStrength = "1";
-        private string _sThighGuardSmoothStrength = "0.35";
+        private string _sThighGuardSmoothStrength = "0";
         private string _sTopEdgeTaper = "-1";
         private string _sBottomEdgeTaper = "0";
         private string _sSideSmoothWidth = "0.8";
         private string _sSideSmoothStrength = "1.4";
         private string _sBreastGuardStrength = "1";
         private string _sOuterClothPregnancyScale = "1";
-        private bool _outerClothSkirtDrape = false;
-        private string _sOuterClothLayerGuard = "0";
-        private string _sInnerClothOffset = "0";
-        private string _sOuterClothOffset = "0";
-        private string _sClothThicknessPreserve = "2";
-        private string _sClothOffsetSideRatio = "0";
-        private string _sClothBackOffsetBoost = "0";
-        private string _sClothDepthStretch = "3";
         private string _sSkirtBoundarySmoothPasses = "2";
         private string _sSkirtBoundarySmoothStrength = "0.35";
-        private string _sSkirtBoundaryUpOffset = "0";
+        private string _sSkirtBoundaryUpOffset = "0.08";
         private string _sSkirtFrontPlaneFwdOffset = "0";
         private string _sSkirtTopRadiusSideScale = "1.15";
         private string _sSkirtTopRadiusFwdScale = "1.15";
+        private string _sSkirtHemFadeRangeScale = "1";
         private string _sSkirtLowerTipSide = "0";
         private string _sSkirtLowerTipUp = "-0.42";
         private string _sSkirtLowerTipFwd = "0";
@@ -112,7 +105,7 @@ namespace COM3D2.Pregnancy.Plugin
 
             float scrollBarW = 18f;
             float contentW = _win.width - scrollBarW;
-            float contentH = 1392f;
+            float contentH = 1442f;
 
             _scrollPos = GUI.BeginScrollView(
                 new Rect(0, 20f, _win.width, _win.height - 20f),
@@ -241,21 +234,13 @@ namespace COM3D2.Pregnancy.Plugin
             DrawField(ref y, x, lw, fx, fw, "Side Smooth Strength", ref _sSideSmoothStrength);
             DrawField(ref y, x, lw, fx, fw, "Breast Guard Strength", ref _sBreastGuardStrength);
             DrawField(ref y, x, lw, fx, fw, "Outer Cloth Pregnancy Scale", ref _sOuterClothPregnancyScale);
-            _outerClothSkirtDrape = GUI.Toggle(new Rect(x, y, w, 22f), _outerClothSkirtDrape, " Outer Cloth Has Skirt Drape");
-            y += 24f;
-            DrawField(ref y, x, lw, fx, fw, "Skirt Layer Guard", ref _sOuterClothLayerGuard);
-            DrawField(ref y, x, lw, fx, fw, "Inner Cloth Offset", ref _sInnerClothOffset);
-            DrawField(ref y, x, lw, fx, fw, "Outer Cloth Offset", ref _sOuterClothOffset);
-            DrawField(ref y, x, lw, fx, fw, "Cloth Thickness Preserve", ref _sClothThicknessPreserve);
-            DrawField(ref y, x, lw, fx, fw, "Cloth Side Offset Ratio", ref _sClothOffsetSideRatio);
-            DrawField(ref y, x, lw, fx, fw, "Cloth Back Offset Boost", ref _sClothBackOffsetBoost);
-            DrawField(ref y, x, lw, fx, fw, "Cloth Depth Stretch", ref _sClothDepthStretch);
             DrawField(ref y, x, lw, fx, fw, "Skirt Boundary Smooth Passes", ref _sSkirtBoundarySmoothPasses);
             DrawField(ref y, x, lw, fx, fw, "Skirt Boundary Smooth Strength", ref _sSkirtBoundarySmoothStrength);
             DrawField(ref y, x, lw, fx, fw, "Skirt Boundary Up Offset", ref _sSkirtBoundaryUpOffset);
             DrawField(ref y, x, lw, fx, fw, "Skirt Front Plane Fwd Offset", ref _sSkirtFrontPlaneFwdOffset);
             DrawField(ref y, x, lw, fx, fw, "Skirt Top Radius Side Scale", ref _sSkirtTopRadiusSideScale);
             DrawField(ref y, x, lw, fx, fw, "Skirt Top Radius Fwd Scale", ref _sSkirtTopRadiusFwdScale);
+            DrawField(ref y, x, lw, fx, fw, "Skirt Hem Fade Range Scale", ref _sSkirtHemFadeRangeScale);
             DrawField(ref y, x, lw, fx, fw, "Skirt Lower Tip Side Offset", ref _sSkirtLowerTipSide);
             DrawField(ref y, x, lw, fx, fw, "Skirt Lower Tip Up", ref _sSkirtLowerTipUp);
             DrawField(ref y, x, lw, fx, fw, "Skirt Lower Tip Fwd Offset", ref _sSkirtLowerTipFwd);
@@ -296,20 +281,13 @@ namespace COM3D2.Pregnancy.Plugin
                 log.LogInfo("  SideSmoothStrength  = " + BellyMorphController.SideSmoothStrength);
                 log.LogInfo("  BreastGuardStrength = " + BellyMorphController.BreastGuardStrength);
                 log.LogInfo("  OuterClothPregnancyScale = " + BellyMorphController.OuterClothPregnancyScale);
-                log.LogInfo("  OuterClothSkirtDrape = " + BellyMorphController.OuterClothSkirtDrape);
-                log.LogInfo("  OuterClothLayerGuard = " + BellyMorphController.OuterClothLayerGuard);
-                log.LogInfo("  InnerClothOffset    = " + BellyMorphController.InnerClothOffset);
-                log.LogInfo("  OuterClothOffset    = " + BellyMorphController.OuterClothOffset);
-                log.LogInfo("  ClothThicknessPreserve = " + BellyMorphController.ClothThicknessPreserve);
-                log.LogInfo("  ClothOffsetSideRatio = " + BellyMorphController.ClothOffsetSideRatio);
-                log.LogInfo("  ClothBackOffsetBoost = " + BellyMorphController.ClothBackOffsetBoost);
-                log.LogInfo("  ClothDepthStretch   = " + BellyMorphController.ClothDepthStretch);
                 log.LogInfo("  SkirtBoundarySmoothPasses = " + BellyMorphController.SkirtBoundarySmoothPasses);
                 log.LogInfo("  SkirtBoundarySmoothStrength = " + BellyMorphController.SkirtBoundarySmoothStrength);
                 log.LogInfo("  SkirtBoundaryUpOffset = " + BellyMorphController.SkirtBoundaryUpOffset);
                 log.LogInfo("  SkirtFrontPlaneFwdOffset = " + BellyMorphController.SkirtFrontPlaneFwdOffset);
                 log.LogInfo("  SkirtTopRadiusSideScale = " + BellyMorphController.SkirtTopRadiusSideScale);
                 log.LogInfo("  SkirtTopRadiusFwdScale = " + BellyMorphController.SkirtTopRadiusFwdScale);
+                log.LogInfo("  SkirtHemFadeRangeScale = " + BellyMorphController.SkirtHemFadeRangeScale);
                 log.LogInfo("  SkirtLowerTipSide   = " + BellyMorphController.SkirtLowerTipSide);
                 log.LogInfo("  SkirtLowerTipUp     = " + BellyMorphController.SkirtLowerTipUp);
                 log.LogInfo("  SkirtLowerTipFwd    = " + BellyMorphController.SkirtLowerTipFwd);
@@ -329,6 +307,33 @@ namespace COM3D2.Pregnancy.Plugin
                 catch (System.Exception e)
                 {
                     log.LogWarning("[Pregnancy] Dump Skirt Verts failed: " + e);
+                }
+            }
+            if (GUI.Button(new Rect(x + 286f, y, 128f, 22f), "Dump Upper Verts"))
+            {
+                var log = BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
+                try
+                {
+                    string path = BellyMorphController.ExportUpperClothVertexMorphDump(_curMaid);
+                    log.LogInfo("[Pregnancy] Dump Upper Verts: " + path);
+                }
+                catch (System.Exception e)
+                {
+                    log.LogWarning("[Pregnancy] Dump Upper Verts failed: " + e);
+                }
+            }
+            y += 26f;
+            if (GUI.Button(new Rect(x, y, 170f, 22f), "Dump Navel Accessory"))
+            {
+                var log = BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
+                try
+                {
+                    string path = BellyMorphController.ExportNavelAccessoryTriangleDump(_curMaid);
+                    log.LogInfo("[Pregnancy] Dump Navel Accessory: " + path);
+                }
+                catch (System.Exception e)
+                {
+                    log.LogWarning("[Pregnancy] Dump Navel Accessory failed: " + e);
                 }
             }
             y += 26f;
@@ -424,20 +429,13 @@ namespace COM3D2.Pregnancy.Plugin
             _sSideSmoothStrength = FormatShape(BellyMorphController.SideSmoothStrength);
             _sBreastGuardStrength = FormatShape(BellyMorphController.BreastGuardStrength);
             _sOuterClothPregnancyScale = FormatShape(BellyMorphController.OuterClothPregnancyScale);
-            _outerClothSkirtDrape = BellyMorphController.OuterClothSkirtDrape;
-            _sOuterClothLayerGuard = FormatShape(BellyMorphController.OuterClothLayerGuard);
-            _sInnerClothOffset = FormatShape(BellyMorphController.InnerClothOffset);
-            _sOuterClothOffset = FormatShape(BellyMorphController.OuterClothOffset);
-            _sClothThicknessPreserve = FormatShape(BellyMorphController.ClothThicknessPreserve);
-            _sClothOffsetSideRatio = FormatShape(BellyMorphController.ClothOffsetSideRatio);
-            _sClothBackOffsetBoost = FormatShape(BellyMorphController.ClothBackOffsetBoost);
-            _sClothDepthStretch = FormatShape(BellyMorphController.ClothDepthStretch);
             _sSkirtBoundarySmoothPasses = BellyMorphController.SkirtBoundarySmoothPasses.ToString(CultureInfo.InvariantCulture);
             _sSkirtBoundarySmoothStrength = FormatShape(BellyMorphController.SkirtBoundarySmoothStrength);
             _sSkirtBoundaryUpOffset = FormatShape(BellyMorphController.SkirtBoundaryUpOffset);
             _sSkirtFrontPlaneFwdOffset = FormatShape(BellyMorphController.SkirtFrontPlaneFwdOffset);
             _sSkirtTopRadiusSideScale = FormatShape(BellyMorphController.SkirtTopRadiusSideScale);
             _sSkirtTopRadiusFwdScale = FormatShape(BellyMorphController.SkirtTopRadiusFwdScale);
+            _sSkirtHemFadeRangeScale = FormatShape(BellyMorphController.SkirtHemFadeRangeScale);
             _sSkirtLowerTipSide = FormatShape(BellyMorphController.SkirtLowerTipSide);
             _sSkirtLowerTipUp = FormatShape(BellyMorphController.SkirtLowerTipUp);
             _sSkirtLowerTipFwd = FormatShape(BellyMorphController.SkirtLowerTipFwd);
@@ -478,14 +476,6 @@ namespace COM3D2.Pregnancy.Plugin
             if (PregnancyManager.TryParseFloat(_sSideSmoothStrength, out v)) BellyMorphController.SideSmoothStrength = v;
             if (PregnancyManager.TryParseFloat(_sBreastGuardStrength, out v)) BellyMorphController.BreastGuardStrength = v;
             if (PregnancyManager.TryParseFloat(_sOuterClothPregnancyScale, out v)) BellyMorphController.OuterClothPregnancyScale = v;
-            BellyMorphController.OuterClothSkirtDrape = _outerClothSkirtDrape;
-            if (PregnancyManager.TryParseFloat(_sOuterClothLayerGuard, out v)) BellyMorphController.OuterClothLayerGuard = v;
-            if (PregnancyManager.TryParseFloat(_sInnerClothOffset, out v)) BellyMorphController.InnerClothOffset = v;
-            if (PregnancyManager.TryParseFloat(_sOuterClothOffset, out v)) BellyMorphController.OuterClothOffset = v;
-            if (PregnancyManager.TryParseFloat(_sClothThicknessPreserve, out v)) BellyMorphController.ClothThicknessPreserve = v;
-            if (PregnancyManager.TryParseFloat(_sClothOffsetSideRatio, out v)) BellyMorphController.ClothOffsetSideRatio = v;
-            if (PregnancyManager.TryParseFloat(_sClothBackOffsetBoost, out v)) BellyMorphController.ClothBackOffsetBoost = v;
-            if (PregnancyManager.TryParseFloat(_sClothDepthStretch, out v)) BellyMorphController.ClothDepthStretch = v;
             if (int.TryParse(_sSkirtBoundarySmoothPasses, NumberStyles.Integer, CultureInfo.InvariantCulture, out int passes)
                 || int.TryParse(_sSkirtBoundarySmoothPasses, NumberStyles.Integer, CultureInfo.CurrentCulture, out passes))
                 BellyMorphController.SkirtBoundarySmoothPasses = Mathf.Clamp(passes, 0, 16);
@@ -494,6 +484,7 @@ namespace COM3D2.Pregnancy.Plugin
             if (PregnancyManager.TryParseFloat(_sSkirtFrontPlaneFwdOffset, out v)) BellyMorphController.SkirtFrontPlaneFwdOffset = v;
             if (PregnancyManager.TryParseFloat(_sSkirtTopRadiusSideScale, out v)) BellyMorphController.SkirtTopRadiusSideScale = v;
             if (PregnancyManager.TryParseFloat(_sSkirtTopRadiusFwdScale, out v)) BellyMorphController.SkirtTopRadiusFwdScale = v;
+            if (PregnancyManager.TryParseFloat(_sSkirtHemFadeRangeScale, out v)) BellyMorphController.SkirtHemFadeRangeScale = v;
             if (PregnancyManager.TryParseFloat(_sSkirtLowerTipSide, out v)) BellyMorphController.SkirtLowerTipSide = v;
             if (PregnancyManager.TryParseFloat(_sSkirtLowerTipUp, out v)) BellyMorphController.SkirtLowerTipUp = v;
             if (PregnancyManager.TryParseFloat(_sSkirtLowerTipFwd, out v)) BellyMorphController.SkirtLowerTipFwd = v;
