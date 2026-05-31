@@ -20,6 +20,7 @@ namespace COM3D2.Pregnancy.Plugin
         internal static ConfigEntry<MorphTriggerMode> CfgMorphTriggerMode;
         internal static ConfigEntry<bool> CfgMorphSpyLogging;
         internal static ConfigEntry<bool> CfgDebugMeshLogging;
+        internal static ConfigEntry<KeyCode> CfgMaidListKey;
         Harmony _harmony;
         int _aysHookAttempts;
         bool _aysHookReady;
@@ -55,6 +56,10 @@ namespace COM3D2.Pregnancy.Plugin
                 "Debug", "Mesh Logging", false,
                 "Log mesh load spy and belly morph diagnostics.");
 
+            CfgMaidListKey = Config.Bind(
+                "General", "Maid List UI Key", KeyCode.F9,
+                "Hotkey to open/close the Maid Status list window.");
+
             try
             {
                 _harmony = new Harmony(PluginGuid);
@@ -77,6 +82,7 @@ namespace COM3D2.Pregnancy.Plugin
             }
 
             gameObject.AddComponent<PregnancyUI>();
+            gameObject.AddComponent<MaidListUI>();
             gameObject.AddComponent<SceneAutoApply>();
             Logger.LogInfo($"{PluginName} {PluginVersion} loaded.");
         }

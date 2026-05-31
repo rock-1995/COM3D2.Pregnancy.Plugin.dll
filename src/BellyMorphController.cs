@@ -13,11 +13,8 @@ namespace COM3D2.Pregnancy.Plugin
         public const int HaraMax = 100;
         const int AutoMorphStableFrames = 2;
 
-        const float BaseRadiusSide = 0.22f;
-        const float BaseRadiusFront = 0.22f;
-        const float BaseRadiusBack = 0.22f;
-        const float BaseRadiusUp = 0.21f;
-        const float BaseRadiusDown = 0.21f;
+        const float BaseRadiusSide = 0.2f;
+        const float BaseRadiusFront = 0.33f;
         const float BasePushOut = 1.0f;
         const float NormalAffectedDelta = 0.0002f;
         const int NormalAffectedExpandPasses = 4;
@@ -30,28 +27,28 @@ namespace COM3D2.Pregnancy.Plugin
         public static float SpineLerpT = 1.0f;
         public static float OffsetSide = 0.0f;
         public static float InflationMultiplier = 0.0f;
-        public static float InflationMoveY = 0.025f;
+        public static float InflationMoveY = 0.05f;
         public static float InflationMoveZ = 0.0f;
-        public static float InflationStretchX = -0.2f;
+        public static float InflationStretchX = 0.22f;
         public static float InflationStretchY = 0.0f;
-        public static float InflationStretchZ = 0.13f;
+        public static float InflationStretchZ = 0.24f;
         public static float InflationShiftY = 0.04f;
         public static float InflationShiftZ = -0.3f;
-        public static float InflationTaperY = -0.03f;
+        public static float InflationTaperY = -0.01f;
         public static float InflationTaperZ = -0.05f;
         public static float InflationRoundness = 0.03f;
-        public static float InflationDrop = 0.1f;
+        public static float InflationDrop = 0.13f;
         public static float InflationFatFold = 0.0f;
         public static float InflationFatFoldHeight = 0.0f;
         public static float InflationFatFoldGap = 0.0f;
         public static float RegionRadiusSide = BaseRadiusSide;
         public static float RegionRadiusFront = BaseRadiusFront;
         public static float RegionRadiusBack = 0.13f;
-        public static float RegionRadiusUp = 0.26f;
-        public static float RegionRadiusDown = 0.18f;
-        public static float ThighGuardSpeed = 4.0f;
+        public static float RegionRadiusUp = 0.51f;
+        public static float RegionRadiusDown = 0.33f;
+        public static float ThighGuardSpeed = 3.0f;
         public static float InnerThighGuardStrength = 1.0f;
-        public static float ThighGuardSmoothStrength = 0.35f;
+        public static float ThighGuardSmoothStrength = 0.0f;
         public static float TopEdgeTaper = -1.0f;
         public static float BottomEdgeTaper = 0.0f;
         public static float SideSmoothWidth = 0.8f;
@@ -60,20 +57,13 @@ namespace COM3D2.Pregnancy.Plugin
         public static float ClothOverdrive = 1.03f;
         public static float OuterClothOverdrive = 1.20f;
         public static float OuterClothPregnancyScale = 1.0f;
-        public static bool OuterClothSkirtDrape = false;
-        public static float OuterClothLayerGuard = 0.0f;
-        public static float InnerClothOffset = 0.0f;
-        public static float OuterClothOffset = 0.0f;
-        public static float ClothThicknessPreserve = 2.0f;
-        public static float ClothOffsetSideRatio = 0.0f;
-        public static float ClothBackOffsetBoost = 0.0f;
-        public static float ClothDepthStretch = 3.0f;
         public static int SkirtBoundarySmoothPasses = 2;
         public static float SkirtBoundarySmoothStrength = 0.35f;
-        public static float SkirtBoundaryUpOffset = 0.0f;
+        public static float SkirtBoundaryUpOffset = 0.08f;
         public static float SkirtFrontPlaneFwdOffset = 0.0f;
         public static float SkirtTopRadiusSideScale = 1.15f;
         public static float SkirtTopRadiusFwdScale = 1.15f;
+        public static float SkirtHemFadeRangeScale = 1.0f;
         public static float SkirtLowerTipSide = 0.0f;
         public static float SkirtLowerTipUp = -0.42f;
         public static float SkirtLowerTipFwd = 0.0f;
@@ -118,6 +108,143 @@ namespace COM3D2.Pregnancy.Plugin
             public Vector3[] LastDeltaVerts;
             public VertexMorphTrace[] LastMorphTrace;
             public int AppliedSignature;
+            public int LastNavelReferenceTriangle = -1;
+            public int LastNavelReferenceA = -1;
+            public int LastNavelReferenceB = -1;
+            public int LastNavelReferenceC = -1;
+            public string LastNavelReferenceReason;
+        }
+
+        class MorphReferenceContext
+        {
+            public int MaidKey;
+            public List<BodyReferencePoint> BodyPoints = new List<BodyReferencePoint>();
+            public List<BodyReferenceMesh> BodyMeshes = new List<BodyReferenceMesh>();
+            public List<BodySurfaceTriangle> SurfaceTriangles = new List<BodySurfaceTriangle>();
+            public Dictionary<int, List<int>> SurfaceBuckets = new Dictionary<int, List<int>>();
+            public float CellSize = 0.025f;
+            public bool BodyChangedUpRangeValid;
+            public float BodyChangedMinUp = float.MaxValue;
+            public float BodyChangedMaxUp = float.MinValue;
+            public int SurfaceQueries;
+            public int SurfaceHits;
+            public int SurfaceMisses;
+            public int VirtualSurfaceTriangles;
+            public int SuppressedSurfaceTriangles;
+        }
+
+        class BodyReferenceMesh
+        {
+            public string MeshId;
+            public int MeshInstanceId;
+            public Vector3[] OriginalWorld;
+            public Vector3[] MorphedWorld;
+            public bool[] Valid;
+            public bool[] Eligible;
+            public List<int>[] Neighbors;
+            public List<int>[] SurfaceTrianglesByVertex;
+        }
+
+        class BoundaryReferenceMesh
+        {
+            public BodyReferenceMesh Mesh;
+            public bool[] Boundary;
+            public bool[] FrameEligible;
+        }
+
+        struct BodyReferencePoint
+        {
+            public BodyReferenceMesh Mesh;
+            public int Index;
+            public Vector3 OriginalWorld;
+        }
+
+        struct BodySurfaceTriangle
+        {
+            public BodyReferenceMesh Mesh;
+            public int A;
+            public int B;
+            public int C;
+            public Vector3 Center;
+            public float RadiusSq;
+        }
+
+        struct BodySurfaceHit
+        {
+            public int TriangleIndex;
+            public Vector3 Closest;
+            public Vector3 Barycentric;
+            public Vector3 Normal;
+            public float DistanceSq;
+        }
+
+        struct BodySurfaceTargetDebug
+        {
+            public string FailReason;
+            public int BodyPointCount;
+            public int SurfaceTriangleCount;
+            public bool SearchHit;
+            public bool FullScanHit;
+            public int TriangleIndex;
+            public string BodyMeshId;
+            public int BodyMeshInstanceId;
+            public int BodyA;
+            public int BodyB;
+            public int BodyC;
+            public float Distance;
+            public float OffsetLen;
+            public float SurfaceMoveLen;
+            public float NormalDot;
+            public Vector3 Barycentric;
+            public Vector3 Closest;
+            public Vector3 SurfaceMorphed;
+            public Vector3 OriginalNormal;
+            public Vector3 MorphedNormal;
+            public Vector3 Target;
+        }
+
+        struct ClothInheritDebug
+        {
+            public string SourceMesh;
+            public int OriginIndex;
+            public int PointAIndex;
+            public int PointBIndex;
+            public int CandidateCount;
+            public float FrameScore;
+            public float NearestDistance;
+            public string FailReason;
+            public float OriginalThickness;
+            public float RawThickness;
+            public float FinalThickness;
+            public Vector3 LocalOffset;
+            public Vector3 MorphedOrigin;
+        }
+
+        struct MorphFrame
+        {
+            public Vector3 Origin;
+            public Vector3 X;
+            public Vector3 Y;
+            public Vector3 Z;
+
+            public bool TryToLocal(Vector3 worldOffset, out Vector3 localOffset)
+            {
+                localOffset = Vector3.zero;
+                float det = Vector3.Dot(X, Vector3.Cross(Y, Z));
+                if (det == 0f)
+                    return false;
+
+                localOffset = new Vector3(
+                    Vector3.Dot(worldOffset, Vector3.Cross(Y, Z)) / det,
+                    Vector3.Dot(X, Vector3.Cross(worldOffset, Z)) / det,
+                    Vector3.Dot(X, Vector3.Cross(Y, worldOffset)) / det);
+                return true;
+            }
+
+            public Vector3 ToWorld(Vector3 localOffset)
+            {
+                return X * localOffset.x + Y * localOffset.y + Z * localOffset.z;
+            }
         }
 
         class VertexMorphTrace
@@ -169,16 +296,8 @@ namespace COM3D2.Pregnancy.Plugin
             public float BottomTaperLower;
             public float BottomTaperFront;
             public float BottomTaperGuardKeep;
-            public float ClothDepthStretchFactor;
-            public float ClothDepthDeltaFwd;
-            public float ClothLayerDeltaFwd;
             public bool InwardGuardApplied;
             public float InwardGuardDeltaFwd;
-
-            public bool SkirtDrapeEnabled;
-            public bool SkirtDrapeReached;
-            public float SkirtDrapeAddFwd;
-            public string SkirtDrapeReason;
 
             public bool SkirtLowerEnabled;
             public float SkirtLowerBoundaryUp;
@@ -189,7 +308,50 @@ namespace COM3D2.Pregnancy.Plugin
             public float SkirtLowerAddFwd;
             public string SkirtLowerReason;
 
-            public float CrossLayerGuardDeltaFwd;
+            public bool OldFinalChanged;
+            public float OldFinalDeltaWorldLen;
+            public float OldFinalMinDelta;
+            public string OldFinalReason;
+
+            public bool ClothInheritApplied;
+            public string ClothInheritKind;
+            public string ClothInheritReason;
+            public string ClothInheritSourceMesh;
+            public int ClothInheritSourceVertex = -1;
+            public int ClothInheritFrameA = -1;
+            public int ClothInheritFrameB = -1;
+            public int ClothInheritFrameCandidateCount;
+            public float ClothInheritFrameScore;
+            public float ClothInheritNearestDistance;
+            public float ClothInheritOriginalThickness;
+            public float ClothInheritRawThickness;
+            public float ClothInheritFinalThickness;
+            public Vector3 ClothInheritLocalOffset;
+            public Vector3 ClothInheritPreWorld;
+            public Vector3 ClothInheritPostWorld;
+            public Vector3 ClothInheritPreCoord;
+            public Vector3 ClothInheritPostCoord;
+            public Vector3 ClothInheritDeltaCoord;
+            public float ClothInheritDeltaWorldLen;
+            public Vector3 ClothInheritDeltaDirCoord;
+            public Vector3 ClothInheritFinalOffsetCoord;
+            public string ClothInheritFailKind;
+            public string ClothInheritFailReason;
+            public string ClothInheritFailSourceMesh;
+            public int ClothInheritFailSourceVertex = -1;
+            public int ClothInheritFailFrameCandidateCount;
+            public float ClothInheritFailFrameScore;
+            public float ClothInheritFailNearestDistance;
+
+            public bool SkirtHemBoundaryValid;
+            public float SkirtHemBoundaryUp;
+            public float SkirtHemFwdThreshold;
+            public bool SkirtHemFront;
+            public bool SkirtHemLowerRange;
+            public bool SkirtHemCandidate;
+            public float SkirtHemBlend = -1f;
+            public string SkirtHemReason;
+
             public float ThighSmoothMask;
             public float ThighSmoothDeltaFwd;
 
@@ -206,23 +368,14 @@ namespace COM3D2.Pregnancy.Plugin
             public float FwdSideSmooth;
             public float FwdRibReduce;
             public float FwdLowerRestore;
-            public float FwdDepthStretch;
-            public float FwdLayerOffset;
             public float FwdInwardGuard;
             public float FwdBreastRestore;
             public float FwdInnerThighRestore;
             public float FwdBottomTaper;
-            public float FwdSkirtDrape;
             public float FwdSkirtLower;
-            public float FwdCrossLayerGuard;
+            public float FwdClothInherit;
             public float FwdThighSmooth;
             public float FwdFinal;
-        }
-
-        enum TraceFwdStage
-        {
-            SkirtDrape,
-            SkirtLower,
         }
 
         class MorphBaseBakeState
@@ -243,50 +396,26 @@ namespace COM3D2.Pregnancy.Plugin
             public MeshMorphClass MeshClass;
         }
 
-        class CrossLayerGuardMesh
-        {
-            public SkinnedMeshRenderer SMR;
-            public MeshRecord Record;
-            public Mesh Mesh;
-            public Vector3[] CurrentVerts;
-            public BoneWeight[] Weights;
-            public Matrix4x4[] BoneMatrices;
-            public Vector3[] OriginalWorld;
-            public Vector3[] MorphedWorld;
-            public bool[] Valid;
-            public LayerGuardCoord[] Coords;
-            public bool Changed;
-        }
-
-        struct LayerGuardRef
-        {
-            public int MeshIndex;
-            public int VertexIndex;
-
-            public LayerGuardRef(int meshIndex, int vertexIndex)
-            {
-                MeshIndex = meshIndex;
-                VertexIndex = vertexIndex;
-            }
-        }
-
         enum MeshMorphClass
         {
             Ignore,
             Body,
             InnerCloth,
             OuterCloth,
+            NavelAccessory,
         }
 
         static Dictionary<int, List<MeshRecord>> _records = new Dictionary<int, List<MeshRecord>>();
         static readonly Dictionary<int, HashSet<TBodySkin>> _morphDirtySkins = new Dictionary<int, HashSet<TBodySkin>>();
         static readonly Dictionary<int, float> _morphSpyLastLogTime = new Dictionary<int, float>();
+        static readonly Dictionary<int, int> _meshInventorySignatures = new Dictionary<int, int>();
         static readonly Dictionary<TMorph, MorphBaseBakeState> _morphBaseBakeStates = new Dictionary<TMorph, MorphBaseBakeState>();
         static readonly FieldInfo _blendValuesChkField = typeof(TMorph).GetField(
             "BlendValuesCHK",
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         static BepInEx.Logging.ManualLogSource _log = BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
         static bool _suppressMorphBaseBake = false;
+        static MorphReferenceContext _morphReferenceContext = null;
         const float MorphSpyMinInterval = 0.5f;
 
         struct LocalFrame
@@ -308,6 +437,43 @@ namespace COM3D2.Pregnancy.Plugin
             public int NonZeroVerts;
             public float MaxDelta;
             public float MaxStrength;
+        }
+
+        struct NavelAccessoryReference
+        {
+            public int Triangle;
+            public int A;
+            public int B;
+            public int C;
+            public float Score;
+            public Vector3 OriginalAWorld;
+            public Vector3 OriginalBWorld;
+            public Vector3 OriginalCWorld;
+            public Vector3 OriginalCenterWorld;
+            public Vector3 TargetCenterWorld;
+            public Quaternion DeltaRotation;
+            public string Reason;
+        }
+
+        struct VirtualSeamSurfaceFit
+        {
+            public float CenterSide;
+            public float HalfWidth;
+            public float MinUp;
+            public float MaxUp;
+            public float OriginalPlaneA;
+            public float OriginalPlaneSide;
+            public float OriginalPlaneUp;
+            public float MorphedSidePlaneA;
+            public float MorphedSidePlaneSide;
+            public float MorphedSidePlaneUp;
+            public float MorphedUpPlaneA;
+            public float MorphedUpPlaneSide;
+            public float MorphedUpPlaneUp;
+            public float MorphedPlaneA;
+            public float MorphedPlaneSide;
+            public float MorphedPlaneUp;
+            public int SampleCount;
         }
 
         static bool _bpWorldCached = false;
@@ -364,48 +530,41 @@ namespace COM3D2.Pregnancy.Plugin
         public static void ResetToDefaults()
         {
             InflationMultiplier       = 0.0f;
-            InflationMoveY            = 0.025f;
+            InflationMoveY            = 0.05f;
             InflationMoveZ            = 0.0f;
-            InflationStretchX         = -0.2f;
+            InflationStretchX         = 0.22f;
             InflationStretchY         = 0.0f;
-            InflationStretchZ         = 0.13f;
+            InflationStretchZ         = 0.24f;
             InflationShiftY           = 0.04f;
             InflationShiftZ           = -0.3f;
-            InflationTaperY           = -0.03f;
+            InflationTaperY           = -0.01f;
             InflationTaperZ           = -0.05f;
             InflationRoundness        = 0.03f;
-            InflationDrop             = 0.1f;
+            InflationDrop             = 0.13f;
             InflationFatFold          = 0.0f;
             InflationFatFoldHeight    = 0.0f;
             InflationFatFoldGap       = 0.0f;
             RegionRadiusSide          = BaseRadiusSide;
             RegionRadiusFront         = BaseRadiusFront;
             RegionRadiusBack          = 0.13f;
-            RegionRadiusUp            = 0.26f;
-            RegionRadiusDown          = 0.18f;
-            ThighGuardSpeed           = 4.0f;
+            RegionRadiusUp            = 0.51f;
+            RegionRadiusDown          = 0.33f;
+            ThighGuardSpeed           = 3.0f;
             InnerThighGuardStrength   = 1.0f;
-            ThighGuardSmoothStrength  = 0.35f;
+            ThighGuardSmoothStrength  = 0.0f;
             TopEdgeTaper              = -1.0f;
             BottomEdgeTaper           = 0.0f;
             SideSmoothWidth           = 0.8f;
             SideSmoothStrength        = 1.4f;
             BreastGuardStrength       = 1.0f;
             OuterClothPregnancyScale  = 1.0f;
-            OuterClothSkirtDrape      = false;
-            OuterClothLayerGuard      = 0.0f;
-            InnerClothOffset          = 0.0f;
-            OuterClothOffset          = 0.0f;
-            ClothThicknessPreserve    = 2.0f;
-            ClothOffsetSideRatio      = 0.0f;
-            ClothBackOffsetBoost      = 0.0f;
-            ClothDepthStretch         = 3.0f;
             SkirtBoundarySmoothPasses = 2;
             SkirtBoundarySmoothStrength = 0.35f;
-            SkirtBoundaryUpOffset    = 0.0f;
+            SkirtBoundaryUpOffset    = 0.08f;
             SkirtFrontPlaneFwdOffset = 0.0f;
             SkirtTopRadiusSideScale  = 1.15f;
             SkirtTopRadiusFwdScale   = 1.15f;
+            SkirtHemFadeRangeScale   = 1.0f;
             SkirtLowerTipSide        = 0.0f;
             SkirtLowerTipUp          = -0.42f;
             SkirtLowerTipFwd         = 0.0f;
@@ -450,6 +609,7 @@ namespace COM3D2.Pregnancy.Plugin
         {
             if (maid == null || maid.body0 == null || maid.body0.goSlot == null) return;
             List<SkinnedMeshRenderer> targetSmrs = CollectTargetRenderers(maid);
+            MaybeLogMeshInventory(maid, targetSmrs, "apply");
 
             _bpWorldCached = false;
             _bpBoneWorld.Clear();
@@ -460,46 +620,73 @@ namespace COM3D2.Pregnancy.Plugin
                 if (TryCacheBindPoseWorldRef(smr)) break;
             }
 
-            HashSet<int> appliedMeshIds = new HashSet<int>();
-            List<SkinnedMeshRenderer> skirtLayerGuardCandidates = new List<SkinnedMeshRenderer>();
-            foreach (SkinnedMeshRenderer smr in targetSmrs)
+            MorphReferenceContext previousContext = _morphReferenceContext;
+            _morphReferenceContext = new MorphReferenceContext
             {
-                if (smr?.sharedMesh == null) continue;
+                MaidKey = maid.GetHashCode(),
+                CellSize = Mathf.Max(RelGeneral(0.025f), 0.005f),
+            };
+            try
+            {
+                HashSet<int> appliedMeshIds = new HashSet<int>();
+                HashSet<int> activeBodyMeshIds = CollectActiveBodyMeshIds(targetSmrs);
+                HashSet<int> hiddenBodyReferenceMeshIds = new HashSet<int>();
 
-                MeshMorphClass meshClass = ClassifyMesh(smr);
-                if (meshClass == MeshMorphClass.Ignore)
+                for (int pass = 0; pass < 2; pass++)
                 {
-                    if (IsDebugMeshLoggingEnabled() && !IsFaceSlot(GetMeshId(smr)))
-                        _log.LogInfo($"[BellyDiag] unrecognized maid={GetMaidName(maid)}"
-                            + $" id={GetMeshId(smr)}"
-                            + $" verts={smr.sharedMesh.vertexCount}");
-                    continue;
-                }
-
-                AttachNotifier(smr.gameObject, maid);
-
-                bool willApply = includeInactive || smr.gameObject.activeInHierarchy;
-                if (IsDebugMeshLoggingEnabled())
-                    LogMorphScan(maid, smr, meshClass, includeInactive, willApply);
-
-                if (willApply)
-                {
-                    int meshId = smr.sharedMesh.GetInstanceID();
-                    if (!appliedMeshIds.Add(meshId))
+                    bool bodyPass = pass == 0;
+                    foreach (SkinnedMeshRenderer smr in targetSmrs)
                     {
-                        if (IsDebugMeshLoggingEnabled())
-                            LogMorphSkip(maid, smr, meshClass, "duplicate-shared-mesh");
-                        continue;
-                    }
+                        if (smr?.sharedMesh == null) continue;
 
-                    ApplySMR(maid, smr, progress, meshClass, false);
-                    if (meshClass == MeshMorphClass.OuterCloth && IsSkirtLikeMesh(smr))
-                        skirtLayerGuardCandidates.Add(smr);
+                        MeshMorphClass meshClass = ClassifyMesh(smr);
+                        if (meshClass == MeshMorphClass.Ignore)
+                        {
+                            if (bodyPass && IsDebugMeshLoggingEnabled() && !IsFaceSlot(GetMeshId(smr)))
+                                _log.LogInfo($"[BellyDiag] unrecognized maid={GetMaidName(maid)}"
+                                    + $" id={GetMeshId(smr)}"
+                                    + $" verts={smr.sharedMesh.vertexCount}");
+                            continue;
+                        }
+
+                        if ((meshClass == MeshMorphClass.Body) != bodyPass)
+                            continue;
+
+                        if (IsDebugMeshLoggingEnabled())
+                            LogMorphScan(maid, smr, meshClass, includeInactive, includeInactive || smr.gameObject.activeInHierarchy);
+
+                        AttachNotifier(smr.gameObject, maid);
+
+                        bool willApply = includeInactive || smr.gameObject.activeInHierarchy;
+                        int meshId = smr.sharedMesh.GetInstanceID();
+                        if (bodyPass && !willApply)
+                        {
+                            if (!activeBodyMeshIds.Contains(meshId) && hiddenBodyReferenceMeshIds.Add(meshId))
+                            {
+                                if (!TryRegisterBodyReferenceOnly(maid, smr, progress))
+                                    LogMorphSkip(maid, smr, meshClass, "hidden-body-reference-failed");
+                            }
+                            continue;
+                        }
+
+                        if (willApply)
+                        {
+                            if (!appliedMeshIds.Add(meshId))
+                            {
+                                if (IsDebugMeshLoggingEnabled())
+                                    LogMorphSkip(maid, smr, meshClass, "duplicate-shared-mesh");
+                                continue;
+                            }
+
+                            ApplySMR(maid, smr, progress, meshClass, false);
+                        }
+                    }
                 }
             }
-
-            if (OuterClothSkirtDrape && OuterClothLayerGuard > 0f && skirtLayerGuardCandidates.Count > 0)
-                ApplyCrossOuterClothLayerGuard(maid, skirtLayerGuardCandidates);
+            finally
+            {
+                _morphReferenceContext = previousContext;
+            }
         }
 
         static void PruneRecords(Maid maid)
@@ -561,6 +748,23 @@ namespace COM3D2.Pregnancy.Plugin
             return result;
         }
 
+        static HashSet<int> CollectActiveBodyMeshIds(List<SkinnedMeshRenderer> renderers)
+        {
+            HashSet<int> result = new HashSet<int>();
+            if (renderers == null) return result;
+
+            for (int i = 0; i < renderers.Count; i++)
+            {
+                SkinnedMeshRenderer smr = renderers[i];
+                if (smr == null || smr.sharedMesh == null) continue;
+                if (!smr.gameObject.activeInHierarchy) continue;
+                if (ClassifyMesh(smr) != MeshMorphClass.Body) continue;
+                result.Add(smr.sharedMesh.GetInstanceID());
+            }
+
+            return result;
+        }
+
         static void AddRenderers(Transform root, List<SkinnedMeshRenderer> result, HashSet<int> seen)
         {
             if (root == null) return;
@@ -610,6 +814,7 @@ namespace COM3D2.Pregnancy.Plugin
             if (string.IsNullOrEmpty(id)) return MeshMorphClass.Ignore;
             if (IsFaceSlot(id)) return MeshMorphClass.Ignore;
             if (id.Contains("moza")) return MeshMorphClass.Ignore;
+            if (ContainsAny(id, "accheso")) return MeshMorphClass.NavelAccessory;
             if (ContainsAny(id, "body", "base", "karada", "inmou", "nip", "under")) return MeshMorphClass.Body;
             if (ContainsAny(id, "bra", "pants", "psnts", "stkg", "mizugi", "zurashi")) return MeshMorphClass.InnerCloth;
             if (ContainsAny(id, "wear", "onep", "skrt", "zubon", "skirt", "mekure")) return MeshMorphClass.OuterCloth;
@@ -621,7 +826,15 @@ namespace COM3D2.Pregnancy.Plugin
         {
             string id = GetMeshId(smr);
             if (string.IsNullOrEmpty(id)) return false;
+            if (id.Contains("etoile_skrt")) return false;
             return ContainsAny(id, "skrt", "skirt", "onep", "mekure");
+        }
+
+        static bool IsPantsLikeMesh(SkinnedMeshRenderer smr)
+        {
+            string id = GetMeshId(smr);
+            if (string.IsNullOrEmpty(id)) return false;
+            return ContainsAny(id, "zubon");
         }
 
         static bool IsArmDetachVertex(BoneWeight[] weights, Transform[] bones, int index)
@@ -670,15 +883,111 @@ namespace COM3D2.Pregnancy.Plugin
                 || name == "Foretwist1_R";
         }
 
+        static void MaybeLogMeshInventory(Maid maid, List<SkinnedMeshRenderer> renderers, string reason)
+        {
+            if (!IsDebugMeshLoggingEnabled())
+            {
+                if (maid != null)
+                    _meshInventorySignatures.Remove(maid.GetHashCode());
+                return;
+            }
+            if (maid == null || renderers == null) return;
+
+            int key = maid.GetHashCode();
+            int signature = ComputeMeshInventorySignature(renderers);
+            int previous;
+            if (_meshInventorySignatures.TryGetValue(key, out previous) && previous == signature)
+                return;
+            _meshInventorySignatures[key] = signature;
+
+            _log.LogInfo("[BellyMesh] inventory"
+                + $" maid={GetMaidName(maid)}"
+                + $" reason={reason}"
+                + $" count={renderers.Count}"
+                + $" signature={signature}");
+
+            for (int i = 0; i < renderers.Count; i++)
+            {
+                SkinnedMeshRenderer smr = renderers[i];
+                if (smr == null)
+                {
+                    _log.LogInfo("[BellyMesh] item"
+                        + $" maid={GetMaidName(maid)}"
+                        + $" index={i}"
+                        + " null=1");
+                    continue;
+                }
+
+                Mesh mesh = smr.sharedMesh;
+                MeshMorphClass meshClass = ClassifyMesh(smr);
+                _log.LogInfo("[BellyMesh] item"
+                    + $" maid={GetMaidName(maid)}"
+                    + $" index={i}"
+                    + $" id={GetMeshId(smr)}"
+                    + $" class={meshClass}"
+                    + $" renderer={smr.name}"
+                    + $" go={smr.gameObject.name}"
+                    + $" path={GetTransformPath(smr.transform)}"
+                    + $" mesh={(mesh != null ? mesh.name : string.Empty)}"
+                    + $" meshId={(mesh != null ? mesh.GetInstanceID() : 0)}"
+                    + $" verts={(mesh != null ? mesh.vertexCount : 0)}"
+                    + $" bones={(smr.bones != null ? smr.bones.Length : 0)}"
+                    + $" enabled={smr.enabled}"
+                    + $" activeSelf={smr.gameObject.activeSelf}"
+                    + $" activeInHierarchy={smr.gameObject.activeInHierarchy}");
+            }
+        }
+
+        static int ComputeMeshInventorySignature(List<SkinnedMeshRenderer> renderers)
+        {
+            unchecked
+            {
+                int hash = 17;
+                if (renderers == null) return hash;
+                hash = hash * 31 + renderers.Count;
+                for (int i = 0; i < renderers.Count; i++)
+                {
+                    SkinnedMeshRenderer smr = renderers[i];
+                    if (smr == null)
+                    {
+                        hash = hash * 31;
+                        continue;
+                    }
+
+                    Mesh mesh = smr.sharedMesh;
+                    hash = hash * 31 + smr.GetInstanceID();
+                    hash = hash * 31 + (mesh != null ? mesh.GetInstanceID() : 0);
+                    hash = hash * 31 + (mesh != null ? mesh.vertexCount : 0);
+                    hash = hash * 31 + (smr.enabled ? 1 : 0);
+                    hash = hash * 31 + (smr.gameObject.activeSelf ? 1 : 0);
+                    hash = hash * 31 + (smr.gameObject.activeInHierarchy ? 1 : 0);
+                    hash = hash * 31 + GetMeshId(smr).GetHashCode();
+                    hash = hash * 31 + ((mesh != null && mesh.name != null) ? mesh.name.GetHashCode() : 0);
+                }
+                return hash;
+            }
+        }
+
+        static string GetTransformPath(Transform transform)
+        {
+            if (transform == null) return string.Empty;
+            List<string> names = new List<string>();
+            Transform current = transform;
+            while (current != null && names.Count < 32)
+            {
+                names.Add(current.name);
+                current = current.parent;
+            }
+            names.Reverse();
+            return string.Join("/", names.ToArray());
+        }
+
         static bool ShouldLogMorphDiagnostics(SkinnedMeshRenderer smr, MeshMorphClass meshClass)
         {
             if (!IsDebugMeshLoggingEnabled()) return false;
-            if (smr == null || meshClass == MeshMorphClass.Ignore) return false;
+            if (smr == null) return false;
             string id = GetMeshId(smr);
-            return meshClass == MeshMorphClass.OuterCloth
-                || id.Contains("218")
-                || id.Contains("skrt")
-                || id.Contains("skirt");
+            return !IsFaceSlot(id);
         }
 
         static bool IsDebugMeshLoggingEnabled()
@@ -918,67 +1227,153 @@ namespace COM3D2.Pregnancy.Plugin
 
             if (!CacheBindPoseWorldForMaid(maid)) return false;
 
-            MeshRecord rec = new MeshRecord
+            MorphReferenceContext previousContext = _morphReferenceContext;
+            _morphReferenceContext = new MorphReferenceContext
             {
-                SMR = smr,
-                Mesh = mesh,
-                OrigVerts = baseVerts,
-                OrigNormals = baseNormals,
+                MaidKey = maid.GetHashCode(),
+                CellSize = Mathf.Max(RelGeneral(0.025f), 0.005f),
             };
 
-            bool[] mask = BuildVertexMask(smr, rec, meshClass);
-            if (!HasAnyMaskedVertex(mask)) return false;
-
-            float effectiveProgress = GetEffectiveMorphProgress(progress, meshClass);
-            Vector3[] bakedVerts;
-            DeformStats stats;
-            if (!TryDeformVertsInBindPoseWorld(
-                smr,
-                rec,
-                mask,
-                meshClass,
-                effectiveProgress,
-                out bakedVerts,
-                out stats))
+            try
             {
+                if (meshClass != MeshMorphClass.Body && !BuildRuntimeBodyMorphReferences(maid, progress))
+                    return false;
+
+                MeshRecord rec = new MeshRecord
+                {
+                    SMR = smr,
+                    Mesh = mesh,
+                    OrigVerts = baseVerts,
+                    OrigNormals = baseNormals,
+                };
+
+                bool[] mask = BuildVertexMask(smr, rec, meshClass);
+                if (!HasAnyMaskedVertex(mask)) return false;
+
+                float effectiveProgress = GetEffectiveMorphProgress(progress, meshClass);
+                Vector3[] bakedVerts;
+                DeformStats stats;
+                if (!TryBuildMorphedVertsInBindPoseWorld(
+                    smr,
+                    rec,
+                    mask,
+                    meshClass,
+                    effectiveProgress,
+                    out bakedVerts,
+                    out stats))
+                {
+                    return false;
+                }
+
+                Vector3[] bakedNormals = BuildMorphBaseNormals(mesh, rec, bakedVerts);
+                if (bakedNormals == null || bakedNormals.Length != bakedVerts.Length)
+                    bakedNormals = CloneVectorArray(baseNormals);
+
+                int originalSignature = ComputeVertexSignature(baseVerts);
+                int appliedSignature = ComputeVertexSignature(bakedVerts);
+                int oldOriVertId = currentVerts.GetHashCode();
+
+                morph.m_vOriVert = bakedVerts;
+                if (bakedNormals != null && bakedNormals.Length == bakedVerts.Length)
+                    morph.m_vOriNorm = bakedNormals;
+
+                MorphBaseBakeState newState = new MorphBaseBakeState
+                {
+                    Maid = maid,
+                    Skin = morph.bodyskin,
+                    Renderer = smr,
+                    Mesh = mesh,
+                    OriginalVerts = baseVerts,
+                    OriginalNormals = baseNormals,
+                    BakedVerts = bakedVerts,
+                    BakedNormals = bakedNormals,
+                    OriginalSignature = originalSignature,
+                    AppliedSignature = appliedSignature,
+                    ShapeSignature = shapeSignature,
+                    Progress = progress,
+                    MeshInstanceId = meshId,
+                    MeshClass = meshClass,
+                };
+                _morphBaseBakeStates[morph] = newState;
+
+                ForceFixBlendValues(morph);
+                LogMorphBaseBake(maid, morph, smr, meshClass, progress, effectiveProgress, oldOriVertId, newState, stats, reusedStoredBase);
+
+                return true;
+            }
+            finally
+            {
+                _morphReferenceContext = previousContext;
+            }
+        }
+
+        static bool BuildRuntimeBodyMorphReferences(Maid maid, float progress)
+        {
+            if (_morphReferenceContext == null || !IsValid(maid) || !_bpWorldCached)
                 return false;
+
+            List<SkinnedMeshRenderer> renderers = CollectTargetRenderers(maid);
+            HashSet<int> seenMeshes = new HashSet<int>();
+            float bodyProgress = GetEffectiveMorphProgress(progress, MeshMorphClass.Body);
+
+            for (int i = 0; i < renderers.Count; i++)
+            {
+                SkinnedMeshRenderer smr = renderers[i];
+                if (smr == null || smr.sharedMesh == null) continue;
+                if (ClassifyMesh(smr) != MeshMorphClass.Body) continue;
+
+                Mesh mesh = smr.sharedMesh;
+                if (!seenMeshes.Add(mesh.GetInstanceID())) continue;
+
+                Vector3[] currentVerts = mesh.vertices;
+                if (currentVerts == null || currentVerts.Length == 0) continue;
+
+                Vector3[] baseVerts = null;
+                Vector3[] baseNormals = null;
+                MeshRecord existing = FindRecord(maid, smr);
+                bool currentIsApplied = existing != null
+                    && existing.OrigVerts != null
+                    && existing.OrigVerts.Length == currentVerts.Length
+                    && existing.LastDeltaVerts != null
+                    && existing.LastDeltaVerts.Length == currentVerts.Length
+                    && existing.AppliedSignature != 0
+                    && ComputeVertexSignature(currentVerts) == existing.AppliedSignature;
+
+                if (currentIsApplied)
+                {
+                    baseVerts = (Vector3[])existing.OrigVerts.Clone();
+                    baseNormals = CloneVectorArray(existing.OrigNormals);
+                }
+                else
+                {
+                    baseVerts = (Vector3[])currentVerts.Clone();
+                    baseNormals = CloneVectorArray(mesh.normals);
+                }
+
+                MeshRecord rec = new MeshRecord
+                {
+                    SMR = smr,
+                    Mesh = mesh,
+                    OrigVerts = baseVerts,
+                    OrigNormals = baseNormals,
+                };
+
+                bool[] mask = BuildVertexMask(smr, rec, MeshMorphClass.Body);
+                if (!HasAnyMaskedVertex(mask)) continue;
+
+                Vector3[] ignoredVerts;
+                DeformStats ignoredStats;
+                TryDeformVertsInBindPoseWorld(
+                    smr,
+                    rec,
+                    mask,
+                    MeshMorphClass.Body,
+                    bodyProgress,
+                    out ignoredVerts,
+                    out ignoredStats);
             }
 
-            Vector3[] bakedNormals = BuildMorphBaseNormals(mesh, rec, bakedVerts);
-            if (bakedNormals == null || bakedNormals.Length != bakedVerts.Length)
-                bakedNormals = CloneVectorArray(baseNormals);
-
-            int originalSignature = ComputeVertexSignature(baseVerts);
-            int appliedSignature = ComputeVertexSignature(bakedVerts);
-            int oldOriVertId = currentVerts.GetHashCode();
-
-            morph.m_vOriVert = bakedVerts;
-            if (bakedNormals != null && bakedNormals.Length == bakedVerts.Length)
-                morph.m_vOriNorm = bakedNormals;
-
-            MorphBaseBakeState newState = new MorphBaseBakeState
-            {
-                Maid = maid,
-                Skin = morph.bodyskin,
-                Renderer = smr,
-                Mesh = mesh,
-                OriginalVerts = baseVerts,
-                OriginalNormals = baseNormals,
-                BakedVerts = bakedVerts,
-                BakedNormals = bakedNormals,
-                OriginalSignature = originalSignature,
-                AppliedSignature = appliedSignature,
-                ShapeSignature = shapeSignature,
-                Progress = progress,
-                MeshInstanceId = meshId,
-                MeshClass = meshClass,
-            };
-            _morphBaseBakeStates[morph] = newState;
-
-            ForceFixBlendValues(morph);
-            LogMorphBaseBake(maid, morph, smr, meshClass, progress, effectiveProgress, oldOriVertId, newState, stats, reusedStoredBase);
-
-            return true;
+            return _morphReferenceContext.SurfaceTriangles.Count > 0;
         }
 
         static SkinnedMeshRenderer FindRendererForMorph(Maid maid, TMorph morph)
@@ -1110,41 +1505,14 @@ namespace COM3D2.Pregnancy.Plugin
             trace.FwdSideSmooth = fwd;
             trace.FwdRibReduce = fwd;
             trace.FwdLowerRestore = fwd;
-            trace.FwdDepthStretch = fwd;
-            trace.FwdLayerOffset = fwd;
             trace.FwdInwardGuard = fwd;
             trace.FwdBreastRestore = fwd;
             trace.FwdInnerThighRestore = fwd;
             trace.FwdBottomTaper = fwd;
-            trace.FwdSkirtDrape = fwd;
             trace.FwdSkirtLower = fwd;
-            trace.FwdCrossLayerGuard = fwd;
+            trace.FwdClothInherit = fwd;
             trace.FwdThighSmooth = fwd;
             trace.FwdFinal = fwd;
-        }
-
-        static void CaptureTraceWorldFwd(
-            VertexMorphTrace[] traces,
-            Vector3[] worldVerts,
-            bool[] valid,
-            Vector3 center,
-            Vector3 fwd,
-            TraceFwdStage stage)
-        {
-            if (traces == null || worldVerts == null || valid == null) return;
-
-            int count = Mathf.Min(traces.Length, Mathf.Min(worldVerts.Length, valid.Length));
-            for (int i = 0; i < count; i++)
-            {
-                VertexMorphTrace trace = traces[i];
-                if (trace == null || !valid[i]) continue;
-
-                float value = TraceFwd(worldVerts[i], center, fwd);
-                if (stage == TraceFwdStage.SkirtDrape)
-                    trace.FwdSkirtDrape = value;
-                else if (stage == TraceFwdStage.SkirtLower)
-                    trace.FwdSkirtLower = value;
-            }
         }
 
         static void CaptureTraceFinalLocalFwd(
@@ -1170,18 +1538,19 @@ namespace COM3D2.Pregnancy.Plugin
                     float beforeFwd = TraceFwd(skin.MultiplyPoint3x4(beforeSmoothLocalVerts[i]), center, fwd);
                     float afterFwd = TraceFwd(skin.MultiplyPoint3x4(finalLocalVerts[i]), center, fwd);
                     trace.ThighSmoothMask = Mathf.Max(trace.LowerBodyRestore, trace.InnerThighRestore);
-                    trace.ThighSmoothDeltaFwd = afterFwd - beforeFwd;
-                    if (Mathf.Abs(trace.CrossLayerGuardDeltaFwd) <= 1e-8f)
-                        trace.FwdCrossLayerGuard = trace.FwdSkirtLower;
-                    trace.FwdThighSmooth = afterFwd;
+                    float afterThighSmoothFwd = trace.ClothInheritApplied ? trace.ClothInheritPreCoord.z : afterFwd;
+                    trace.ThighSmoothDeltaFwd = afterThighSmoothFwd - beforeFwd;
+                    trace.FwdThighSmooth = afterThighSmoothFwd;
+                    if (!trace.ClothInheritApplied)
+                        trace.FwdClothInherit = afterThighSmoothFwd;
                     trace.FwdFinal = afterFwd;
                 }
                 else
                 {
                     float finalFwd = TraceFwd(skin.MultiplyPoint3x4(finalLocalVerts[i]), center, fwd);
-                    if (Mathf.Abs(trace.CrossLayerGuardDeltaFwd) <= 1e-8f)
-                        trace.FwdCrossLayerGuard = trace.FwdSkirtLower;
-                    trace.FwdThighSmooth = finalFwd;
+                    trace.FwdThighSmooth = trace.ClothInheritApplied ? trace.ClothInheritPreCoord.z : finalFwd;
+                    if (!trace.ClothInheritApplied)
+                        trace.FwdClothInherit = trace.FwdThighSmooth;
                     trace.FwdFinal = finalFwd;
                 }
             }
@@ -1385,20 +1754,13 @@ namespace COM3D2.Pregnancy.Plugin
                 AddBakeSignatureFloat(ref hash, ClothOverdrive);
                 AddBakeSignatureFloat(ref hash, OuterClothOverdrive);
                 AddBakeSignatureFloat(ref hash, OuterClothPregnancyScale);
-                hash = hash * 31 + (OuterClothSkirtDrape ? 1 : 0);
-                AddBakeSignatureFloat(ref hash, OuterClothLayerGuard);
-                AddBakeSignatureFloat(ref hash, InnerClothOffset);
-                AddBakeSignatureFloat(ref hash, OuterClothOffset);
-                AddBakeSignatureFloat(ref hash, ClothThicknessPreserve);
-                AddBakeSignatureFloat(ref hash, ClothOffsetSideRatio);
-                AddBakeSignatureFloat(ref hash, ClothBackOffsetBoost);
-                AddBakeSignatureFloat(ref hash, ClothDepthStretch);
                 hash = hash * 31 + SkirtBoundarySmoothPasses;
                 AddBakeSignatureFloat(ref hash, SkirtBoundarySmoothStrength);
                 AddBakeSignatureFloat(ref hash, SkirtBoundaryUpOffset);
                 AddBakeSignatureFloat(ref hash, SkirtFrontPlaneFwdOffset);
                 AddBakeSignatureFloat(ref hash, SkirtTopRadiusSideScale);
                 AddBakeSignatureFloat(ref hash, SkirtTopRadiusFwdScale);
+                AddBakeSignatureFloat(ref hash, SkirtHemFadeRangeScale);
                 AddBakeSignatureFloat(ref hash, SkirtLowerTipSide);
                 AddBakeSignatureFloat(ref hash, SkirtLowerTipUp);
                 AddBakeSignatureFloat(ref hash, SkirtLowerTipFwd);
@@ -1487,19 +1849,7 @@ namespace COM3D2.Pregnancy.Plugin
             progress = Mathf.Clamp01(progress);
             if (progress <= 0f) return;
 
-            _bpWorldCached = false;
-            _bpBoneWorld.Clear();
-            PruneRecords(maid);
-
-            foreach (SkinnedMeshRenderer smr in CollectTargetRenderers(maid))
-            {
-                if (smr?.sharedMesh == null) continue;
-                if (ClassifyMesh(smr) != MeshMorphClass.Body) continue;
-                if (TryCacheBindPoseWorldRef(smr)) break;
-            }
-
-            foreach (TBodySkin skin in toProcess)
-                ApplyToBodySkin(maid, skin, progress);
+            ApplyToSlots(maid, progress, false);
         }
 
         static Maid FindMaidForBodySkin(TBodySkin skin)
@@ -1529,25 +1879,7 @@ namespace COM3D2.Pregnancy.Plugin
         static void ApplyToBodySkin(Maid maid, TBodySkin skin, float progress)
         {
             if (maid == null || skin == null || skin.obj == null) return;
-
-            List<SkinnedMeshRenderer> targetSmrs = new List<SkinnedMeshRenderer>();
-            HashSet<int> seenRenderers = new HashSet<int>();
-            AddRenderers(skin.obj.transform, targetSmrs, seenRenderers);
-
-            HashSet<int> appliedMeshIds = new HashSet<int>();
-            foreach (SkinnedMeshRenderer smr in targetSmrs)
-            {
-                if (smr?.sharedMesh == null) continue;
-
-                MeshMorphClass meshClass = ClassifyMesh(smr);
-                if (meshClass == MeshMorphClass.Ignore) continue;
-                if (!smr.gameObject.activeInHierarchy) continue;
-
-                int meshId = smr.sharedMesh.GetInstanceID();
-                if (!appliedMeshIds.Add(meshId)) continue;
-
-                ApplySMR(maid, smr, progress, meshClass, false);
-            }
+            ApplyToSlots(maid, progress, false);
         }
 
         public static void RequestCurrentMeshRefresh(Maid maid)
@@ -2075,6 +2407,52 @@ namespace COM3D2.Pregnancy.Plugin
             return hasAnyUsableBone || hasOffset;
         }
 
+        static bool TryBuildNavelAccessorySkinMatrices(SkinnedMeshRenderer smr, out Matrix4x4[] boneMatrices)
+        {
+            if (TryBuildBindPoseSkinMatrices(smr, out boneMatrices))
+                return true;
+
+            boneMatrices = null;
+            if (smr == null || smr.sharedMesh == null)
+                return false;
+
+            int matrixCount = GetRequiredBoneMatrixCount(smr.sharedMesh.boneWeights);
+            if (matrixCount <= 0)
+            {
+                Transform[] bones = smr.bones;
+                matrixCount = bones != null && bones.Length > 0 ? bones.Length : 1;
+            }
+
+            Matrix4x4 fallback = smr.transform != null ? smr.transform.localToWorldMatrix : Matrix4x4.identity;
+            boneMatrices = new Matrix4x4[matrixCount];
+            for (int i = 0; i < boneMatrices.Length; i++)
+                boneMatrices[i] = fallback;
+            return true;
+        }
+
+        static int GetRequiredBoneMatrixCount(BoneWeight[] weights)
+        {
+            if (weights == null || weights.Length == 0)
+                return 0;
+
+            int maxIndex = -1;
+            for (int i = 0; i < weights.Length; i++)
+            {
+                AddRequiredBoneIndex(ref maxIndex, weights[i].boneIndex0, weights[i].weight0);
+                AddRequiredBoneIndex(ref maxIndex, weights[i].boneIndex1, weights[i].weight1);
+                AddRequiredBoneIndex(ref maxIndex, weights[i].boneIndex2, weights[i].weight2);
+                AddRequiredBoneIndex(ref maxIndex, weights[i].boneIndex3, weights[i].weight3);
+            }
+
+            return maxIndex + 1;
+        }
+
+        static void AddRequiredBoneIndex(ref int maxIndex, int index, float weight)
+        {
+            if (weight > 0f && index > maxIndex)
+                maxIndex = index;
+        }
+
         static bool TryGetMeshToBodyBindPoseOffset(SkinnedMeshRenderer smr, out Matrix4x4 offset)
         {
             offset = Matrix4x4.identity;
@@ -2177,18 +2555,10 @@ namespace COM3D2.Pregnancy.Plugin
             }
 
             float effectiveProgress = progress;
-            if (meshClass == MeshMorphClass.InnerCloth)
-            {
-                effectiveProgress = progress * ClothOverdrive;
-            }
-            else if (meshClass == MeshMorphClass.OuterCloth)
-            {
-                effectiveProgress = progress * OuterClothPregnancyScale;
-            }
 
             Vector3[] newVerts;
             DeformStats stats;
-            if (!TryDeformVertsInBindPoseWorld(
+            if (!TryBuildMorphedVertsInBindPoseWorld(
                 smr,
                 rec,
                 mask,
@@ -2232,6 +2602,369 @@ namespace COM3D2.Pregnancy.Plugin
             }
         }
 
+        static bool TryRegisterBodyReferenceOnly(Maid maid, SkinnedMeshRenderer smr, float progress)
+        {
+            if (maid == null || smr == null || smr.sharedMesh == null)
+                return false;
+            if (ClassifyMesh(smr) != MeshMorphClass.Body)
+                return false;
+
+            Mesh mesh = smr.sharedMesh;
+            Vector3[] currentVerts = mesh.vertices;
+            if (currentVerts == null || currentVerts.Length == 0)
+                return false;
+
+            MeshRecord existing = FindRecord(maid, smr);
+            bool currentIsApplied = existing != null
+                && existing.OrigVerts != null
+                && existing.OrigVerts.Length == currentVerts.Length
+                && existing.LastDeltaVerts != null
+                && existing.LastDeltaVerts.Length == currentVerts.Length
+                && existing.AppliedSignature != 0
+                && ComputeVertexSignature(currentVerts) == existing.AppliedSignature;
+
+            MeshRecord rec = new MeshRecord
+            {
+                SMR = smr,
+                Mesh = mesh,
+                OrigVerts = currentIsApplied ? (Vector3[])existing.OrigVerts.Clone() : (Vector3[])currentVerts.Clone(),
+                OrigNormals = currentIsApplied ? CloneVectorArray(existing.OrigNormals) : CloneVectorArray(mesh.normals),
+            };
+
+            bool[] mask = BuildVertexMask(smr, rec, MeshMorphClass.Body);
+            if (!HasAnyMaskedVertex(mask))
+                return false;
+
+            Vector3[] ignoredVerts;
+            DeformStats stats;
+            bool ok = TryDeformVertsInBindPoseWorld(
+                smr,
+                rec,
+                mask,
+                MeshMorphClass.Body,
+                GetEffectiveMorphProgress(progress, MeshMorphClass.Body),
+                out ignoredVerts,
+                out stats);
+
+            if (ok && IsDebugMeshLoggingEnabled())
+            {
+                _log.LogInfo("[BellyDiag] hidden-body-reference"
+                    + $" maid={GetMaidName(maid)}"
+                    + $" id={GetMeshId(smr)}"
+                    + $" activeSelf={smr.gameObject.activeSelf}"
+                    + $" activeInHierarchy={smr.gameObject.activeInHierarchy}"
+                    + $" verts={rec.OrigVerts.Length}"
+                    + $" ellipsoid={stats.EllipsoidVerts}"
+                    + $" moved={stats.NonZeroVerts}"
+                    + $" bodyRefs={(_morphReferenceContext != null ? _morphReferenceContext.BodyPoints.Count : 0)}"
+                    + $" surfaceTris={(_morphReferenceContext != null ? _morphReferenceContext.SurfaceTriangles.Count : 0)}");
+            }
+
+            return ok;
+        }
+
+        static bool TryBuildMorphedVertsInBindPoseWorld(
+            SkinnedMeshRenderer smr,
+            MeshRecord rec,
+            bool[] mask,
+            MeshMorphClass meshClass,
+            float progress,
+            out Vector3[] newVerts,
+            out DeformStats stats)
+        {
+            if (meshClass == MeshMorphClass.NavelAccessory)
+                return TryDeformNavelAccessoryInBindPoseWorld(smr, rec, mask, progress, out newVerts, out stats);
+
+            return TryDeformVertsInBindPoseWorld(smr, rec, mask, meshClass, progress, out newVerts, out stats);
+        }
+
+        static bool TryDeformNavelAccessoryInBindPoseWorld(
+            SkinnedMeshRenderer smr,
+            MeshRecord rec,
+            bool[] mask,
+            float progress,
+            out Vector3[] newVerts,
+            out DeformStats stats)
+        {
+            newVerts = null;
+            stats = new DeformStats();
+            if (rec != null)
+                rec.LastMorphTrace = null;
+            if (!_bpWorldCached) return false;
+            if (_morphReferenceContext == null || _morphReferenceContext.SurfaceTriangles.Count == 0) return false;
+            if (smr == null || smr.sharedMesh == null || rec == null || rec.OrigVerts == null) return false;
+
+            Mesh mesh = smr.sharedMesh;
+            BoneWeight[] weights = mesh.boneWeights;
+            if (weights == null || weights.Length != rec.OrigVerts.Length) return false;
+
+            Matrix4x4[] boneMatrices;
+            if (!TryBuildNavelAccessorySkinMatrices(smr, out boneMatrices)) return false;
+
+            NavelAccessoryReference reference;
+            if (!TryBuildNavelAccessoryReference(mesh, rec.OrigVerts, weights, boneMatrices, out reference))
+                return false;
+
+            if (progress <= 0.00001f)
+            {
+                newVerts = (Vector3[])rec.OrigVerts.Clone();
+                rec.LastNavelReferenceTriangle = reference.Triangle;
+                rec.LastNavelReferenceA = reference.A;
+                rec.LastNavelReferenceB = reference.B;
+                rec.LastNavelReferenceC = reference.C;
+                rec.LastNavelReferenceReason = "zero-progress";
+                return true;
+            }
+
+            Vector3 targetA;
+            Vector3 targetB;
+            Vector3 targetC;
+            if (!TryGetBodySurfaceClothTarget(_morphReferenceContext, GetNavelReferenceWorld(reference, 0), 1f, out targetA)
+                || !TryGetBodySurfaceClothTarget(_morphReferenceContext, GetNavelReferenceWorld(reference, 1), 1f, out targetB)
+                || !TryGetBodySurfaceClothTarget(_morphReferenceContext, GetNavelReferenceWorld(reference, 2), 1f, out targetC))
+            {
+                return false;
+            }
+
+            Vector3 referenceDelta =
+                ((targetA - reference.OriginalAWorld)
+                + (targetB - reference.OriginalBWorld)
+                + (targetC - reference.OriginalCWorld)) / 3f;
+            if (!IsFinite(referenceDelta))
+                return false;
+
+            reference.OriginalCenterWorld = (reference.OriginalAWorld + reference.OriginalBWorld + reference.OriginalCWorld) / 3f;
+            reference.TargetCenterWorld = reference.OriginalCenterWorld + referenceDelta;
+            reference.DeltaRotation = Quaternion.identity;
+            rec.LastNavelReferenceTriangle = reference.Triangle;
+            rec.LastNavelReferenceA = reference.A;
+            rec.LastNavelReferenceB = reference.B;
+            rec.LastNavelReferenceC = reference.C;
+            rec.LastNavelReferenceReason = (reference.Reason ?? string.Empty) + ":translation";
+
+            newVerts = (Vector3[])rec.OrigVerts.Clone();
+            bool trackStats = IsDebugMeshLoggingEnabled();
+            int count = rec.OrigVerts.Length;
+            for (int i = 0; i < count; i++)
+            {
+                if (mask != null && (i >= mask.Length || !mask[i])) continue;
+                if (trackStats) stats.MaskedVerts++;
+                if (!HasValidBoneWeight(weights[i], boneMatrices)) continue;
+
+                Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
+                Vector3 originalWorld = skin.MultiplyPoint3x4(rec.OrigVerts[i]);
+                Vector3 targetWorld = originalWorld + referenceDelta;
+                Vector3 local = skin.inverse.MultiplyPoint3x4(targetWorld);
+                if (!IsFinite(local)) continue;
+
+                newVerts[i] = local;
+                float moved = (local - rec.OrigVerts[i]).magnitude;
+                if (moved > 0.00001f)
+                {
+                    stats.NonZeroVerts++;
+                    if (moved > stats.MaxDelta) stats.MaxDelta = moved;
+                }
+            }
+
+            stats.EllipsoidVerts = 3;
+            stats.MaxStrength = 1f;
+            return true;
+        }
+
+        static Vector3 GetNavelReferenceWorld(NavelAccessoryReference reference, int index)
+        {
+            if (index == 0) return reference.OriginalAWorld;
+            if (index == 1) return reference.OriginalBWorld;
+            return reference.OriginalCWorld;
+        }
+
+        static bool TryBuildNavelAccessoryReference(
+            Mesh mesh,
+            Vector3[] localVerts,
+            BoneWeight[] weights,
+            Matrix4x4[] boneMatrices,
+            out NavelAccessoryReference reference)
+        {
+            reference = new NavelAccessoryReference
+            {
+                Triangle = -1,
+                A = -1,
+                B = -1,
+                C = -1,
+            };
+            if (!TrySelectNavelReferenceTriangle(mesh, localVerts, out reference))
+                return false;
+
+            Vector3 aWorld;
+            Vector3 bWorld;
+            Vector3 cWorld;
+            if (!TryGetBindPoseSkinnedWorld(localVerts, weights, boneMatrices, reference.A, out aWorld)
+                || !TryGetBindPoseSkinnedWorld(localVerts, weights, boneMatrices, reference.B, out bWorld)
+                || !TryGetBindPoseSkinnedWorld(localVerts, weights, boneMatrices, reference.C, out cWorld))
+            {
+                return false;
+            }
+
+            reference.OriginalAWorld = aWorld;
+            reference.OriginalBWorld = bWorld;
+            reference.OriginalCWorld = cWorld;
+            return true;
+        }
+
+        static bool TrySelectNavelReferenceTriangle(
+            Mesh mesh,
+            Vector3[] localVerts,
+            out NavelAccessoryReference reference)
+        {
+            reference = new NavelAccessoryReference
+            {
+                Triangle = -1,
+                A = -1,
+                B = -1,
+                C = -1,
+                Score = float.MaxValue,
+                Reason = "not-found",
+            };
+            if (mesh == null || localVerts == null || localVerts.Length == 0)
+                return false;
+
+            int[] triangles;
+            try
+            {
+                triangles = mesh.triangles;
+            }
+            catch
+            {
+                return false;
+            }
+            if (triangles == null || triangles.Length < 3)
+                return false;
+
+            bool found = false;
+            for (int t = 0; t + 2 < triangles.Length; t += 3)
+            {
+                int a = triangles[t];
+                int b = triangles[t + 1];
+                int c = triangles[t + 2];
+                if (!IsValidVertexIndex(a, localVerts.Length)
+                    || !IsValidVertexIndex(b, localVerts.Length)
+                    || !IsValidVertexIndex(c, localVerts.Length))
+                {
+                    continue;
+                }
+
+                Vector3 va = localVerts[a];
+                Vector3 vb = localVerts[b];
+                Vector3 vc = localVerts[c];
+                if (!IsFinite(va) || !IsFinite(vb) || !IsFinite(vc))
+                    continue;
+
+                Vector3 normal = Vector3.Cross(vb - va, vc - va);
+                if (normal.sqrMagnitude <= 1e-14f)
+                    continue;
+
+                Vector3 center = (va + vb + vc) / 3f;
+                float minX = Mathf.Min(va.x, Mathf.Min(vb.x, vc.x));
+                float maxX = Mathf.Max(va.x, Mathf.Max(vb.x, vc.x));
+                bool spansOriginX = minX <= 0f && maxX >= 0f;
+                float minAbsX = Mathf.Min(Mathf.Abs(va.x), Mathf.Min(Mathf.Abs(vb.x), Mathf.Abs(vc.x)));
+                float score = center.sqrMagnitude;
+                if (!spansOriginX)
+                    score += 0.0001f + minAbsX * minAbsX;
+
+                if (found && score >= reference.Score)
+                    continue;
+
+                found = true;
+                reference.Triangle = t / 3;
+                reference.A = a;
+                reference.B = b;
+                reference.C = c;
+                reference.Score = score;
+                reference.Reason = spansOriginX ? "origin-x-span" : "origin-nearest";
+            }
+
+            return found;
+        }
+
+        static bool IsValidVertexIndex(int index, int count)
+        {
+            return index >= 0 && index < count;
+        }
+
+        static bool TryGetBindPoseSkinnedWorld(
+            Vector3[] localVerts,
+            BoneWeight[] weights,
+            Matrix4x4[] boneMatrices,
+            int index,
+            out Vector3 world)
+        {
+            world = Vector3.zero;
+            if (localVerts == null || weights == null || boneMatrices == null)
+                return false;
+            if (index < 0 || index >= localVerts.Length || index >= weights.Length)
+                return false;
+            if (!HasValidBoneWeight(weights[index], boneMatrices))
+                return false;
+
+            Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[index]);
+            world = skin.MultiplyPoint3x4(localVerts[index]);
+            return IsFinite(world);
+        }
+
+        static bool TryBuildRigidTrianglePose(
+            Vector3 a,
+            Vector3 b,
+            Vector3 c,
+            out Vector3 center,
+            out Quaternion rotation,
+            out string reason)
+        {
+            center = (a + b + c) / 3f;
+            rotation = Quaternion.identity;
+            reason = string.Empty;
+
+            Vector3 x = b - a;
+            if (x.sqrMagnitude <= 1e-14f)
+                x = c - a;
+            if (x.sqrMagnitude <= 1e-14f)
+            {
+                reason = "navel-frame:x-zero";
+                return false;
+            }
+
+            Vector3 normal = Vector3.Cross(b - a, c - a);
+            if (normal.sqrMagnitude <= 1e-14f)
+            {
+                reason = "navel-frame:normal-zero";
+                return false;
+            }
+
+            Vector3 forward = normal.normalized;
+            x.Normalize();
+            Vector3 up = Vector3.Cross(forward, x);
+            if (up.sqrMagnitude <= 1e-14f)
+            {
+                up = Vector3.Cross(forward, Vector3.up);
+                if (up.sqrMagnitude <= 1e-14f)
+                    up = Vector3.Cross(forward, Vector3.right);
+            }
+            if (up.sqrMagnitude <= 1e-14f)
+            {
+                reason = "navel-frame:up-zero";
+                return false;
+            }
+
+            rotation = Quaternion.LookRotation(forward, up.normalized);
+            if (!IsFinite(rotation))
+            {
+                reason = "navel-frame:rotation-nonfinite";
+                return false;
+            }
+
+            return true;
+        }
+
         static bool TryDeformVertsInBindPoseWorld(
             SkinnedMeshRenderer smr,
             MeshRecord rec,
@@ -2271,16 +3004,15 @@ namespace COM3D2.Pregnancy.Plugin
                 worldRight = Vector3.Cross(worldUp, worldFwd).normalized;
             if (worldRight.sqrMagnitude < 1e-8f) worldRight = Vector3.right;
             Vector3 regionCenter = worldCenter + worldUp * RelUp(InflationMoveY) + worldFwd * RelFwd(InflationMoveZ);
-            bool isSkirtLikeOuter = meshClass == MeshMorphClass.OuterCloth && IsSkirtLikeMesh(smr);
-            bool useSkirtDrape = isSkirtLikeOuter && OuterClothSkirtDrape;
-            bool useSkirtLowerShape = isSkirtLikeOuter;
-            bool trackOuterClothWorld = useSkirtDrape || useSkirtLowerShape;
-            VertexMorphTrace[] morphTrace = isSkirtLikeOuter ? new VertexMorphTrace[rec.OrigVerts.Length] : null;
+            bool trackOuterClothWorld = true;
+            VertexMorphTrace[] morphTrace = meshClass == MeshMorphClass.OuterCloth ? new VertexMorphTrace[rec.OrigVerts.Length] : null;
             rec.LastMorphTrace = morphTrace;
             Vector3[] clothOriginalWorld = trackOuterClothWorld ? new Vector3[rec.OrigVerts.Length] : null;
             Vector3[] clothMorphedWorld = trackOuterClothWorld ? new Vector3[rec.OrigVerts.Length] : null;
             bool[] clothValid = trackOuterClothWorld ? new bool[rec.OrigVerts.Length] : null;
+            bool[] surfaceTransformEligible = trackOuterClothWorld ? new bool[rec.OrigVerts.Length] : null;
             float[] thighGuardSmoothMask = ThighGuardSmoothStrength > 0f ? new float[rec.OrigVerts.Length] : null;
+            bool[] oldDirectAffected = new bool[rec.OrigVerts.Length];
 
             newVerts = new Vector3[rec.OrigVerts.Length];
             for (int i = 0; i < rec.OrigVerts.Length; i++)
@@ -2301,8 +3033,6 @@ namespace COM3D2.Pregnancy.Plugin
                         RadiusUp = radiusUp,
                         RadiusDown = radiusDown,
                         StopReason = "not-processed",
-                        SkirtDrapeEnabled = useSkirtDrape,
-                        SkirtLowerEnabled = useSkirtLowerShape,
                     };
                     morphTrace[i] = trace;
                 }
@@ -2400,6 +3130,7 @@ namespace COM3D2.Pregnancy.Plugin
                     trace.MorphApplied = true;
                     trace.StopReason = "ok";
                 }
+                oldDirectAffected[i] = true;
 
                 if (trackStats && morphWeight > stats.MaxStrength) stats.MaxStrength = morphWeight;
 
@@ -2555,48 +3286,6 @@ namespace COM3D2.Pregnancy.Plugin
                 }
                 if (trace != null) trace.FwdLowerRestore = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
-                float beforeDepthFwd = trace != null ? TraceFwd(newWorldVert, regionCenter, worldFwd) : 0f;
-                float depthStretchFactor = trace != null
-                    ? GetClothDepthStretchFactor(meshClass, dist, directionalRadius, upDot, radiusDown)
-                    : 1f;
-                newWorldVert = ApplyClothDepthStretchWorld(
-                    meshClass,
-                    worldVert,
-                    newWorldVert,
-                    directionalRadius,
-                    dist,
-                    upDot,
-                    radiusDown);
-                if (trace != null)
-                {
-                    float afterDepthFwd = TraceFwd(newWorldVert, regionCenter, worldFwd);
-                    trace.ClothDepthStretchFactor = depthStretchFactor;
-                    trace.ClothDepthDeltaFwd = afterDepthFwd - beforeDepthFwd;
-                    trace.FwdDepthStretch = afterDepthFwd;
-                }
-
-                float beforeLayerFwd = trace != null ? TraceFwd(newWorldVert, regionCenter, worldFwd) : 0f;
-                newWorldVert = ApplyClothLayerOffsetWorld(
-                    meshClass,
-                    worldVert,
-                    newWorldVert,
-                    regionCenter,
-                    morphWeight,
-                    directionalRadius,
-                    dist,
-                    edgeRatio,
-                    upDot,
-                    radiusDown,
-                    worldRight,
-                    worldUp,
-                    worldFwd);
-                if (trace != null)
-                {
-                    float afterLayerFwd = TraceFwd(newWorldVert, regionCenter, worldFwd);
-                    trace.ClothLayerDeltaFwd = afterLayerFwd - beforeLayerFwd;
-                    trace.FwdLayerOffset = afterLayerFwd;
-                }
-
                 Vector3 originalRel = worldVert - regionCenter;
                 Vector3 finalRel = newWorldVert - regionCenter;
                 float originalCoreSide = Vector3.Dot(originalRel, worldRight);
@@ -2674,7 +3363,10 @@ namespace COM3D2.Pregnancy.Plugin
                 if (trace != null) trace.FwdBottomTaper = TraceFwd(newWorldVert, regionCenter, worldFwd);
 
                 if (trackOuterClothWorld)
+                {
                     clothMorphedWorld[i] = newWorldVert;
+                    surfaceTransformEligible[i] = (newWorldVert - worldVert).sqrMagnitude > 1e-10f;
+                }
 
                 Vector3 newLocalVert = skin.inverse.MultiplyPoint3x4(newWorldVert);
                 if (trackStats)
@@ -2690,65 +3382,3590 @@ namespace COM3D2.Pregnancy.Plugin
                 newVerts[i] = newLocalVert;
             }
 
-            if (useSkirtDrape)
-            {
-                ApplyOuterClothSkirtDrapeToMesh(
-                    smr.sharedMesh,
-                    rec.OrigVerts,
-                    weights,
-                    boneMatrices,
-                    clothOriginalWorld,
-                    clothMorphedWorld,
-                    clothValid,
-                    newVerts,
-                    worldCenter,
-                    regionCenter,
-                    worldRight,
-                    worldUp,
-                    worldFwd,
-                    radiusSide,
-                    radiusDown,
-                    morphTrace);
-            }
-
-            if (morphTrace != null && trackOuterClothWorld)
-                CaptureTraceWorldFwd(morphTrace, clothMorphedWorld, clothValid, regionCenter, worldFwd, TraceFwdStage.SkirtDrape);
-
-            if (useSkirtLowerShape)
-            {
-                ApplySkirtLowerShapeToMesh(
-                    smr.sharedMesh,
-                    rec.OrigVerts,
-                    weights,
-                    boneMatrices,
-                    clothOriginalWorld,
-                    clothMorphedWorld,
-                    clothValid,
-                    newVerts,
-                    worldCenter,
-                    regionCenter,
-                    worldRight,
-                    worldUp,
-                    worldFwd,
-                    radiusSide,
-                    radiusFront,
-                    radiusBack,
-                    radiusUp,
-                    radiusDown,
-                    morphTrace);
-            }
-
-            if (morphTrace != null && trackOuterClothWorld)
-                CaptureTraceWorldFwd(morphTrace, clothMorphedWorld, clothValid, regionCenter, worldFwd, TraceFwdStage.SkirtLower);
-
             Vector3[] beforeThighSmoothVerts = morphTrace != null && thighGuardSmoothMask != null
                 ? (Vector3[])newVerts.Clone()
                 : null;
             SmoothThighGuardAffectedVerts(smr.sharedMesh, rec.OrigVerts, newVerts, thighGuardSmoothMask);
+            RefreshMorphedWorldFromLocal(newVerts, weights, boneMatrices, clothMorphedWorld, clothValid);
+            ExpandTriangleEligibilityFromAnyVertex(smr.sharedMesh, surfaceTransformEligible, clothValid);
+            bool[] oldFinalChanged = BuildWorldChangedMask(clothOriginalWorld, clothMorphedWorld, clothValid);
 
+            if (meshClass == MeshMorphClass.Body)
+            {
+                RegisterBodyMorphReferences(
+                    smr.sharedMesh,
+                    clothOriginalWorld,
+                    clothMorphedWorld,
+                    clothValid,
+                    oldDirectAffected,
+                    worldCenter,
+                    worldUp);
+            }
+            else
+            {
+                ApplyBodySurfaceTransformToCloth(
+                    smr.sharedMesh,
+                    rec.OrigVerts,
+                    weights,
+                    boneMatrices,
+                    clothOriginalWorld,
+                    clothMorphedWorld,
+                    clothValid,
+                    surfaceTransformEligible,
+                    newVerts,
+                    meshClass,
+                    morphTrace,
+                    regionCenter,
+                    worldRight,
+                    worldUp,
+                    worldFwd,
+                    ref stats);
+
+                if (meshClass == MeshMorphClass.OuterCloth && IsSkirtLikeMesh(smr))
+                {
+                    ApplySkirtLowerEdgeFadeToMesh(
+                        smr.sharedMesh,
+                        rec.OrigVerts,
+                        weights,
+                        boneMatrices,
+                        clothOriginalWorld,
+                        clothMorphedWorld,
+                        clothValid,
+                        surfaceTransformEligible,
+                        newVerts,
+                        regionCenter,
+                        worldRight,
+                        worldUp,
+                        worldFwd,
+                        morphTrace,
+                        ref stats);
+                }
+            }
             if (morphTrace != null)
                 CaptureTraceFinalLocalFwd(morphTrace, newVerts, beforeThighSmoothVerts, weights, boneMatrices, regionCenter, worldFwd);
 
+            return true;
+        }
+
+        static void ApplyNearestBodyDisplacementToCloth(
+            Vector3[] localOriginalVerts,
+            BoneWeight[] weights,
+            Matrix4x4[] boneMatrices,
+            Vector3[] originalWorld,
+            bool[] valid,
+            Vector3[] newLocalVerts,
+            ref DeformStats stats)
+        {
+            if (_morphReferenceContext == null || _morphReferenceContext.BodyPoints.Count == 0)
+                return;
+            if (localOriginalVerts == null || weights == null || boneMatrices == null
+                || originalWorld == null || valid == null || newLocalVerts == null)
+                return;
+
+            bool trackStats = IsDebugMeshLoggingEnabled();
+            var bodyPoints = _morphReferenceContext.BodyPoints;
+            int count = Mathf.Min(newLocalVerts.Length,
+                Mathf.Min(localOriginalVerts.Length,
+                Mathf.Min(weights.Length,
+                Mathf.Min(originalWorld.Length, valid.Length))));
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i]) continue;
+
+                Vector3 clothOrig = originalWorld[i];
+
+                int nearest = -1;
+                float bestSqrDist = float.MaxValue;
+                for (int j = 0; j < bodyPoints.Count; j++)
+                {
+                    float sqd = (bodyPoints[j].OriginalWorld - clothOrig).sqrMagnitude;
+                    if (sqd >= bestSqrDist) continue;
+                    bestSqrDist = sqd;
+                    nearest = j;
+                }
+                if (nearest < 0) continue;
+
+                BodyReferencePoint refPoint = bodyPoints[nearest];
+                float dist = Mathf.Sqrt(bestSqrDist);
+                Vector3 bodyOrigWorld = refPoint.OriginalWorld;
+                Vector3 bodyMorphedWorld = refPoint.Mesh.MorphedWorld[refPoint.Index];
+                Vector3 bodyDelta = bodyMorphedWorld - bodyOrigWorld;
+                Vector3 bodyDir = bodyDelta.sqrMagnitude > 1e-12f ? bodyDelta.normalized : Vector3.zero;
+
+                Vector3 newClothWorld = clothOrig + bodyDelta + bodyDir * dist;
+                Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
+                Vector3 newLocal = skin.inverse.MultiplyPoint3x4(newClothWorld);
+                newLocalVerts[i] = newLocal;
+
+                if (trackStats)
+                {
+                    float moved = (newLocal - localOriginalVerts[i]).magnitude;
+                    if (moved > stats.MaxDelta) stats.MaxDelta = moved;
+                }
+            }
+        }
+
+        // Selects one body surface triangle per cloth triangle (via centroid) and records
+        // the per-vertex closest-point hit for that triangle. Adjacent vertices in the same
+        // cloth triangle always share the same body reference, eliminating intra-triangle
+        // tears caused by per-vertex independent nearest-triangle selection.
+        static BodySurfaceHit[] BuildClothTriangleBodyHits(
+            Mesh clothMesh,
+            Vector3[] originalWorld,
+            bool[] valid,
+            bool[] surfaceEligible,
+            int count)
+        {
+            BodySurfaceHit[] result = new BodySurfaceHit[count];
+            for (int i = 0; i < count; i++)
+                result[i] = new BodySurfaceHit { TriangleIndex = -1 };
+
+            if (_morphReferenceContext == null || clothMesh == null) return result;
+
+            int[] clothTris = null;
+            try { clothTris = clothMesh.triangles; } catch { }
+            if (clothTris == null || clothTris.Length < 3) return result;
+
+            float[] bestDistSq = new float[count];
+            for (int i = 0; i < count; i++)
+                bestDistSq[i] = float.MaxValue;
+
+            for (int t = 0; t + 2 < clothTris.Length; t += 3)
+            {
+                int a = clothTris[t], b = clothTris[t + 1], c = clothTris[t + 2];
+                if (a < 0 || b < 0 || c < 0 || a >= count || b >= count || c >= count) continue;
+
+                bool anyEligible = (valid[a] && surfaceEligible[a])
+                    || (valid[b] && surfaceEligible[b])
+                    || (valid[c] && surfaceEligible[c]);
+                if (!anyEligible) continue;
+
+                // Centroid from valid vertices
+                Vector3 centroid = Vector3.zero;
+                int validCount = 0;
+                if (valid[a]) { centroid += originalWorld[a]; validCount++; }
+                if (valid[b]) { centroid += originalWorld[b]; validCount++; }
+                if (valid[c]) { centroid += originalWorld[c]; validCount++; }
+                if (validCount == 0) continue;
+                centroid *= (1f / validCount);
+
+                BodySurfaceHit centHit;
+                if (!TryFindNearestBodySurfaceTriangle(_morphReferenceContext, centroid, out centHit)) continue;
+                if (centHit.TriangleIndex < 0) continue;
+
+                // Assign this body triangle to each vertex, re-evaluating the closest point
+                // per vertex so barycentric coords are correct for each individual position.
+                TryAssignVertexBodyHit(a, originalWorld, valid, surfaceEligible, centHit.TriangleIndex, count, result, bestDistSq);
+                TryAssignVertexBodyHit(b, originalWorld, valid, surfaceEligible, centHit.TriangleIndex, count, result, bestDistSq);
+                TryAssignVertexBodyHit(c, originalWorld, valid, surfaceEligible, centHit.TriangleIndex, count, result, bestDistSq);
+            }
+
+            return result;
+        }
+
+        static void TryAssignVertexBodyHit(
+            int vertIdx,
+            Vector3[] originalWorld,
+            bool[] valid,
+            bool[] surfaceEligible,
+            int bodyTriIdx,
+            int count,
+            BodySurfaceHit[] result,
+            float[] bestDistSq)
+        {
+            if (vertIdx < 0 || vertIdx >= count) return;
+            if (!valid[vertIdx] || !surfaceEligible[vertIdx]) return;
+            if (_morphReferenceContext == null) return;
+            if (bodyTriIdx < 0 || bodyTriIdx >= _morphReferenceContext.SurfaceTriangles.Count) return;
+
+            BodySurfaceTriangle bodyTri = _morphReferenceContext.SurfaceTriangles[bodyTriIdx];
+            BodyReferenceMesh mesh = bodyTri.Mesh;
+            if (mesh == null || mesh.OriginalWorld == null) return;
+            if (!IsValidBodySurfaceVertex(mesh, bodyTri.A)
+                || !IsValidBodySurfaceVertex(mesh, bodyTri.B)
+                || !IsValidBodySurfaceVertex(mesh, bodyTri.C)) return;
+
+            Vector3 pa = mesh.OriginalWorld[bodyTri.A];
+            Vector3 pb = mesh.OriginalWorld[bodyTri.B];
+            Vector3 pc = mesh.OriginalWorld[bodyTri.C];
+
+            Vector3 point = originalWorld[vertIdx];
+            Vector3 closest, barycentric;
+            if (!TryClosestPointOnTriangle(point, pa, pb, pc, out closest, out barycentric)) return;
+
+            float distSq = (point - closest).sqrMagnitude;
+            if (distSq >= bestDistSq[vertIdx]) return;
+
+            Vector3 normal = Vector3.Cross(pb - pa, pc - pa);
+            float normalLen = normal.magnitude;
+            if (normalLen < 1e-9f || !IsFinite(normal)) return;
+            normal /= normalLen;
+
+            bestDistSq[vertIdx] = distSq;
+            result[vertIdx] = new BodySurfaceHit
+            {
+                TriangleIndex = bodyTriIdx,
+                Closest = closest,
+                Barycentric = barycentric,
+                Normal = normal,
+                DistanceSq = distSq,
+            };
+        }
+
+        static void ApplyBodySurfaceTransformToCloth(
+            Mesh clothMesh,
+            Vector3[] localOriginalVerts,
+            BoneWeight[] weights,
+            Matrix4x4[] boneMatrices,
+            Vector3[] originalWorld,
+            Vector3[] morphedWorld,
+            bool[] valid,
+            bool[] surfaceEligible,
+            Vector3[] newLocalVerts,
+            MeshMorphClass meshClass,
+            VertexMorphTrace[] traces,
+            Vector3 traceCenter,
+            Vector3 right,
+            Vector3 up,
+            Vector3 fwd,
+            ref DeformStats stats)
+        {
+            if (_morphReferenceContext == null || _morphReferenceContext.SurfaceTriangles.Count == 0)
+                return;
+            if (localOriginalVerts == null || weights == null || boneMatrices == null
+                || originalWorld == null || morphedWorld == null || valid == null || surfaceEligible == null || newLocalVerts == null)
+                return;
+
+            int count = Mathf.Min(newLocalVerts.Length,
+                Mathf.Min(localOriginalVerts.Length,
+                Mathf.Min(weights.Length,
+                Mathf.Min(originalWorld.Length, Mathf.Min(morphedWorld.Length, Mathf.Min(valid.Length, surfaceEligible.Length))))));
+            if (count <= 0) return;
+
+            // Pre-assign body surface references per cloth triangle to ensure all 3 vertices
+            // of each cloth triangle use the same body reference → no intra-triangle tears.
+            BodySurfaceHit[] triBodyHits = BuildClothTriangleBodyHits(
+                clothMesh, originalWorld, valid, surfaceEligible, count);
+
+            float multiplier = GetBodySurfaceClothMultiplier(meshClass);
+            int applied = 0;
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i]) continue;
+                if (!surfaceEligible[i]) continue;
+                if (!HasValidBoneWeight(weights[i], boneMatrices)) continue;
+
+                Vector3 targetWorld = Vector3.zero;
+                bool transformed = false;
+
+                // Try the triangle-coherent hit first
+                if (triBodyHits != null && i < triBodyHits.Length && triBodyHits[i].TriangleIndex >= 0)
+                {
+                    if (TryBuildBodySurfaceTargetFromHit(
+                        _morphReferenceContext, originalWorld[i], multiplier, triBodyHits[i], out targetWorld))
+                    {
+                        _morphReferenceContext.SurfaceQueries++;
+                        _morphReferenceContext.SurfaceHits++;
+                        transformed = true;
+                    }
+                }
+
+                // Fall back to per-vertex nearest if the triangle-coherent hit failed
+                if (!transformed)
+                {
+                    if (!TryGetBodySurfaceClothTarget(_morphReferenceContext, originalWorld[i], multiplier, out targetWorld))
+                        continue;
+                    transformed = true;
+                }
+
+                Vector3 preWorld = morphedWorld[i];
+                Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
+                Vector3 local = skin.inverse.MultiplyPoint3x4(targetWorld);
+                if (!IsFinite(local)) continue;
+
+                newLocalVerts[i] = local;
+                morphedWorld[i] = targetWorld;
+                applied++;
+
+                float moved = (local - localOriginalVerts[i]).magnitude;
+                if (moved > 0.00001f && moved > stats.MaxDelta)
+                    stats.MaxDelta = moved;
+
+                VertexMorphTrace trace = traces != null && i < traces.Length ? traces[i] : null;
+                if (trace != null)
+                {
+                    Vector3 preCoord = ProjectPointCoord(preWorld, traceCenter, right, up, fwd);
+                    Vector3 postCoord = ProjectPointCoord(targetWorld, traceCenter, right, up, fwd);
+                    Vector3 delta = targetWorld - preWorld;
+                    trace.ClothInheritApplied = true;
+                    trace.ClothInheritKind = "surface";
+                    trace.ClothInheritReason = "surface:applied";
+                    trace.ClothInheritPreWorld = preWorld;
+                    trace.ClothInheritPostWorld = targetWorld;
+                    trace.ClothInheritPreCoord = preCoord;
+                    trace.ClothInheritPostCoord = postCoord;
+                    trace.ClothInheritDeltaCoord = ProjectVectorCoord(delta, right, up, fwd);
+                    trace.ClothInheritDeltaWorldLen = delta.magnitude;
+                    trace.FwdClothInherit = postCoord.z;
+                    trace.FwdFinal = postCoord.z;
+                }
+            }
+
+            if (IsDebugMeshLoggingEnabled() && applied > 0)
+            {
+                _log.LogInfo("[BellyDiag] surface-cloth"
+                    + $" class={meshClass}"
+                    + $" applied={applied}/{count}"
+                    + $" hits={_morphReferenceContext.SurfaceHits}"
+                    + $" queries={_morphReferenceContext.SurfaceQueries}"
+                    + $" misses={_morphReferenceContext.SurfaceMisses}");
+            }
+        }
+
+        static void ApplySkirtLowerEdgeFadeToMesh(
+            Mesh mesh,
+            Vector3[] localOriginalVerts,
+            BoneWeight[] weights,
+            Matrix4x4[] boneMatrices,
+            Vector3[] originalWorld,
+            Vector3[] morphedWorld,
+            bool[] valid,
+            bool[] surfaceEligible,
+            Vector3[] newLocalVerts,
+            Vector3 center,
+            Vector3 right,
+            Vector3 up,
+            Vector3 fwd,
+            VertexMorphTrace[] traces,
+            ref DeformStats stats)
+        {
+            if (mesh == null || localOriginalVerts == null || weights == null || boneMatrices == null)
+                return;
+            if (originalWorld == null || morphedWorld == null || valid == null || surfaceEligible == null || newLocalVerts == null)
+                return;
+
+            int count = Mathf.Min(newLocalVerts.Length,
+                Mathf.Min(localOriginalVerts.Length,
+                Mathf.Min(weights.Length,
+                Mathf.Min(originalWorld.Length,
+                Mathf.Min(morphedWorld.Length,
+                Mathf.Min(valid.Length, surfaceEligible.Length))))));
+            if (count <= 0) return;
+
+            int[] triangles = null;
+            try { triangles = mesh.triangles; }
+            catch { return; }
+            if (triangles == null || triangles.Length < 3)
+                return;
+
+            int triCount = triangles.Length / 3;
+            List<int>[] triNeighbors = BuildTriangleNeighborsByEdge(triangles, triCount, count);
+            if (triNeighbors == null)
+                return;
+
+            int[] triA = new int[triCount];
+            int[] triB = new int[triCount];
+            int[] triC = new int[triCount];
+            bool[] triValid = new bool[triCount];
+            bool[] triFront = new bool[triCount];
+            bool[] inSkirtRegion = new bool[triCount];
+            bool[] assigned = new bool[triCount];
+            float[] triUp = new float[triCount];
+            float[] triSide = new float[triCount];
+            float[] triFwd = new float[triCount];
+            float[] triDeltaUp = new float[triCount];
+            Vector3[] triDelta = new Vector3[triCount];
+            Vector3[] assignedDelta = new Vector3[triCount];
+
+            float minDelta = RelGeneral(SkirtLowerMinDelta);
+            float minDeltaSq = minDelta * minDelta;
+            float fwdThreshold = RelFwd(SkirtFrontPlaneFwdOffset);
+            float lowerHalfLimit = RelUp(0.06f);
+            float upEpsilon = RelUp(0.0005f);
+            float sideStepTolerance = RelUp(0.012f);
+
+            for (int tri = 0; tri < triCount; tri++)
+            {
+                int baseIndex = tri * 3;
+                int a = triangles[baseIndex];
+                int b = triangles[baseIndex + 1];
+                int c = triangles[baseIndex + 2];
+                triA[tri] = a;
+                triB[tri] = b;
+                triC[tri] = c;
+                if (!IsValidVertexIndex(a, count) || !IsValidVertexIndex(b, count) || !IsValidVertexIndex(c, count))
+                    continue;
+                if (!valid[a] || !valid[b] || !valid[c])
+                    continue;
+
+                Vector3 centerWorld = (originalWorld[a] + originalWorld[b] + originalWorld[c]) / 3f;
+                Vector3 rel = centerWorld - center;
+                triUp[tri] = Vector3.Dot(rel, up);
+                triSide[tri] = Vector3.Dot(rel, right);
+                triFwd[tri] = Vector3.Dot(rel, fwd);
+                triFront[tri] = triFwd[tri] > fwdThreshold;
+                triValid[tri] = triFront[tri] && triUp[tri] <= lowerHalfLimit;
+
+                Vector3 da = morphedWorld[a] - originalWorld[a];
+                Vector3 db = morphedWorld[b] - originalWorld[b];
+                Vector3 dc = morphedWorld[c] - originalWorld[c];
+                triDelta[tri] = (da + db + dc) / 3f;
+                triDeltaUp[tri] = Vector3.Dot(triDelta[tri], up);
+            }
+
+            Queue<int> queue = new Queue<int>();
+            float maxSeedUp = float.MinValue;
+            for (int tri = 0; tri < triCount; tri++)
+            {
+                if (!triValid[tri] || triDelta[tri].sqrMagnitude <= minDeltaSq || triDeltaUp[tri] >= -minDelta)
+                    continue;
+
+                if (!HasUpperNonDownSkirtNeighbor(triNeighbors, triValid, triFront, triUp, triDeltaUp, tri, upEpsilon, minDelta))
+                    continue;
+
+                inSkirtRegion[tri] = true;
+                queue.Enqueue(tri);
+                if (triUp[tri] > maxSeedUp)
+                    maxSeedUp = triUp[tri];
+            }
+
+            if (queue.Count <= 0)
+                return;
+
+            while (queue.Count > 0)
+            {
+                int tri = queue.Dequeue();
+                List<int> ns = triNeighbors[tri];
+                for (int i = 0; i < ns.Count; i++)
+                {
+                    int n = ns[i];
+                    if (n < 0 || n >= triCount || inSkirtRegion[n]) continue;
+                    if (!triValid[n] || !triFront[n]) continue;
+                    if (triUp[n] > maxSeedUp + sideStepTolerance) continue;
+                    if (triUp[n] > triUp[tri] + sideStepTolerance) continue;
+
+                    inSkirtRegion[n] = true;
+                    queue.Enqueue(n);
+                }
+            }
+
+            List<int> ordered = BuildSkirtFlowOrder(inSkirtRegion, triUp);
+            AssignSkirtFlowDeltas(ordered, triNeighbors, triValid, triFront, inSkirtRegion, assigned, triUp, triDelta, assignedDelta, upEpsilon, minDeltaSq);
+
+            if (SeedDisconnectedSkirtFlowRegions(
+                triNeighbors,
+                triValid,
+                triFront,
+                inSkirtRegion,
+                assigned,
+                triUp,
+                triSide,
+                triFwd,
+                triDeltaUp,
+                triDelta,
+                assignedDelta,
+                maxSeedUp,
+                minDelta,
+                minDeltaSq,
+                upEpsilon,
+                sideStepTolerance) > 0)
+            {
+                ordered = BuildSkirtFlowOrder(inSkirtRegion, triUp);
+                AssignSkirtFlowDeltas(ordered, triNeighbors, triValid, triFront, inSkirtRegion, assigned, triUp, triDelta, assignedDelta, upEpsilon, minDeltaSq);
+            }
+
+            Vector3[] accumDelta = new Vector3[count];
+            float[] accumWeight = new float[count];
+            int assignedCount = 0;
+            for (int tri = 0; tri < triCount; tri++)
+            {
+                if (!assigned[tri])
+                    continue;
+                AddSkirtTriangleFadeTarget(triA, triB, triC, valid, tri, assignedDelta[tri], 1f, accumDelta, accumWeight);
+                assignedCount++;
+            }
+
+            if (assignedCount <= 0)
+                return;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (accumWeight[i] <= 0f || !valid[i]) continue;
+                if (!HasValidBoneWeight(weights[i], boneMatrices)) continue;
+
+                Vector3 delta = accumDelta[i] / accumWeight[i];
+                Vector3 targetWorld = originalWorld[i] + delta;
+                Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
+                Vector3 local = skin.inverse.MultiplyPoint3x4(targetWorld);
+                if (!IsFinite(local)) continue;
+
+                Vector3 before = morphedWorld[i];
+                newLocalVerts[i] = local;
+                morphedWorld[i] = targetWorld;
+
+                float moved = (local - localOriginalVerts[i]).magnitude;
+                if (moved > 0.00001f && moved > stats.MaxDelta)
+                    stats.MaxDelta = moved;
+
+                VertexMorphTrace trace = traces != null && i < traces.Length ? traces[i] : null;
+                if (trace != null)
+                {
+                    Vector3 add = targetWorld - before;
+                    trace.SkirtLowerEnabled = true;
+                    trace.SkirtLowerAddFwd += Vector3.Dot(add, fwd);
+                    trace.SkirtLowerReason = "lowerFlow100:applied";
+                    trace.FwdSkirtLower = TraceFwd(targetWorld, center, fwd);
+                    trace.FwdFinal = trace.FwdSkirtLower;
+                }
+            }
+        }
+
+        static List<int> BuildSkirtFlowOrder(bool[] inSkirtRegion, float[] triUp)
+        {
+            List<int> ordered = new List<int>();
+            if (inSkirtRegion == null || triUp == null)
+                return ordered;
+
+            int count = Mathf.Min(inSkirtRegion.Length, triUp.Length);
+            for (int tri = 0; tri < count; tri++)
+                if (inSkirtRegion[tri])
+                    ordered.Add(tri);
+            ordered.Sort((a, b) => triUp[b].CompareTo(triUp[a]));
+            return ordered;
+        }
+
+        static int AssignSkirtFlowDeltas(
+            List<int> ordered,
+            List<int>[] triNeighbors,
+            bool[] triValid,
+            bool[] triFront,
+            bool[] inSkirtRegion,
+            bool[] assigned,
+            float[] triUp,
+            Vector3[] triDelta,
+            Vector3[] assignedDelta,
+            float upEpsilon,
+            float minDeltaSq)
+        {
+            if (ordered == null || assigned == null || assignedDelta == null)
+                return 0;
+
+            int assignedNow = 0;
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                int tri = ordered[i];
+                if (tri < 0 || tri >= assigned.Length || assigned[tri])
+                    continue;
+
+                int source = FindUpperSkirtFlowSource(triNeighbors, triValid, triFront, inSkirtRegion, assigned, triUp, tri, upEpsilon);
+                Vector3 sourceDelta;
+                if (!TryGetSkirtFlowSourceDelta(source, assigned, triDelta, assignedDelta, minDeltaSq, out sourceDelta))
+                    continue;
+
+                assignedDelta[tri] = sourceDelta;
+                assigned[tri] = true;
+                assignedNow++;
+            }
+
+            return assignedNow;
+        }
+
+        static int SeedDisconnectedSkirtFlowRegions(
+            List<int>[] triNeighbors,
+            bool[] triValid,
+            bool[] triFront,
+            bool[] inSkirtRegion,
+            bool[] assigned,
+            float[] triUp,
+            float[] triSide,
+            float[] triFwd,
+            float[] triDeltaUp,
+            Vector3[] triDelta,
+            Vector3[] assignedDelta,
+            float maxSeedUp,
+            float minDelta,
+            float minDeltaSq,
+            float upEpsilon,
+            float sideStepTolerance)
+        {
+            if (triNeighbors == null || triValid == null || triFront == null || inSkirtRegion == null
+                || assigned == null || triUp == null || triSide == null || triFwd == null || triDeltaUp == null
+                || triDelta == null || assignedDelta == null)
+                return 0;
+            if (maxSeedUp == float.MinValue)
+                return 0;
+
+            int triCount = Mathf.Min(triValid.Length,
+                Mathf.Min(triFront.Length,
+                Mathf.Min(inSkirtRegion.Length,
+                Mathf.Min(assigned.Length,
+                Mathf.Min(triUp.Length,
+                Mathf.Min(triSide.Length,
+                Mathf.Min(triFwd.Length,
+                Mathf.Min(triDeltaUp.Length,
+                Mathf.Min(triDelta.Length, assignedDelta.Length)))))))));
+            if (triCount <= 0)
+                return 0;
+
+            bool[] candidate = new bool[triCount];
+            float topLimit = maxSeedUp + Mathf.Max(sideStepTolerance, RelUp(0.01f));
+            for (int tri = 0; tri < triCount; tri++)
+            {
+                if (!triValid[tri] || !triFront[tri] || inSkirtRegion[tri])
+                    continue;
+                if (triUp[tri] > topLimit)
+                    continue;
+                candidate[tri] = true;
+            }
+
+            bool[] visited = new bool[triCount];
+            bool[] componentMask = new bool[triCount];
+            Queue<int> queue = new Queue<int>();
+            List<int> component = new List<int>();
+            float topBand = Mathf.Max(RelUp(0.018f), sideStepTolerance * 1.5f);
+            int added = 0;
+
+            for (int start = 0; start < triCount; start++)
+            {
+                if (!candidate[start] || visited[start])
+                    continue;
+
+                component.Clear();
+                queue.Enqueue(start);
+                visited[start] = true;
+                while (queue.Count > 0)
+                {
+                    int tri = queue.Dequeue();
+                    component.Add(tri);
+                    List<int> ns = tri < triNeighbors.Length ? triNeighbors[tri] : null;
+                    if (ns == null) continue;
+                    for (int i = 0; i < ns.Count; i++)
+                    {
+                        int n = ns[i];
+                        if (n < 0 || n >= triCount || visited[n] || !candidate[n])
+                            continue;
+                        visited[n] = true;
+                        queue.Enqueue(n);
+                    }
+                }
+
+                if (component.Count <= 0)
+                    continue;
+
+                float componentMaxUp = float.MinValue;
+                int topTri = -1;
+                for (int i = 0; i < component.Count; i++)
+                {
+                    int tri = component[i];
+                    componentMask[tri] = true;
+                    if (triUp[tri] > componentMaxUp)
+                    {
+                        componentMaxUp = triUp[tri];
+                        topTri = tri;
+                    }
+                }
+
+                int seeded = 0;
+                for (int i = 0; i < component.Count; i++)
+                {
+                    int tri = component[i];
+                    if (componentMaxUp - triUp[tri] > topBand)
+                        continue;
+
+                    int source = FindSpatialSkirtFlowSource(
+                        triValid,
+                        triFront,
+                        componentMask,
+                        assigned,
+                        triUp,
+                        triSide,
+                        triFwd,
+                        triDeltaUp,
+                        triDelta,
+                        assignedDelta,
+                        tri,
+                        minDelta,
+                        minDeltaSq,
+                        upEpsilon);
+                    Vector3 sourceDelta;
+                    if (!TryGetSkirtFlowSourceDelta(source, assigned, triDelta, assignedDelta, minDeltaSq, out sourceDelta))
+                        continue;
+
+                    assignedDelta[tri] = sourceDelta;
+                    assigned[tri] = true;
+                    seeded++;
+                }
+
+                if (seeded <= 0 && topTri >= 0)
+                {
+                    int source = FindSpatialSkirtFlowSource(
+                        triValid,
+                        triFront,
+                        componentMask,
+                        assigned,
+                        triUp,
+                        triSide,
+                        triFwd,
+                        triDeltaUp,
+                        triDelta,
+                        assignedDelta,
+                        topTri,
+                        minDelta,
+                        minDeltaSq,
+                        upEpsilon);
+                    Vector3 sourceDelta;
+                    if (TryGetSkirtFlowSourceDelta(source, assigned, triDelta, assignedDelta, minDeltaSq, out sourceDelta))
+                    {
+                        assignedDelta[topTri] = sourceDelta;
+                        assigned[topTri] = true;
+                        seeded = 1;
+                    }
+                }
+
+                if (seeded > 0)
+                {
+                    for (int i = 0; i < component.Count; i++)
+                        inSkirtRegion[component[i]] = true;
+                    added += component.Count;
+                }
+
+                for (int i = 0; i < component.Count; i++)
+                    componentMask[component[i]] = false;
+            }
+
+            return added;
+        }
+
+        static List<int>[] BuildTriangleNeighborsByEdge(int[] triangles, int triCount, int vertexCount)
+        {
+            if (triangles == null || triCount <= 0 || vertexCount <= 0)
+                return null;
+
+            List<int>[] neighbors = new List<int>[triCount];
+            for (int i = 0; i < triCount; i++)
+                neighbors[i] = new List<int>(3);
+
+            Dictionary<long, int> edgeOwner = new Dictionary<long, int>();
+            for (int tri = 0; tri < triCount; tri++)
+            {
+                int baseIndex = tri * 3;
+                AddTriangleEdgeNeighbor(edgeOwner, neighbors, tri, triangles[baseIndex], triangles[baseIndex + 1], vertexCount);
+                AddTriangleEdgeNeighbor(edgeOwner, neighbors, tri, triangles[baseIndex + 1], triangles[baseIndex + 2], vertexCount);
+                AddTriangleEdgeNeighbor(edgeOwner, neighbors, tri, triangles[baseIndex + 2], triangles[baseIndex], vertexCount);
+            }
+
+            return neighbors;
+        }
+
+        static void AddTriangleEdgeNeighbor(
+            Dictionary<long, int> edgeOwner,
+            List<int>[] neighbors,
+            int tri,
+            int a,
+            int b,
+            int vertexCount)
+        {
+            if (edgeOwner == null || neighbors == null) return;
+            if (!IsValidVertexIndex(a, vertexCount) || !IsValidVertexIndex(b, vertexCount) || a == b)
+                return;
+
+            int lo = Mathf.Min(a, b);
+            int hi = Mathf.Max(a, b);
+            long key = ((long)lo << 32) ^ (uint)hi;
+            int other;
+            if (edgeOwner.TryGetValue(key, out other))
+            {
+                AddTriangleNeighbor(neighbors, tri, other);
+                AddTriangleNeighbor(neighbors, other, tri);
+            }
+            else
+            {
+                edgeOwner[key] = tri;
+            }
+        }
+
+        static void AddTriangleNeighbor(List<int>[] neighbors, int tri, int other)
+        {
+            if (neighbors == null || tri < 0 || tri >= neighbors.Length || other < 0 || other >= neighbors.Length || tri == other)
+                return;
+            if (!neighbors[tri].Contains(other))
+                neighbors[tri].Add(other);
+        }
+
+        static bool HasUpperNonDownSkirtNeighbor(
+            List<int>[] triNeighbors,
+            bool[] triValid,
+            bool[] triFront,
+            float[] triUp,
+            float[] triDeltaUp,
+            int tri,
+            float upEpsilon,
+            float minDelta)
+        {
+            if (triNeighbors == null || tri < 0 || tri >= triNeighbors.Length)
+                return false;
+
+            List<int> ns = triNeighbors[tri];
+            for (int i = 0; i < ns.Count; i++)
+            {
+                int n = ns[i];
+                if (n < 0 || n >= triValid.Length || !triValid[n] || !triFront[n]) continue;
+                if (triUp[n] <= triUp[tri] + upEpsilon) continue;
+                if (triDeltaUp[n] >= -minDelta * 0.5f || triDeltaUp[n] > triDeltaUp[tri] + minDelta)
+                    return true;
+            }
+
+            return false;
+        }
+
+        static int FindUpperSkirtFlowSource(
+            List<int>[] triNeighbors,
+            bool[] triValid,
+            bool[] triFront,
+            bool[] inSkirtRegion,
+            bool[] assigned,
+            float[] triUp,
+            int tri,
+            float upEpsilon)
+        {
+            if (triNeighbors == null || tri < 0 || tri >= triNeighbors.Length)
+                return -1;
+
+            int best = -1;
+            float bestStep = float.MaxValue;
+            List<int> ns = triNeighbors[tri];
+            for (int i = 0; i < ns.Count; i++)
+            {
+                int n = ns[i];
+                if (n < 0 || n >= triValid.Length || !triValid[n] || !triFront[n]) continue;
+
+                float step = triUp[n] - triUp[tri];
+                if (step <= upEpsilon || step >= bestStep) continue;
+                if (inSkirtRegion != null && n < inSkirtRegion.Length && inSkirtRegion[n]
+                    && (assigned == null || n >= assigned.Length || !assigned[n]))
+                    continue;
+
+                bestStep = step;
+                best = n;
+            }
+
+            return best;
+        }
+
+        static int FindSpatialSkirtFlowSource(
+            bool[] triValid,
+            bool[] triFront,
+            bool[] componentMask,
+            bool[] assigned,
+            float[] triUp,
+            float[] triSide,
+            float[] triFwd,
+            float[] triDeltaUp,
+            Vector3[] triDelta,
+            Vector3[] assignedDelta,
+            int target,
+            float minDelta,
+            float minDeltaSq,
+            float upEpsilon)
+        {
+            if (triValid == null || triFront == null || triUp == null || triSide == null || triFwd == null
+                || triDeltaUp == null || triDelta == null || assignedDelta == null)
+                return -1;
+            if (target < 0 || target >= triValid.Length || target >= triUp.Length || target >= triSide.Length || target >= triFwd.Length)
+                return -1;
+
+            int triCount = Mathf.Min(triValid.Length,
+                Mathf.Min(triFront.Length,
+                Mathf.Min(triUp.Length,
+                Mathf.Min(triSide.Length,
+                Mathf.Min(triFwd.Length,
+                Mathf.Min(triDeltaUp.Length,
+                Mathf.Min(triDelta.Length, assignedDelta.Length)))))));
+            if (triCount <= 0)
+                return -1;
+
+            float targetUp = triUp[target];
+            float targetSide = triSide[target];
+            float targetFwd = triFwd[target];
+            float nearBelowTolerance = Mathf.Max(upEpsilon, RelUp(0.006f));
+            int best = -1;
+            float bestScore = float.MaxValue;
+
+            for (int source = 0; source < triCount; source++)
+            {
+                if (source == target)
+                    continue;
+                if (componentMask != null && source < componentMask.Length && componentMask[source])
+                    continue;
+                if (!triValid[source] || !triFront[source])
+                    continue;
+                if (triUp[source] < targetUp - nearBelowTolerance)
+                    continue;
+
+                bool sourceAssigned = assigned != null && source < assigned.Length && assigned[source];
+                if (!sourceAssigned && triDeltaUp[source] < -minDelta)
+                    continue;
+
+                Vector3 sourceDelta;
+                if (!TryGetSkirtFlowSourceDelta(source, assigned, triDelta, assignedDelta, minDeltaSq, out sourceDelta))
+                    continue;
+
+                float sideGap = Mathf.Abs(triSide[source] - targetSide);
+                float fwdGap = Mathf.Abs(triFwd[source] - targetFwd);
+                float upGap = Mathf.Max(0f, triUp[source] - targetUp);
+                float score = sideGap + fwdGap * 0.45f + upGap * 0.65f;
+                if (triUp[source] <= targetUp + upEpsilon)
+                    score += RelUp(0.06f);
+                if (!sourceAssigned)
+                    score += RelUp(0.01f);
+
+                if (score >= bestScore)
+                    continue;
+                bestScore = score;
+                best = source;
+            }
+
+            return best;
+        }
+
+        static bool TryGetSkirtFlowSourceDelta(
+            int source,
+            bool[] assigned,
+            Vector3[] triDelta,
+            Vector3[] assignedDelta,
+            float minDeltaSq,
+            out Vector3 delta)
+        {
+            delta = Vector3.zero;
+            if (source < 0)
+                return false;
+
+            bool useAssigned = assigned != null && source < assigned.Length && assigned[source]
+                && assignedDelta != null && source < assignedDelta.Length;
+            if (useAssigned)
+            {
+                delta = assignedDelta[source];
+            }
+            else
+            {
+                if (triDelta == null || source >= triDelta.Length)
+                    return false;
+                delta = triDelta[source];
+            }
+
+            return IsFinite(delta) && delta.sqrMagnitude > minDeltaSq;
+        }
+
+        static bool HasLowerUnchangedTriangle(
+            List<int>[] triNeighbors,
+            bool[] triValid,
+            bool[] triAffected,
+            float[] triUp,
+            int tri,
+            float upEpsilon)
+        {
+            if (triNeighbors == null || tri < 0 || tri >= triNeighbors.Length)
+                return false;
+
+            List<int> ns = triNeighbors[tri];
+            for (int i = 0; i < ns.Count; i++)
+            {
+                int n = ns[i];
+                if (n < 0 || n >= triValid.Length || !triValid[n]) continue;
+                if (triUp[n] >= triUp[tri] - upEpsilon) continue;
+                if (!triAffected[n])
+                    return true;
+            }
+            return false;
+        }
+
+        static int FindAdjacentSkirtTriangle(
+            List<int>[] triNeighbors,
+            bool[] triValid,
+            bool[] triAffected,
+            float[] triUp,
+            int tri,
+            bool upward,
+            bool requireAffected,
+            float upEpsilon)
+        {
+            if (triNeighbors == null || tri < 0 || tri >= triNeighbors.Length)
+                return -1;
+
+            int best = -1;
+            float bestStep = float.MaxValue;
+            List<int> ns = triNeighbors[tri];
+            for (int i = 0; i < ns.Count; i++)
+            {
+                int n = ns[i];
+                if (n < 0 || n >= triValid.Length || !triValid[n]) continue;
+                if (requireAffected && !triAffected[n]) continue;
+
+                float step = upward ? triUp[n] - triUp[tri] : triUp[tri] - triUp[n];
+                if (step <= upEpsilon || step >= bestStep) continue;
+                bestStep = step;
+                best = n;
+            }
+            return best;
+        }
+
+        static void AddSkirtTriangleFadeTarget(
+            int[] triA,
+            int[] triB,
+            int[] triC,
+            bool[] valid,
+            int tri,
+            Vector3 sourceDelta,
+            float fade,
+            Vector3[] accumDelta,
+            float[] accumWeight)
+        {
+            if (triA == null || triB == null || triC == null || valid == null || accumDelta == null || accumWeight == null)
+                return;
+            if (tri < 0 || tri >= triA.Length)
+                return;
+
+            Vector3 delta = sourceDelta * Mathf.Clamp01(fade);
+            AddSkirtVertexFadeTarget(triA[tri], valid, delta, accumDelta, accumWeight);
+            AddSkirtVertexFadeTarget(triB[tri], valid, delta, accumDelta, accumWeight);
+            AddSkirtVertexFadeTarget(triC[tri], valid, delta, accumDelta, accumWeight);
+        }
+
+        static void AddSkirtVertexFadeTarget(
+            int vertex,
+            bool[] valid,
+            Vector3 delta,
+            Vector3[] accumDelta,
+            float[] accumWeight)
+        {
+            if (vertex < 0 || vertex >= valid.Length || vertex >= accumDelta.Length || vertex >= accumWeight.Length)
+                return;
+            if (!valid[vertex])
+                return;
+
+            accumDelta[vertex] += delta;
+            accumWeight[vertex] += 1f;
+        }
+
+        static float GetBodySurfaceClothMultiplier(MeshMorphClass meshClass)
+        {
+            if (meshClass == MeshMorphClass.OuterCloth)
+                return Mathf.Max(0f, OuterClothOverdrive * OuterClothPregnancyScale);
+            if (meshClass == MeshMorphClass.InnerCloth)
+                return Mathf.Max(0f, ClothOverdrive);
+            return 1f;
+        }
+
+        static bool TryGetBodySurfaceClothTarget(
+            MorphReferenceContext context,
+            Vector3 original,
+            float multiplier,
+            out Vector3 target)
+        {
+            target = original;
+            if (context == null || context.SurfaceTriangles.Count == 0)
+                return false;
+
+            context.SurfaceQueries++;
+            BodySurfaceHit hit;
+            if (!TryFindNearestBodySurfaceTriangle(context, original, out hit))
+                return BodySurfaceMiss(context);
+
+            if (hit.TriangleIndex < 0 || hit.TriangleIndex >= context.SurfaceTriangles.Count)
+                return BodySurfaceMiss(context);
+
+            if (TryBuildBodySurfaceTargetFromHit(context, original, multiplier, hit, out target))
+            {
+                context.SurfaceHits++;
+                return true;
+            }
+
+            BodySurfaceHit fallbackHit;
+            if (TryFindNearestValidBodySurfaceTargetFullScan(context, original, multiplier, out fallbackHit, out target))
+            {
+                context.SurfaceHits++;
+                return true;
+            }
+
+            return BodySurfaceMiss(context);
+        }
+
+        static bool TryBuildBodySurfaceTargetFromHit(
+            MorphReferenceContext context,
+            Vector3 original,
+            float multiplier,
+            BodySurfaceHit hit,
+            out Vector3 target)
+        {
+            target = original;
+            if (context == null || context.SurfaceTriangles == null)
+                return false;
+            if (hit.TriangleIndex < 0 || hit.TriangleIndex >= context.SurfaceTriangles.Count)
+                return false;
+
+            BodySurfaceTriangle tri = context.SurfaceTriangles[hit.TriangleIndex];
+            BodyReferenceMesh mesh = tri.Mesh;
+            if (mesh == null || mesh.OriginalWorld == null || mesh.MorphedWorld == null)
+                return false;
+            if (!IsValidBodySurfaceVertex(mesh, tri.A)
+                || !IsValidBodySurfaceVertex(mesh, tri.B)
+                || !IsValidBodySurfaceVertex(mesh, tri.C))
+                return false;
+
+            float mul = Mathf.Max(0f, multiplier);
+            Vector3 a = mesh.OriginalWorld[tri.A];
+            Vector3 b = mesh.OriginalWorld[tri.B];
+            Vector3 c = mesh.OriginalWorld[tri.C];
+            Vector3 am = ScaleBodySurfaceMove(a, mesh.MorphedWorld[tri.A], mul);
+            Vector3 bm = ScaleBodySurfaceMove(b, mesh.MorphedWorld[tri.B], mul);
+            Vector3 cm = ScaleBodySurfaceMove(c, mesh.MorphedWorld[tri.C], mul);
+
+            Vector3 normalM = Vector3.Cross(bm - am, cm - am);
+            float normalMLen = normalM.magnitude;
+            if (normalMLen < 1e-9f || !IsFinite(normalM))
+                return false;
+            normalM /= normalMLen;
+
+            if (Vector3.Dot(hit.Normal, normalM) < -0.25f)
+                return false;
+
+            Vector3 surfaceM =
+                am * hit.Barycentric.x +
+                bm * hit.Barycentric.y +
+                cm * hit.Barycentric.z;
+
+            Vector3 offset = original - hit.Closest;
+            Quaternion normalRotation = Quaternion.FromToRotation(hit.Normal, normalM);
+            target = surfaceM + normalRotation * offset;
+            if (!IsFinite(target))
+                return false;
+
+            return true;
+        }
+
+        static bool BodySurfaceMiss(MorphReferenceContext context)
+        {
+            if (context != null) context.SurfaceMisses++;
+            return false;
+        }
+
+        static bool TryGetBodySurfaceClothTargetDebug(
+            MorphReferenceContext context,
+            Vector3 original,
+            float multiplier,
+            out Vector3 target,
+            out BodySurfaceTargetDebug debug)
+        {
+            target = original;
+            debug = new BodySurfaceTargetDebug
+            {
+                FailReason = "init",
+                TriangleIndex = -1,
+                BodyMeshInstanceId = 0,
+                BodyA = -1,
+                BodyB = -1,
+                BodyC = -1,
+                Target = original,
+            };
+
+            if (context == null)
+            {
+                debug.FailReason = "no-context";
+                return false;
+            }
+
+            debug.BodyPointCount = context.BodyPoints != null ? context.BodyPoints.Count : 0;
+            debug.SurfaceTriangleCount = context.SurfaceTriangles != null ? context.SurfaceTriangles.Count : 0;
+            if (context.SurfaceTriangles == null || context.SurfaceTriangles.Count == 0)
+            {
+                debug.FailReason = "no-surface-triangles";
+                return false;
+            }
+
+            BodySurfaceHit hit;
+            if (!TryFindNearestBodySurfaceTriangle(context, original, out hit))
+            {
+                BodySurfaceHit fullHit;
+                if (TryFindNearestBodySurfaceTriangleFullScan(context, original, out fullHit))
+                {
+                    debug.FullScanHit = true;
+                    bool fullScanWouldPass = FillBodySurfaceTargetDebugFromHit(context, original, fullHit, multiplier, ref debug, out target);
+                    string fullScanReason = debug.FailReason ?? string.Empty;
+                    debug.FailReason = fullScanWouldPass
+                        ? "nearest-not-found-in-buckets/full-scan-ok"
+                        : "nearest-not-found-in-buckets/full-scan-" + fullScanReason;
+                }
+                else
+                {
+                    debug.FailReason = "nearest-not-found";
+                }
+                return false;
+            }
+
+            debug.SearchHit = true;
+            if (FillBodySurfaceTargetDebugFromHit(context, original, hit, multiplier, ref debug, out target))
+                return true;
+
+            string nearestReason = debug.FailReason ?? string.Empty;
+            BodySurfaceHit fallbackHit;
+            if (TryFindNearestValidBodySurfaceTargetFullScan(context, original, multiplier, out fallbackHit, out target))
+            {
+                debug.FullScanHit = true;
+                if (FillBodySurfaceTargetDebugFromHit(context, original, fallbackHit, multiplier, ref debug, out target))
+                {
+                    debug.FailReason = "fallback-after-" + nearestReason;
+                    return true;
+                }
+            }
+
+            debug.FailReason = nearestReason;
+            return false;
+        }
+
+        static bool FillBodySurfaceTargetDebugFromHit(
+            MorphReferenceContext context,
+            Vector3 original,
+            BodySurfaceHit hit,
+            float multiplier,
+            ref BodySurfaceTargetDebug debug,
+            out Vector3 target)
+        {
+            target = original;
+            debug.TriangleIndex = hit.TriangleIndex;
+            debug.Distance = Mathf.Sqrt(Mathf.Max(hit.DistanceSq, 0f));
+            debug.OffsetLen = (original - hit.Closest).magnitude;
+            debug.Barycentric = hit.Barycentric;
+            debug.Closest = hit.Closest;
+            debug.OriginalNormal = hit.Normal;
+
+            if (hit.TriangleIndex < 0 || context == null || context.SurfaceTriangles == null || hit.TriangleIndex >= context.SurfaceTriangles.Count)
+            {
+                debug.FailReason = "nearest-index-invalid";
+                return false;
+            }
+
+            BodySurfaceTriangle tri = context.SurfaceTriangles[hit.TriangleIndex];
+            BodyReferenceMesh mesh = tri.Mesh;
+            debug.BodyMeshId = MeshDebugId(mesh);
+            debug.BodyMeshInstanceId = mesh != null ? mesh.MeshInstanceId : 0;
+            debug.BodyA = tri.A;
+            debug.BodyB = tri.B;
+            debug.BodyC = tri.C;
+
+            if (mesh == null || mesh.OriginalWorld == null || mesh.MorphedWorld == null)
+            {
+                debug.FailReason = "body-mesh-missing";
+                return false;
+            }
+            if (!IsValidBodySurfaceVertex(mesh, tri.A))
+            {
+                debug.FailReason = "body-vertex-a-invalid";
+                return false;
+            }
+            if (!IsValidBodySurfaceVertex(mesh, tri.B))
+            {
+                debug.FailReason = "body-vertex-b-invalid";
+                return false;
+            }
+            if (!IsValidBodySurfaceVertex(mesh, tri.C))
+            {
+                debug.FailReason = "body-vertex-c-invalid";
+                return false;
+            }
+
+            float mul = Mathf.Max(0f, multiplier);
+            Vector3 a = mesh.OriginalWorld[tri.A];
+            Vector3 b = mesh.OriginalWorld[tri.B];
+            Vector3 c = mesh.OriginalWorld[tri.C];
+            Vector3 am = ScaleBodySurfaceMove(a, mesh.MorphedWorld[tri.A], mul);
+            Vector3 bm = ScaleBodySurfaceMove(b, mesh.MorphedWorld[tri.B], mul);
+            Vector3 cm = ScaleBodySurfaceMove(c, mesh.MorphedWorld[tri.C], mul);
+
+            Vector3 normalM = Vector3.Cross(bm - am, cm - am);
+            float normalMLen = normalM.magnitude;
+            if (normalMLen < 1e-9f || !IsFinite(normalM))
+            {
+                debug.FailReason = "morphed-normal-invalid";
+                return false;
+            }
+            normalM /= normalMLen;
+            debug.MorphedNormal = normalM;
+            debug.NormalDot = Vector3.Dot(hit.Normal, normalM);
+
+            if (debug.NormalDot < -0.25f)
+            {
+                debug.FailReason = "normal-flipped";
+                return false;
+            }
+
+            Vector3 surfaceM =
+                am * hit.Barycentric.x +
+                bm * hit.Barycentric.y +
+                cm * hit.Barycentric.z;
+            debug.SurfaceMorphed = surfaceM;
+            debug.SurfaceMoveLen = (surfaceM - hit.Closest).magnitude;
+
+            Vector3 offset = original - hit.Closest;
+            Quaternion normalRotation = Quaternion.FromToRotation(hit.Normal, normalM);
+            target = surfaceM + normalRotation * offset;
+            debug.Target = target;
+            if (!IsFinite(target))
+            {
+                debug.FailReason = "target-nonfinite";
+                return false;
+            }
+
+            debug.FailReason = "ok";
+            return true;
+        }
+
+        static bool TryFindNearestBodySurfaceTriangle(
+            MorphReferenceContext context,
+            Vector3 point,
+            out BodySurfaceHit nearest)
+        {
+            nearest = new BodySurfaceHit { TriangleIndex = -1 };
+            if (context == null || context.SurfaceTriangles.Count == 0)
+                return false;
+
+            bool found = false;
+            float bestSq = float.MaxValue;
+            HashSet<int> seen = new HashSet<int>();
+
+            if (context.SurfaceBuckets != null && context.SurfaceBuckets.Count > 0)
+            {
+                int bx, by, bz;
+                BodySurfaceBucketCoords(point, context.CellSize, out bx, out by, out bz);
+                for (int dx = -4; dx <= 4; dx++)
+                    for (int dy = -4; dy <= 4; dy++)
+                        for (int dz = -4; dz <= 4; dz++)
+                        {
+                            int key = BodySurfaceBucketKey(bx + dx, by + dy, bz + dz);
+                            List<int> list;
+                            if (!context.SurfaceBuckets.TryGetValue(key, out list)) continue;
+                            for (int i = 0; i < list.Count; i++)
+                            {
+                                int triIndex = list[i];
+                                if (!seen.Add(triIndex)) continue;
+                                TestBodySurfaceTriangle(context, point, triIndex, ref found, ref bestSq, ref nearest);
+                            }
+                        }
+                if (found) return true;
+                return false;
+            }
+
+            for (int i = 0; i < context.SurfaceTriangles.Count; i++)
+                TestBodySurfaceTriangle(context, point, i, ref found, ref bestSq, ref nearest);
+            return found;
+        }
+
+        static bool TryFindNearestBodySurfaceTriangleFullScan(
+            MorphReferenceContext context,
+            Vector3 point,
+            out BodySurfaceHit nearest)
+        {
+            nearest = new BodySurfaceHit { TriangleIndex = -1 };
+            if (context == null || context.SurfaceTriangles == null || context.SurfaceTriangles.Count == 0)
+                return false;
+
+            bool found = false;
+            float bestSq = float.MaxValue;
+            for (int i = 0; i < context.SurfaceTriangles.Count; i++)
+                TestBodySurfaceTriangle(context, point, i, ref found, ref bestSq, ref nearest);
+            return found;
+        }
+
+        static bool TryFindNearestValidBodySurfaceTargetFullScan(
+            MorphReferenceContext context,
+            Vector3 point,
+            float multiplier,
+            out BodySurfaceHit nearest,
+            out Vector3 target)
+        {
+            nearest = new BodySurfaceHit { TriangleIndex = -1 };
+            target = point;
+            if (context == null || context.SurfaceTriangles == null || context.SurfaceTriangles.Count == 0)
+                return false;
+
+            bool found = false;
+            float bestSq = float.MaxValue;
+            for (int i = 0; i < context.SurfaceTriangles.Count; i++)
+            {
+                bool candidateFound = false;
+                float candidateBestSq = float.MaxValue;
+                BodySurfaceHit candidate = new BodySurfaceHit { TriangleIndex = -1 };
+                TestBodySurfaceTriangle(context, point, i, ref candidateFound, ref candidateBestSq, ref candidate);
+                if (!candidateFound || candidate.DistanceSq >= bestSq)
+                    continue;
+
+                Vector3 candidateTarget;
+                if (!TryBuildBodySurfaceTargetFromHit(context, point, multiplier, candidate, out candidateTarget))
+                    continue;
+
+                found = true;
+                bestSq = candidate.DistanceSq;
+                nearest = candidate;
+                target = candidateTarget;
+            }
+
+            return found;
+        }
+
+        static void TestBodySurfaceTriangle(
+            MorphReferenceContext context,
+            Vector3 point,
+            int triangleIndex,
+            ref bool found,
+            ref float bestSq,
+            ref BodySurfaceHit nearest)
+        {
+            if (context == null || triangleIndex < 0 || triangleIndex >= context.SurfaceTriangles.Count)
+                return;
+
+            BodySurfaceTriangle tri = context.SurfaceTriangles[triangleIndex];
+            BodyReferenceMesh mesh = tri.Mesh;
+            if (mesh == null || mesh.OriginalWorld == null)
+                return;
+            if (!IsValidBodySurfaceVertex(mesh, tri.A)
+                || !IsValidBodySurfaceVertex(mesh, tri.B)
+                || !IsValidBodySurfaceVertex(mesh, tri.C))
+                return;
+            if (ShouldSuppressBodySurfaceTriangleCandidate(context, mesh, tri))
+                return;
+
+            Vector3 a = mesh.OriginalWorld[tri.A];
+            Vector3 b = mesh.OriginalWorld[tri.B];
+            Vector3 c = mesh.OriginalWorld[tri.C];
+            Vector3 closest;
+            Vector3 barycentric;
+            if (!TryClosestPointOnTriangle(point, a, b, c, out closest, out barycentric))
+                return;
+
+            float sq = (point - closest).sqrMagnitude;
+            if (sq >= bestSq)
+                return;
+
+            Vector3 normal = Vector3.Cross(b - a, c - a);
+            float normalLen = normal.magnitude;
+            if (normalLen < 1e-9f || !IsFinite(normal))
+                return;
+            normal /= normalLen;
+
+            found = true;
+            bestSq = sq;
+            nearest = new BodySurfaceHit
+            {
+                TriangleIndex = triangleIndex,
+                Closest = closest,
+                Barycentric = barycentric,
+                Normal = normal,
+                DistanceSq = sq,
+            };
+        }
+
+        static bool ShouldSuppressBodySurfaceTriangleCandidate(
+            MorphReferenceContext context,
+            BodyReferenceMesh mesh,
+            BodySurfaceTriangle tri)
+        {
+            if (context == null || context.VirtualSurfaceTriangles <= 0)
+                return false;
+            if (mesh == null || mesh.OriginalWorld == null || mesh.MorphedWorld == null)
+                return false;
+            if (IsVirtualBodySurfaceMesh(mesh))
+                return false;
+            if (!IsValidBodySurfaceVertex(mesh, tri.A)
+                || !IsValidBodySurfaceVertex(mesh, tri.B)
+                || !IsValidBodySurfaceVertex(mesh, tri.C))
+                return false;
+
+            Vector3 p0 = mesh.OriginalWorld[tri.A];
+            Vector3 p1 = mesh.OriginalWorld[tri.B];
+            Vector3 p2 = mesh.OriginalWorld[tri.C];
+            Vector3 m0 = mesh.MorphedWorld[tri.A];
+            Vector3 m1 = mesh.MorphedWorld[tri.B];
+            Vector3 m2 = mesh.MorphedWorld[tri.C];
+            Vector3 normal = Vector3.Cross(p1 - p0, p2 - p0);
+            float minEdge = Mathf.Max(context.CellSize * 0.015f, 0.00001f);
+            float minArea = minEdge * minEdge;
+            float minAreaSq = minArea * minArea;
+            if (!IsFinite(normal) || normal.sqrMagnitude < minAreaSq)
+                return false;
+
+            return IsVirtualFrontSeamSurfaceCandidate(context, p0, p1, p2, m0, m1, m2, normal, minAreaSq);
+        }
+
+        static bool IsVirtualBodySurfaceMesh(BodyReferenceMesh mesh)
+        {
+            return mesh != null
+                && mesh.MeshId != null
+                && mesh.MeshId.IndexOf(":virtual-front-seam", System.StringComparison.Ordinal) >= 0;
+        }
+
+        static bool TryClosestPointOnTriangle(
+            Vector3 point,
+            Vector3 a,
+            Vector3 b,
+            Vector3 c,
+            out Vector3 closest,
+            out Vector3 barycentric)
+        {
+            closest = a;
+            barycentric = new Vector3(1f, 0f, 0f);
+
+            Vector3 ab = b - a;
+            Vector3 ac = c - a;
+            Vector3 ap = point - a;
+            float d1 = Vector3.Dot(ab, ap);
+            float d2 = Vector3.Dot(ac, ap);
+            if (d1 <= 0f && d2 <= 0f)
+                return IsFinite(closest);
+
+            Vector3 bp = point - b;
+            float d3 = Vector3.Dot(ab, bp);
+            float d4 = Vector3.Dot(ac, bp);
+            if (d3 >= 0f && d4 <= d3)
+            {
+                closest = b;
+                barycentric = new Vector3(0f, 1f, 0f);
+                return IsFinite(closest);
+            }
+
+            float vc = d1 * d4 - d3 * d2;
+            if (vc <= 0f && d1 >= 0f && d3 <= 0f)
+            {
+                float denom = d1 - d3;
+                if (Mathf.Abs(denom) < 1e-9f) return false;
+                float v = d1 / denom;
+                closest = a + ab * v;
+                barycentric = new Vector3(1f - v, v, 0f);
+                return IsFinite(closest);
+            }
+
+            Vector3 cp = point - c;
+            float d5 = Vector3.Dot(ab, cp);
+            float d6 = Vector3.Dot(ac, cp);
+            if (d6 >= 0f && d5 <= d6)
+            {
+                closest = c;
+                barycentric = new Vector3(0f, 0f, 1f);
+                return IsFinite(closest);
+            }
+
+            float vb = d5 * d2 - d1 * d6;
+            if (vb <= 0f && d2 >= 0f && d6 <= 0f)
+            {
+                float denom = d2 - d6;
+                if (Mathf.Abs(denom) < 1e-9f) return false;
+                float w = d2 / denom;
+                closest = a + ac * w;
+                barycentric = new Vector3(1f - w, 0f, w);
+                return IsFinite(closest);
+            }
+
+            float va = d3 * d6 - d5 * d4;
+            if (va <= 0f && (d4 - d3) >= 0f && (d5 - d6) >= 0f)
+            {
+                float denom = (d4 - d3) + (d5 - d6);
+                if (Mathf.Abs(denom) < 1e-9f) return false;
+                float w = (d4 - d3) / denom;
+                closest = b + (c - b) * w;
+                barycentric = new Vector3(0f, 1f - w, w);
+                return IsFinite(closest);
+            }
+
+            float sum = va + vb + vc;
+            if (Mathf.Abs(sum) < 1e-9f)
+                return false;
+
+            float inv = 1f / sum;
+            float vFace = vb * inv;
+            float wFace = vc * inv;
+            float uFace = 1f - vFace - wFace;
+            closest = a * uFace + b * vFace + c * wFace;
+            barycentric = new Vector3(uFace, vFace, wFace);
+            return IsFinite(closest) && IsFinite(barycentric);
+        }
+
+        static bool IsValidBodySurfaceVertex(BodyReferenceMesh mesh, int index)
+        {
+            return mesh != null
+                && mesh.Valid != null
+                && mesh.OriginalWorld != null
+                && mesh.MorphedWorld != null
+                && index >= 0
+                && index < mesh.Valid.Length
+                && index < mesh.OriginalWorld.Length
+                && index < mesh.MorphedWorld.Length
+                && mesh.Valid[index];
+        }
+
+        static bool BodySurfaceMoveSignificant(Vector3 original, Vector3 morphed)
+        {
+            return IsFinite(original)
+                && IsFinite(morphed)
+                && (morphed - original).sqrMagnitude > 1e-10f;
+        }
+
+        static Vector3 ScaleBodySurfaceMove(Vector3 original, Vector3 morphed, float multiplier)
+        {
+            return original + (morphed - original) * multiplier;
+        }
+
+        static void BodySurfaceBucketCoords(Vector3 point, float cellSize, out int x, out int y, out int z)
+        {
+            float cell = Mathf.Max(cellSize, 0.0001f);
+            x = Mathf.FloorToInt(point.x / cell);
+            y = Mathf.FloorToInt(point.y / cell);
+            z = Mathf.FloorToInt(point.z / cell);
+        }
+
+        static int BodySurfaceBucketKey(int x, int y, int z)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + x;
+                hash = hash * 31 + y;
+                hash = hash * 31 + z;
+                return hash;
+            }
+        }
+
+        static bool IsFinite(Vector3 v)
+        {
+            return IsFinite(v.x) && IsFinite(v.y) && IsFinite(v.z);
+        }
+
+        static bool IsFinite(Quaternion q)
+        {
+            return IsFinite(q.x) && IsFinite(q.y) && IsFinite(q.z) && IsFinite(q.w);
+        }
+
+        static bool IsFinite(float f)
+        {
+            return !float.IsNaN(f) && !float.IsInfinity(f);
+        }
+
+        static void RefreshMorphedWorldFromLocal(
+            Vector3[] localVerts,
+            BoneWeight[] weights,
+            Matrix4x4[] boneMatrices,
+            Vector3[] morphedWorld,
+            bool[] valid)
+        {
+            if (localVerts == null || weights == null || boneMatrices == null || morphedWorld == null || valid == null)
+                return;
+
+            int count = Mathf.Min(localVerts.Length, Mathf.Min(weights.Length, Mathf.Min(morphedWorld.Length, valid.Length)));
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i]) continue;
+                Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
+                morphedWorld[i] = skin.MultiplyPoint3x4(localVerts[i]);
+            }
+        }
+
+        static bool[] BuildWorldChangedMask(Vector3[] originalWorld, Vector3[] morphedWorld, bool[] valid)
+        {
+            if (originalWorld == null || morphedWorld == null || valid == null)
+                return null;
+
+            int count = Mathf.Min(originalWorld.Length, Mathf.Min(morphedWorld.Length, valid.Length));
+            bool[] changed = new bool[count];
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i])
+                    continue;
+
+                Vector3 original = originalWorld[i];
+                Vector3 morphed = morphedWorld[i];
+                changed[i] = WorldPositionChanged(original, morphed);
+            }
+
+            return changed;
+        }
+
+        static bool WorldPositionChanged(Vector3 original, Vector3 morphed)
+        {
+            return original.x != morphed.x
+                || original.y != morphed.y
+                || original.z != morphed.z;
+        }
+
+        static void RecordBodyChangedUp(float value)
+        {
+            if (_morphReferenceContext == null)
+                return;
+
+            if (!_morphReferenceContext.BodyChangedUpRangeValid)
+            {
+                _morphReferenceContext.BodyChangedUpRangeValid = true;
+                _morphReferenceContext.BodyChangedMinUp = value;
+                _morphReferenceContext.BodyChangedMaxUp = value;
+                return;
+            }
+
+            if (value < _morphReferenceContext.BodyChangedMinUp)
+                _morphReferenceContext.BodyChangedMinUp = value;
+            if (value > _morphReferenceContext.BodyChangedMaxUp)
+                _morphReferenceContext.BodyChangedMaxUp = value;
+        }
+
+        static void RegisterBodyMorphReferences(
+            Mesh mesh,
+            Vector3[] originalWorld,
+            Vector3[] morphedWorld,
+            bool[] valid,
+            bool[] referenceEligible,
+            Vector3 center,
+            Vector3 up)
+        {
+            if (_morphReferenceContext == null || mesh == null || originalWorld == null
+                || morphedWorld == null || valid == null || referenceEligible == null)
+                return;
+
+            int count = Mathf.Min(originalWorld.Length,
+                Mathf.Min(morphedWorld.Length, Mathf.Min(valid.Length, referenceEligible.Length)));
+            List<int>[] neighbors = BuildMeshNeighbors(mesh, count);
+            if (neighbors == null) return;
+
+            bool[] eligible = new bool[count];
+            BodyReferenceMesh refMesh = new BodyReferenceMesh
+            {
+                MeshId = mesh.name ?? string.Empty,
+                MeshInstanceId = mesh.GetInstanceID(),
+                OriginalWorld = originalWorld,
+                MorphedWorld = morphedWorld,
+                Valid = valid,
+                Eligible = eligible,
+                Neighbors = neighbors,
+                SurfaceTrianglesByVertex = new List<int>[count],
+            };
+            _morphReferenceContext.BodyMeshes.Add(refMesh);
+
+            for (int i = 0; i < count; i++)
+            {
+                bool finalMoved = valid[i] && BodySurfaceMoveSignificant(originalWorld[i], morphedWorld[i]);
+                bool finalEligible = finalMoved && referenceEligible[i];
+
+                if (finalMoved)
+                    RecordBodyChangedUp(Vector3.Dot(morphedWorld[i] - center, up));
+
+                if (!finalEligible) continue;
+
+                eligible[i] = true;
+                _morphReferenceContext.BodyPoints.Add(new BodyReferencePoint
+                {
+                    Mesh = refMesh,
+                    Index = i,
+                    OriginalWorld = originalWorld[i],
+                });
+            }
+
+            // Use referenceEligible (all in-ellipsoid vertices) not eligible (only moved ones).
+            // Breast-area body vertices are in-ellipsoid but the breast guard pulled them back
+            // to near-original, so they show no movement → their triangles were missing from the
+            // reference. Cloth near the breast then fell back to belly triangles and got pushed
+            // forward. With these triangles present, surfaceM ≈ hit.Closest and R ≈ identity →
+            // target ≈ cloth_original, which is the correct result for that region.
+            AddBodySurfaceTriangles(_morphReferenceContext, mesh, refMesh, referenceEligible, count);
+        }
+
+        static int AddBodySurfaceTriangles(
+            MorphReferenceContext context,
+            Mesh mesh,
+            BodyReferenceMesh refMesh,
+            bool[] referenceEligible,
+            int count)
+        {
+            if (context == null || mesh == null || refMesh == null) return 0;
+            if (refMesh.OriginalWorld == null || refMesh.MorphedWorld == null || refMesh.Valid == null || referenceEligible == null)
+                return 0;
+
+            int[] triangles = null;
+            try { triangles = mesh.triangles; }
+            catch { return 0; }
+            if (triangles == null || triangles.Length < 3)
+                return 0;
+
+            float minEdge = Mathf.Max(context.CellSize * 0.015f, 0.00001f);
+            float minArea = minEdge * minEdge;
+            float minAreaSq = minArea * minArea;
+            int added = 0;
+
+            for (int i = 0; i + 2 < triangles.Length; i += 3)
+            {
+                int a = triangles[i];
+                int b = triangles[i + 1];
+                int c = triangles[i + 2];
+                if (!IsValidBodySurfaceTriangleVertex(refMesh, a, count)
+                    || !IsValidBodySurfaceTriangleVertex(refMesh, b, count)
+                    || !IsValidBodySurfaceTriangleVertex(refMesh, c, count))
+                    continue;
+
+                if (!IsEligibleBodySurfaceVertex(referenceEligible, a, count)
+                    && !IsEligibleBodySurfaceVertex(referenceEligible, b, count)
+                    && !IsEligibleBodySurfaceVertex(referenceEligible, c, count))
+                    continue;
+
+                Vector3 p0 = refMesh.OriginalWorld[a];
+                Vector3 p1 = refMesh.OriginalWorld[b];
+                Vector3 p2 = refMesh.OriginalWorld[c];
+                Vector3 normal = Vector3.Cross(p1 - p0, p2 - p0);
+                if (!IsFinite(normal) || normal.sqrMagnitude < minAreaSq)
+                    continue;
+
+                Vector3 m0 = refMesh.MorphedWorld[a];
+                Vector3 m1 = refMesh.MorphedWorld[b];
+                Vector3 m2 = refMesh.MorphedWorld[c];
+                if (IsVirtualFrontSeamSurfaceCandidate(context, p0, p1, p2, m0, m1, m2, normal, minAreaSq))
+                {
+                    if (TryAddVirtualFrontSeamSurface(
+                        context,
+                        refMesh,
+                        triangles,
+                        referenceEligible,
+                        count,
+                        a,
+                        b,
+                        c,
+                        minAreaSq))
+                    {
+                        context.SuppressedSurfaceTriangles++;
+                        continue;
+                    }
+                }
+
+                Vector3 center = (p0 + p1 + p2) / 3f;
+                float radiusSq = (p0 - center).sqrMagnitude;
+                radiusSq = Mathf.Max(radiusSq, (p1 - center).sqrMagnitude);
+                radiusSq = Mathf.Max(radiusSq, (p2 - center).sqrMagnitude);
+
+                int triIndex = context.SurfaceTriangles.Count;
+                context.SurfaceTriangles.Add(new BodySurfaceTriangle
+                {
+                    Mesh = refMesh,
+                    A = a,
+                    B = b,
+                    C = c,
+                    Center = center,
+                    RadiusSq = radiusSq,
+                });
+                AddBodySurfaceTriangleForVertex(refMesh, a, triIndex);
+                AddBodySurfaceTriangleForVertex(refMesh, b, triIndex);
+                AddBodySurfaceTriangleForVertex(refMesh, c, triIndex);
+                AddBodySurfaceTriangleToBuckets(context, triIndex, p0, p1, p2);
+                added++;
+            }
+
+            return added;
+        }
+
+        static bool IsVirtualFrontSeamSurfaceCandidate(
+            MorphReferenceContext context,
+            Vector3 p0,
+            Vector3 p1,
+            Vector3 p2,
+            Vector3 m0,
+            Vector3 m1,
+            Vector3 m2,
+            Vector3 originalNormal,
+            float minAreaSq)
+        {
+            if (context == null || !_bpWorldCached)
+                return false;
+            if (!IsFinite(p0) || !IsFinite(p1) || !IsFinite(p2)
+                || !IsFinite(m0) || !IsFinite(m1) || !IsFinite(m2)
+                || !IsFinite(originalNormal))
+                return false;
+
+            Vector3 morphedNormal = Vector3.Cross(m1 - m0, m2 - m0);
+            if (!IsFinite(morphedNormal) || morphedNormal.sqrMagnitude < minAreaSq)
+                return false;
+
+            Vector3 right = _bpWorldFrame.Right;
+            Vector3 up = _bpWorldFrame.Up;
+            Vector3 fwd = _bpWorldFrame.Fwd;
+            if (right.sqrMagnitude < 1e-8f || up.sqrMagnitude < 1e-8f || fwd.sqrMagnitude < 1e-8f)
+                return false;
+            right.Normalize();
+            up.Normalize();
+            fwd.Normalize();
+
+            Vector3 n0 = originalNormal.normalized;
+            Vector3 center = (p0 + p1 + p2) / 3f;
+            Vector3 rel = center - _bpWorldFrame.Center;
+
+            float side = Mathf.Abs(Vector3.Dot(rel, right));
+            float upCoord = Vector3.Dot(rel, up);
+            float front = Vector3.Dot(rel, fwd);
+            float sideFacing = Mathf.Abs(Vector3.Dot(n0, right));
+            float frontFacing = Mathf.Abs(Vector3.Dot(n0, fwd));
+
+            float centerlineLimit = Mathf.Max(RelSide(0.03f), context.CellSize * 0.6f);
+            float minUp = -RelUp(0.30f);
+            float maxUp = RelUp(0.05f);
+            float minFront = RelFwd(0.04f);
+            float maxFront = RelFwd(0.38f);
+            return side <= centerlineLimit
+                && upCoord >= minUp
+                && upCoord <= maxUp
+                && front >= minFront
+                && front <= maxFront
+                && sideFacing >= 0.70f
+                && frontFacing <= 0.35f;
+        }
+
+        static bool TryAddVirtualFrontSeamSurface(
+            MorphReferenceContext context,
+            BodyReferenceMesh sourceMesh,
+            int[] triangles,
+            bool[] referenceEligible,
+            int count,
+            int candidateA,
+            int candidateB,
+            int candidateC,
+            float minAreaSq)
+        {
+            if (context == null || sourceMesh == null || !_bpWorldCached)
+                return false;
+
+            Vector3 origin = _bpWorldFrame.Center;
+            Vector3 right = _bpWorldFrame.Right;
+            Vector3 up = _bpWorldFrame.Up;
+            Vector3 fwd = _bpWorldFrame.Fwd;
+            if (right.sqrMagnitude < 1e-8f || up.sqrMagnitude < 1e-8f || fwd.sqrMagnitude < 1e-8f)
+                return false;
+            right.Normalize();
+            up.Normalize();
+            fwd.Normalize();
+
+            if (!IsValidBodySurfaceTriangleVertex(sourceMesh, candidateA, count)
+                || !IsValidBodySurfaceTriangleVertex(sourceMesh, candidateB, count)
+                || !IsValidBodySurfaceTriangleVertex(sourceMesh, candidateC, count))
+                return false;
+
+            Vector3 p0 = sourceMesh.OriginalWorld[candidateA];
+            Vector3 p1 = sourceMesh.OriginalWorld[candidateB];
+            Vector3 p2 = sourceMesh.OriginalWorld[candidateC];
+            Vector3 m0 = sourceMesh.MorphedWorld[candidateA];
+            Vector3 m1 = sourceMesh.MorphedWorld[candidateB];
+            Vector3 m2 = sourceMesh.MorphedWorld[candidateC];
+            if (!IsFinite(p0) || !IsFinite(p1) || !IsFinite(p2)
+                || !IsFinite(m0) || !IsFinite(m1) || !IsFinite(m2))
+                return false;
+
+            float originalSide;
+            float originalMinUp;
+            float originalMaxUp;
+            float originalFwd;
+            float morphedSide;
+            float morphedMinUp;
+            float morphedMaxUp;
+            float morphedFwd;
+            ComputeVirtualFrontSeamCoords(origin, right, up, fwd, p0, p1, p2, out originalSide, out originalMinUp, out originalMaxUp, out originalFwd);
+            ComputeVirtualFrontSeamCoords(origin, right, up, fwd, m0, m1, m2, out morphedSide, out morphedMinUp, out morphedMaxUp, out morphedFwd);
+
+            float forwardBias = Mathf.Max(RelFwd(0.012f), context.CellSize * 0.35f);
+            morphedFwd += forwardBias;
+
+            float halfWidth = Mathf.Max(RelSide(0.024f), context.CellSize * 0.75f);
+            float minHeight = Mathf.Max(RelUp(0.018f), context.CellSize * 0.5f);
+            float originalCenterUp = (originalMinUp + originalMaxUp) * 0.5f;
+            float morphedCenterUp = (morphedMinUp + morphedMaxUp) * 0.5f;
+            float halfHeight = Mathf.Max((originalMaxUp - originalMinUp) * 0.5f + Mathf.Max(RelUp(0.006f), context.CellSize * 0.2f), minHeight);
+
+            originalMinUp = originalCenterUp - halfHeight;
+            originalMaxUp = originalCenterUp + halfHeight;
+            morphedMinUp = morphedCenterUp - halfHeight;
+            morphedMaxUp = morphedCenterUp + halfHeight;
+
+            Vector3[] original = new Vector3[4];
+            Vector3[] morphed = new Vector3[4];
+            original[0] = ComposeVirtualSurfacePoint(origin, right, up, fwd, originalSide - halfWidth, originalMinUp, originalFwd);
+            original[1] = ComposeVirtualSurfacePoint(origin, right, up, fwd, originalSide + halfWidth, originalMinUp, originalFwd);
+            original[2] = ComposeVirtualSurfacePoint(origin, right, up, fwd, originalSide - halfWidth, originalMaxUp, originalFwd);
+            original[3] = ComposeVirtualSurfacePoint(origin, right, up, fwd, originalSide + halfWidth, originalMaxUp, originalFwd);
+            morphed[0] = ComposeVirtualSurfacePoint(origin, right, up, fwd, morphedSide - halfWidth, morphedMinUp, morphedFwd);
+            morphed[1] = ComposeVirtualSurfacePoint(origin, right, up, fwd, morphedSide + halfWidth, morphedMinUp, morphedFwd);
+            morphed[2] = ComposeVirtualSurfacePoint(origin, right, up, fwd, morphedSide - halfWidth, morphedMaxUp, morphedFwd);
+            morphed[3] = ComposeVirtualSurfacePoint(origin, right, up, fwd, morphedSide + halfWidth, morphedMaxUp, morphedFwd);
+
+            if (!BodySurfaceMoveSignificant(original[0], morphed[0])
+                && !BodySurfaceMoveSignificant(original[1], morphed[1])
+                && !BodySurfaceMoveSignificant(original[2], morphed[2])
+                && !BodySurfaceMoveSignificant(original[3], morphed[3]))
+            {
+                return false;
+            }
+
+            BodyReferenceMesh virtualMesh = new BodyReferenceMesh
+            {
+                MeshId = (sourceMesh.MeshId ?? string.Empty) + ":virtual-front-seam-fwd",
+                MeshInstanceId = sourceMesh.MeshInstanceId,
+                OriginalWorld = original,
+                MorphedWorld = morphed,
+                Valid = new[] { true, true, true, true },
+                Eligible = new[] { true, true, true, true },
+                Neighbors = new List<int>[4],
+                SurfaceTrianglesByVertex = new List<int>[4],
+            };
+            virtualMesh.Neighbors[0] = new List<int> { 1, 2 };
+            virtualMesh.Neighbors[1] = new List<int> { 0, 2, 3 };
+            virtualMesh.Neighbors[2] = new List<int> { 0, 1, 3 };
+            virtualMesh.Neighbors[3] = new List<int> { 1, 2 };
+
+            context.BodyMeshes.Add(virtualMesh);
+            AddVirtualBodySurfaceTriangle(context, virtualMesh, 0, 1, 2);
+            AddVirtualBodySurfaceTriangle(context, virtualMesh, 1, 3, 2);
+            return true;
+        }
+
+        static bool TryFitVirtualFrontSeamSurface(
+            MorphReferenceContext context,
+            BodyReferenceMesh sourceMesh,
+            int[] triangles,
+            bool[] referenceEligible,
+            int count,
+            int candidateA,
+            int candidateB,
+            int candidateC,
+            Vector3 origin,
+            Vector3 right,
+            Vector3 up,
+            Vector3 fwd,
+            float minAreaSq,
+            out VirtualSeamSurfaceFit fit)
+        {
+            fit = new VirtualSeamSurfaceFit();
+            if (context == null || sourceMesh == null || sourceMesh.OriginalWorld == null || sourceMesh.MorphedWorld == null
+                || sourceMesh.Valid == null || sourceMesh.Neighbors == null || triangles == null)
+                return false;
+
+            Vector3 p0 = sourceMesh.OriginalWorld[candidateA];
+            Vector3 p1 = sourceMesh.OriginalWorld[candidateB];
+            Vector3 p2 = sourceMesh.OriginalWorld[candidateC];
+            float candidateSide;
+            float candidateMinUp;
+            float candidateMaxUp;
+            float candidateFwd;
+            ComputeVirtualFrontSeamCoords(origin, right, up, fwd, p0, p1, p2, out candidateSide, out candidateMinUp, out candidateMaxUp, out candidateFwd);
+            float candidateCenterUp = (candidateMinUp + candidateMaxUp) * 0.5f;
+
+            HashSet<int> topological = CollectTopologicalVertexSet(sourceMesh.Neighbors, candidateA, candidateB, candidateC, 5);
+            if (topological == null || topological.Count == 0)
+                return false;
+
+            float sideLimit = Mathf.Max(RelSide(0.09f), context.CellSize * 3.0f);
+            float upLimit = Mathf.Max(RelUp(0.07f), context.CellSize * 2.5f);
+            float backLimit = Mathf.Max(RelFwd(0.04f), context.CellSize * 1.5f);
+            List<Vector3> originalSamples = new List<Vector3>();
+            List<Vector3> morphedSamples = new List<Vector3>();
+            HashSet<int> sampleVertices = new HashSet<int>();
+
+            for (int i = 0; i + 2 < triangles.Length; i += 3)
+            {
+                int a = triangles[i];
+                int b = triangles[i + 1];
+                int c = triangles[i + 2];
+                if (!IsValidBodySurfaceTriangleVertex(sourceMesh, a, count)
+                    || !IsValidBodySurfaceTriangleVertex(sourceMesh, b, count)
+                    || !IsValidBodySurfaceTriangleVertex(sourceMesh, c, count))
+                    continue;
+                if (!topological.Contains(a) && !topological.Contains(b) && !topological.Contains(c))
+                    continue;
+                if (!IsEligibleBodySurfaceVertex(referenceEligible, a, count)
+                    && !IsEligibleBodySurfaceVertex(referenceEligible, b, count)
+                    && !IsEligibleBodySurfaceVertex(referenceEligible, c, count))
+                    continue;
+
+                Vector3 q0 = sourceMesh.OriginalWorld[a];
+                Vector3 q1 = sourceMesh.OriginalWorld[b];
+                Vector3 q2 = sourceMesh.OriginalWorld[c];
+                Vector3 mq0 = sourceMesh.MorphedWorld[a];
+                Vector3 mq1 = sourceMesh.MorphedWorld[b];
+                Vector3 mq2 = sourceMesh.MorphedWorld[c];
+                Vector3 normal = Vector3.Cross(q1 - q0, q2 - q0);
+                Vector3 morphedNormal = Vector3.Cross(mq1 - mq0, mq2 - mq0);
+                if (!IsFinite(normal) || !IsFinite(morphedNormal) || normal.sqrMagnitude < minAreaSq || morphedNormal.sqrMagnitude < minAreaSq)
+                    continue;
+
+                Vector3 n = normal.normalized;
+                Vector3 mn = morphedNormal.normalized;
+                if (Vector3.Dot(n, fwd) < 0.25f)
+                    continue;
+                if (Vector3.Dot(n, mn) < -0.25f)
+                    continue;
+
+                Vector3 triCenter = (q0 + q1 + q2) / 3f;
+                Vector3 rel = triCenter - origin;
+                float triSide = Vector3.Dot(rel, right);
+                float triUp = Vector3.Dot(rel, up);
+                float triFwd = Vector3.Dot(rel, fwd);
+                if (Mathf.Abs(triSide - candidateSide) > sideLimit)
+                    continue;
+                if (Mathf.Abs(triUp - candidateCenterUp) > upLimit)
+                    continue;
+                if (triFwd < candidateFwd - backLimit)
+                    continue;
+
+                AddVirtualFitSample(sourceMesh, a, sampleVertices, originalSamples, morphedSamples);
+                AddVirtualFitSample(sourceMesh, b, sampleVertices, originalSamples, morphedSamples);
+                AddVirtualFitSample(sourceMesh, c, sampleVertices, originalSamples, morphedSamples);
+            }
+
+            if (originalSamples.Count < 3)
+                return false;
+
+            if (!TryFitVirtualPlaneComponent(originalSamples, originalSamples, origin, right, up, fwd, 2, out fit.OriginalPlaneA, out fit.OriginalPlaneSide, out fit.OriginalPlaneUp))
+                return false;
+            if (!TryFitVirtualPlaneComponent(originalSamples, morphedSamples, origin, right, up, fwd, 0, out fit.MorphedSidePlaneA, out fit.MorphedSidePlaneSide, out fit.MorphedSidePlaneUp))
+                return false;
+            if (!TryFitVirtualPlaneComponent(originalSamples, morphedSamples, origin, right, up, fwd, 1, out fit.MorphedUpPlaneA, out fit.MorphedUpPlaneSide, out fit.MorphedUpPlaneUp))
+                return false;
+            if (!TryFitVirtualPlaneComponent(originalSamples, morphedSamples, origin, right, up, fwd, 2, out fit.MorphedPlaneA, out fit.MorphedPlaneSide, out fit.MorphedPlaneUp))
+                return false;
+
+            float maxSideDelta = 0f;
+            float maxUpDelta = 0f;
+            for (int i = 0; i < originalSamples.Count; i++)
+            {
+                Vector3 rel = originalSamples[i] - origin;
+                maxSideDelta = Mathf.Max(maxSideDelta, Mathf.Abs(Vector3.Dot(rel, right) - candidateSide));
+                maxUpDelta = Mathf.Max(maxUpDelta, Mathf.Abs(Vector3.Dot(rel, up) - candidateCenterUp));
+            }
+
+            float minHalfWidth = Mathf.Max(RelSide(0.024f), context.CellSize * 0.75f);
+            float maxHalfWidth = Mathf.Max(minHalfWidth, RelSide(0.085f));
+            float minHalfHeight = Mathf.Max(RelUp(0.012f), context.CellSize * 0.35f);
+            float maxHalfHeight = Mathf.Max(minHalfHeight, RelUp(0.055f));
+
+            fit.CenterSide = candidateSide;
+            fit.HalfWidth = Mathf.Clamp(maxSideDelta, minHalfWidth, maxHalfWidth);
+            float candidateHalfHeight = Mathf.Max((candidateMaxUp - candidateMinUp) * 0.5f + Mathf.Max(RelUp(0.006f), context.CellSize * 0.2f), maxUpDelta * 0.35f);
+            fit.MinUp = candidateCenterUp - Mathf.Clamp(candidateHalfHeight, minHalfHeight, maxHalfHeight);
+            fit.MaxUp = candidateCenterUp + Mathf.Clamp(candidateHalfHeight, minHalfHeight, maxHalfHeight);
+            fit.SampleCount = originalSamples.Count;
+            return true;
+        }
+
+        static HashSet<int> CollectTopologicalVertexSet(List<int>[] neighbors, int a, int b, int c, int depth)
+        {
+            if (neighbors == null)
+                return null;
+
+            HashSet<int> result = new HashSet<int>();
+            Queue<int> queue = new Queue<int>();
+            Queue<int> depths = new Queue<int>();
+            AddTopologicalSeed(neighbors, result, queue, depths, a);
+            AddTopologicalSeed(neighbors, result, queue, depths, b);
+            AddTopologicalSeed(neighbors, result, queue, depths, c);
+
+            while (queue.Count > 0)
+            {
+                int v = queue.Dequeue();
+                int d = depths.Dequeue();
+                if (d >= depth) continue;
+                if (v < 0 || v >= neighbors.Length || neighbors[v] == null) continue;
+
+                List<int> ns = neighbors[v];
+                for (int i = 0; i < ns.Count; i++)
+                {
+                    int n = ns[i];
+                    if (n < 0 || n >= neighbors.Length || !result.Add(n)) continue;
+                    queue.Enqueue(n);
+                    depths.Enqueue(d + 1);
+                }
+            }
+
+            return result;
+        }
+
+        static void AddTopologicalSeed(List<int>[] neighbors, HashSet<int> result, Queue<int> queue, Queue<int> depths, int vertex)
+        {
+            if (neighbors == null || result == null || queue == null || depths == null) return;
+            if (vertex < 0 || vertex >= neighbors.Length || !result.Add(vertex)) return;
+            queue.Enqueue(vertex);
+            depths.Enqueue(0);
+        }
+
+        static void AddVirtualFitSample(
+            BodyReferenceMesh sourceMesh,
+            int vertex,
+            HashSet<int> sampleVertices,
+            List<Vector3> originalSamples,
+            List<Vector3> morphedSamples)
+        {
+            if (sourceMesh == null || sampleVertices == null || originalSamples == null || morphedSamples == null)
+                return;
+            if (!sampleVertices.Add(vertex))
+                return;
+            if (sourceMesh.OriginalWorld == null || sourceMesh.MorphedWorld == null || sourceMesh.Valid == null)
+                return;
+            if (vertex < 0 || vertex >= sourceMesh.Valid.Length || !sourceMesh.Valid[vertex])
+                return;
+            if (vertex >= sourceMesh.OriginalWorld.Length || vertex >= sourceMesh.MorphedWorld.Length)
+                return;
+            Vector3 original = sourceMesh.OriginalWorld[vertex];
+            Vector3 morphed = sourceMesh.MorphedWorld[vertex];
+            if (!IsFinite(original) || !IsFinite(morphed))
+                return;
+            originalSamples.Add(original);
+            morphedSamples.Add(morphed);
+        }
+
+        static bool TryFitVirtualPlaneComponent(
+            List<Vector3> parameterSamples,
+            List<Vector3> targetSamples,
+            Vector3 origin,
+            Vector3 right,
+            Vector3 up,
+            Vector3 fwd,
+            int component,
+            out float a,
+            out float sideCoeff,
+            out float upCoeff)
+        {
+            a = 0f;
+            sideCoeff = 0f;
+            upCoeff = 0f;
+            if (parameterSamples == null || targetSamples == null || parameterSamples.Count == 0 || targetSamples.Count != parameterSamples.Count)
+                return false;
+
+            float n = 0f;
+            float sumS = 0f;
+            float sumU = 0f;
+            float sumSS = 0f;
+            float sumSU = 0f;
+            float sumUU = 0f;
+            float sumT = 0f;
+            float sumST = 0f;
+            float sumUT = 0f;
+
+            for (int i = 0; i < parameterSamples.Count; i++)
+            {
+                Vector3 rel = parameterSamples[i] - origin;
+                float s = Vector3.Dot(rel, right);
+                float u = Vector3.Dot(rel, up);
+                Vector3 targetRel = targetSamples[i] - origin;
+                float t = component == 0
+                    ? Vector3.Dot(targetRel, right)
+                    : (component == 1 ? Vector3.Dot(targetRel, up) : Vector3.Dot(targetRel, fwd));
+
+                n += 1f;
+                sumS += s;
+                sumU += u;
+                sumSS += s * s;
+                sumSU += s * u;
+                sumUU += u * u;
+                sumT += t;
+                sumST += s * t;
+                sumUT += u * t;
+            }
+
+            float det = Determinant3(
+                n, sumS, sumU,
+                sumS, sumSS, sumSU,
+                sumU, sumSU, sumUU);
+            if (Mathf.Abs(det) < 1e-12f)
+            {
+                a = sumT / Mathf.Max(n, 1f);
+                sideCoeff = 0f;
+                upCoeff = 0f;
+                return IsFinite(a);
+            }
+
+            a = Determinant3(
+                sumT, sumS, sumU,
+                sumST, sumSS, sumSU,
+                sumUT, sumSU, sumUU) / det;
+            sideCoeff = Determinant3(
+                n, sumT, sumU,
+                sumS, sumST, sumSU,
+                sumU, sumUT, sumUU) / det;
+            upCoeff = Determinant3(
+                n, sumS, sumT,
+                sumS, sumSS, sumST,
+                sumU, sumSU, sumUT) / det;
+            return IsFinite(a) && IsFinite(sideCoeff) && IsFinite(upCoeff);
+        }
+
+        static float Determinant3(
+            float a00, float a01, float a02,
+            float a10, float a11, float a12,
+            float a20, float a21, float a22)
+        {
+            return a00 * (a11 * a22 - a12 * a21)
+                - a01 * (a10 * a22 - a12 * a20)
+                + a02 * (a10 * a21 - a11 * a20);
+        }
+
+        static float EvaluateVirtualFwdPlane(float a, float sideCoeff, float upCoeff, float side, float upCoord)
+        {
+            return a + sideCoeff * side + upCoeff * upCoord;
+        }
+
+        static Vector3 ComposeVirtualFittedMorphedPoint(
+            Vector3 origin,
+            Vector3 right,
+            Vector3 up,
+            Vector3 fwd,
+            VirtualSeamSurfaceFit fit,
+            float side,
+            float upCoord)
+        {
+            float morphedSide = EvaluateVirtualFwdPlane(fit.MorphedSidePlaneA, fit.MorphedSidePlaneSide, fit.MorphedSidePlaneUp, side, upCoord);
+            float morphedUp = EvaluateVirtualFwdPlane(fit.MorphedUpPlaneA, fit.MorphedUpPlaneSide, fit.MorphedUpPlaneUp, side, upCoord);
+            float morphedFwd = EvaluateVirtualFwdPlane(fit.MorphedPlaneA, fit.MorphedPlaneSide, fit.MorphedPlaneUp, side, upCoord);
+            return ComposeVirtualSurfacePoint(origin, right, up, fwd, morphedSide, morphedUp, morphedFwd);
+        }
+
+        static void ComputeVirtualFrontSeamCoords(
+            Vector3 origin,
+            Vector3 right,
+            Vector3 up,
+            Vector3 fwd,
+            Vector3 p0,
+            Vector3 p1,
+            Vector3 p2,
+            out float side,
+            out float minUp,
+            out float maxUp,
+            out float maxFwd)
+        {
+            Vector3 r0 = p0 - origin;
+            Vector3 r1 = p1 - origin;
+            Vector3 r2 = p2 - origin;
+            float s0 = Vector3.Dot(r0, right);
+            float s1 = Vector3.Dot(r1, right);
+            float s2 = Vector3.Dot(r2, right);
+            float u0 = Vector3.Dot(r0, up);
+            float u1 = Vector3.Dot(r1, up);
+            float u2 = Vector3.Dot(r2, up);
+            float f0 = Vector3.Dot(r0, fwd);
+            float f1 = Vector3.Dot(r1, fwd);
+            float f2 = Vector3.Dot(r2, fwd);
+
+            side = (s0 + s1 + s2) / 3f;
+            minUp = Mathf.Min(u0, Mathf.Min(u1, u2));
+            maxUp = Mathf.Max(u0, Mathf.Max(u1, u2));
+            maxFwd = Mathf.Max(f0, Mathf.Max(f1, f2));
+        }
+
+        static Vector3 ComposeVirtualSurfacePoint(
+            Vector3 origin,
+            Vector3 right,
+            Vector3 up,
+            Vector3 fwd,
+            float side,
+            float upCoord,
+            float fwdCoord)
+        {
+            return origin + right * side + up * upCoord + fwd * fwdCoord;
+        }
+
+        static void AddVirtualBodySurfaceTriangle(
+            MorphReferenceContext context,
+            BodyReferenceMesh virtualMesh,
+            int a,
+            int b,
+            int c)
+        {
+            if (context == null || virtualMesh == null || virtualMesh.OriginalWorld == null)
+                return;
+
+            Vector3 p0 = virtualMesh.OriginalWorld[a];
+            Vector3 p1 = virtualMesh.OriginalWorld[b];
+            Vector3 p2 = virtualMesh.OriginalWorld[c];
+            Vector3 center = (p0 + p1 + p2) / 3f;
+            float radiusSq = (p0 - center).sqrMagnitude;
+            radiusSq = Mathf.Max(radiusSq, (p1 - center).sqrMagnitude);
+            radiusSq = Mathf.Max(radiusSq, (p2 - center).sqrMagnitude);
+
+            int triIndex = context.SurfaceTriangles.Count;
+            context.SurfaceTriangles.Add(new BodySurfaceTriangle
+            {
+                Mesh = virtualMesh,
+                A = a,
+                B = b,
+                C = c,
+                Center = center,
+                RadiusSq = radiusSq,
+            });
+            AddBodySurfaceTriangleForVertex(virtualMesh, a, triIndex);
+            AddBodySurfaceTriangleForVertex(virtualMesh, b, triIndex);
+            AddBodySurfaceTriangleForVertex(virtualMesh, c, triIndex);
+            AddBodySurfaceTriangleToBuckets(context, triIndex, p0, p1, p2);
+            context.VirtualSurfaceTriangles++;
+        }
+
+        static bool IsEligibleBodySurfaceVertex(bool[] eligible, int index, int count)
+        {
+            return eligible != null && index >= 0 && index < count && index < eligible.Length && eligible[index];
+        }
+
+        static bool IsValidBodySurfaceTriangleVertex(BodyReferenceMesh mesh, int index, int count)
+        {
+            return index >= 0
+                && index < count
+                && mesh.Valid != null
+                && index < mesh.Valid.Length
+                && mesh.Valid[index]
+                && mesh.OriginalWorld != null
+                && mesh.MorphedWorld != null
+                && index < mesh.OriginalWorld.Length
+                && index < mesh.MorphedWorld.Length
+                && IsFinite(mesh.OriginalWorld[index])
+                && IsFinite(mesh.MorphedWorld[index]);
+        }
+
+        static void AddBodySurfaceTriangleForVertex(BodyReferenceMesh mesh, int vertexIndex, int triIndex)
+        {
+            if (mesh == null || mesh.SurfaceTrianglesByVertex == null) return;
+            if (vertexIndex < 0 || vertexIndex >= mesh.SurfaceTrianglesByVertex.Length) return;
+            List<int> list = mesh.SurfaceTrianglesByVertex[vertexIndex];
+            if (list == null)
+            {
+                list = new List<int>(6);
+                mesh.SurfaceTrianglesByVertex[vertexIndex] = list;
+            }
+            list.Add(triIndex);
+        }
+
+        static void AddBodySurfaceTriangleToBuckets(
+            MorphReferenceContext context,
+            int triIndex,
+            Vector3 p0,
+            Vector3 p1,
+            Vector3 p2)
+        {
+            if (context == null) return;
+
+            float minX = Mathf.Min(p0.x, Mathf.Min(p1.x, p2.x));
+            float minY = Mathf.Min(p0.y, Mathf.Min(p1.y, p2.y));
+            float minZ = Mathf.Min(p0.z, Mathf.Min(p1.z, p2.z));
+            float maxX = Mathf.Max(p0.x, Mathf.Max(p1.x, p2.x));
+            float maxY = Mathf.Max(p0.y, Mathf.Max(p1.y, p2.y));
+            float maxZ = Mathf.Max(p0.z, Mathf.Max(p1.z, p2.z));
+
+            int minBx, minBy, minBz;
+            int maxBx, maxBy, maxBz;
+            BodySurfaceBucketCoords(new Vector3(minX, minY, minZ), context.CellSize, out minBx, out minBy, out minBz);
+            BodySurfaceBucketCoords(new Vector3(maxX, maxY, maxZ), context.CellSize, out maxBx, out maxBy, out maxBz);
+
+            for (int x = minBx; x <= maxBx; x++)
+                for (int y = minBy; y <= maxBy; y++)
+                    for (int z = minBz; z <= maxBz; z++)
+                    {
+                        int key = BodySurfaceBucketKey(x, y, z);
+                        List<int> list;
+                        if (!context.SurfaceBuckets.TryGetValue(key, out list))
+                        {
+                            list = new List<int>(4);
+                            context.SurfaceBuckets[key] = list;
+                        }
+                        list.Add(triIndex);
+                    }
+        }
+
+        static void ApplyClothThicknessInheritancePostprocess(
+            Mesh mesh,
+            Vector3[] localOriginalVerts,
+            BoneWeight[] weights,
+            Matrix4x4[] boneMatrices,
+            Vector3[] originalWorld,
+            Vector3[] oldMorphedWorld,
+            bool[] valid,
+            bool[] oldFinalChanged,
+            Vector3[] newLocalVerts,
+            MeshMorphClass meshClass,
+            bool isSkirtLikeOuter,
+            bool skirtLowerBoundaryValid,
+            float skirtLowerBoundaryUp,
+            Vector3 center,
+            Vector3 traceCenter,
+            Vector3 right,
+            Vector3 up,
+            Vector3 fwd,
+            VertexMorphTrace[] traces,
+            ref DeformStats stats)
+        {
+            if (_morphReferenceContext == null || _morphReferenceContext.BodyPoints.Count == 0)
+                return;
+            if (mesh == null || localOriginalVerts == null || weights == null || boneMatrices == null
+                || originalWorld == null || oldMorphedWorld == null || valid == null
+                || oldFinalChanged == null || newLocalVerts == null)
+                return;
+
+            int count = Mathf.Min(newLocalVerts.Length,
+                Mathf.Min(localOriginalVerts.Length,
+                Mathf.Min(weights.Length,
+                Mathf.Min(originalWorld.Length,
+                Mathf.Min(oldMorphedWorld.Length,
+                Mathf.Min(valid.Length, oldFinalChanged.Length))))));
+            if (count <= 0) return;
+
+            Vector3[] postWorld = (Vector3[])oldMorphedWorld.Clone();
+            bool[] postChanged = new bool[count];
+            if (meshClass == MeshMorphClass.OuterCloth)
+            {
+                float diagnosticBoundaryUp = skirtLowerBoundaryUp;
+                bool diagnosticBoundaryValid = skirtLowerBoundaryValid
+                    || TryComputeSkirtBoundaryUpFromOldChanged(
+                        originalWorld,
+                        oldMorphedWorld,
+                        valid,
+                        oldFinalChanged,
+                        center,
+                        up,
+                        fwd,
+                        out diagnosticBoundaryUp);
+                RecordSkirtHemEligibilityTrace(
+                    originalWorld,
+                    valid,
+                    oldFinalChanged,
+                    diagnosticBoundaryValid,
+                    diagnosticBoundaryUp,
+                    center,
+                    up,
+                    fwd,
+                    traces);
+            }
+
+            float oldFinalMinDelta = 0f;
+            for (int i = 0; i < count; i++)
+            {
+                VertexMorphTrace trace = traces != null && i < traces.Length ? traces[i] : null;
+                RecordOldFinalChangedTrace(trace, valid[i], oldFinalChanged[i], originalWorld[i], oldMorphedWorld[i], oldFinalMinDelta);
+                if (!valid[i])
+                    continue;
+                if (!oldFinalChanged[i])
+                {
+                    SetClothInheritSkipTrace(trace, "body:skip:not-oldFinalChanged");
+                    continue;
+                }
+
+                Vector3 inherited;
+                ClothInheritDebug inheritDebug;
+                if (!TryInheritFromNearestBodyFrame(originalWorld[i], _morphReferenceContext.BodyPoints, out inherited, out inheritDebug))
+                {
+                    RecordClothInheritFailTrace(trace, "body", "body:no-frame", inheritDebug);
+                    SetClothInheritSkipTrace(trace, "body:no-frame");
+                    continue;
+                }
+
+                Vector3 preWorld = postWorld[i];
+                postWorld[i] = inherited;
+                postChanged[i] = true;
+                RecordClothInheritTrace(
+                    trace,
+                    "body",
+                    "body:applied",
+                    inheritDebug,
+                    preWorld,
+                    inherited,
+                    traceCenter,
+                    right,
+                    up,
+                    fwd);
+            }
+
+            if (isSkirtLikeOuter)
+                ApplySkirtHemThicknessInheritance(
+                    mesh,
+                    originalWorld,
+                    oldMorphedWorld,
+                    valid,
+                    oldFinalChanged,
+                    postWorld,
+                    postChanged,
+                    skirtLowerBoundaryValid,
+                    skirtLowerBoundaryUp,
+                    center,
+                    traceCenter,
+                    right,
+                    up,
+                    fwd,
+                    traces);
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!postChanged[i]) continue;
+
+                Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
+                Vector3 local = skin.inverse.MultiplyPoint3x4(postWorld[i]);
+                newLocalVerts[i] = local;
+                oldMorphedWorld[i] = postWorld[i];
+
+                float moved = (local - localOriginalVerts[i]).magnitude;
+                if (moved > 0.00001f)
+                {
+                    if (moved > stats.MaxDelta) stats.MaxDelta = moved;
+                }
+            }
+        }
+
+        static void RecordOldFinalChangedTrace(
+            VertexMorphTrace trace,
+            bool valid,
+            bool changed,
+            Vector3 originalWorld,
+            Vector3 oldMorphedWorld,
+            float minDelta)
+        {
+            if (trace == null) return;
+
+            float delta = valid ? (oldMorphedWorld - originalWorld).magnitude : 0f;
+            trace.OldFinalChanged = valid && changed;
+            trace.OldFinalDeltaWorldLen = delta;
+            trace.OldFinalMinDelta = minDelta;
+            if (!valid)
+                trace.OldFinalReason = "invalid";
+            else
+                trace.OldFinalReason = changed ? "changed:position-different" : "unchanged:position-same";
+        }
+
+        static void RecordSkirtHemEligibilityTrace(
+            Vector3[] originalWorld,
+            bool[] valid,
+            bool[] oldFinalChanged,
+            bool boundaryValid,
+            float boundaryUp,
+            Vector3 center,
+            Vector3 up,
+            Vector3 fwd,
+            VertexMorphTrace[] traces)
+        {
+            if (traces == null || originalWorld == null || valid == null || oldFinalChanged == null)
+                return;
+
+            int count = Mathf.Min(traces.Length,
+                Mathf.Min(originalWorld.Length, Mathf.Min(valid.Length, oldFinalChanged.Length)));
+            float fwdThreshold = RelFwd(SkirtFrontPlaneFwdOffset);
+            for (int i = 0; i < count; i++)
+            {
+                VertexMorphTrace trace = traces[i];
+                if (trace == null) continue;
+
+                trace.SkirtHemBoundaryValid = boundaryValid;
+                trace.SkirtHemBoundaryUp = boundaryUp;
+                trace.SkirtHemFwdThreshold = fwdThreshold;
+
+                if (!valid[i])
+                {
+                    trace.SkirtHemReason = "skirtHem:invalid";
+                    continue;
+                }
+
+                Vector3 rel = originalWorld[i] - center;
+                float localUp = Vector3.Dot(rel, up);
+                float localFwd = Vector3.Dot(rel, fwd);
+                bool front = localFwd > fwdThreshold;
+                bool lower = boundaryValid && localUp < boundaryUp;
+                bool candidate = oldFinalChanged[i] && front && lower;
+                trace.SkirtHemFront = front;
+                trace.SkirtHemLowerRange = lower;
+                trace.SkirtHemCandidate = candidate;
+
+                if (!boundaryValid)
+                    trace.SkirtHemReason = "skirtHem:no-boundary";
+                else if (!oldFinalChanged[i])
+                    trace.SkirtHemReason = "skirtHem:not-oldFinalChanged";
+                else if (!front)
+                    trace.SkirtHemReason = "skirtHem:not-front";
+                else if (!lower)
+                    trace.SkirtHemReason = "skirtHem:not-lower-range";
+                else
+                    trace.SkirtHemReason = "skirtHem:candidate";
+            }
+        }
+
+        static void SetClothInheritSkipTrace(VertexMorphTrace trace, string reason)
+        {
+            if (trace == null || trace.ClothInheritApplied) return;
+            trace.ClothInheritReason = reason ?? string.Empty;
+        }
+
+        static void RecordClothInheritFailTrace(
+            VertexMorphTrace trace,
+            string kind,
+            string reason,
+            ClothInheritDebug debug)
+        {
+            if (trace == null) return;
+
+            trace.ClothInheritFailKind = kind ?? string.Empty;
+            trace.ClothInheritFailReason = !string.IsNullOrEmpty(debug.FailReason)
+                ? debug.FailReason
+                : (reason ?? string.Empty);
+            trace.ClothInheritFailSourceMesh = debug.SourceMesh ?? string.Empty;
+            trace.ClothInheritFailSourceVertex = debug.OriginIndex;
+            trace.ClothInheritFailFrameCandidateCount = debug.CandidateCount;
+            trace.ClothInheritFailFrameScore = debug.FrameScore;
+            trace.ClothInheritFailNearestDistance = debug.NearestDistance;
+        }
+
+        static void RecordClothInheritTrace(
+            VertexMorphTrace trace,
+            string kind,
+            string reason,
+            ClothInheritDebug debug,
+            Vector3 preWorld,
+            Vector3 postWorld,
+            Vector3 center,
+            Vector3 right,
+            Vector3 up,
+            Vector3 fwd)
+        {
+            if (trace == null) return;
+
+            Vector3 preCoord = ProjectPointCoord(preWorld, center, right, up, fwd);
+            Vector3 postCoord = ProjectPointCoord(postWorld, center, right, up, fwd);
+            Vector3 delta = postWorld - preWorld;
+            Vector3 deltaCoord = ProjectVectorCoord(delta, right, up, fwd);
+            Vector3 deltaDir = delta.sqrMagnitude > 1e-12f
+                ? ProjectVectorCoord(delta.normalized, right, up, fwd)
+                : Vector3.zero;
+            Vector3 finalOffset = postWorld - debug.MorphedOrigin;
+
+            trace.ClothInheritApplied = true;
+            trace.ClothInheritKind = kind ?? string.Empty;
+            trace.ClothInheritReason = reason ?? string.Empty;
+            trace.ClothInheritSourceMesh = debug.SourceMesh ?? string.Empty;
+            trace.ClothInheritSourceVertex = debug.OriginIndex;
+            trace.ClothInheritFrameA = debug.PointAIndex;
+            trace.ClothInheritFrameB = debug.PointBIndex;
+            trace.ClothInheritFrameCandidateCount = debug.CandidateCount;
+            trace.ClothInheritFrameScore = debug.FrameScore;
+            trace.ClothInheritNearestDistance = debug.NearestDistance;
+            trace.ClothInheritOriginalThickness = debug.OriginalThickness;
+            trace.ClothInheritRawThickness = debug.RawThickness;
+            trace.ClothInheritFinalThickness = debug.FinalThickness;
+            trace.ClothInheritLocalOffset = debug.LocalOffset;
+            trace.ClothInheritPreWorld = preWorld;
+            trace.ClothInheritPostWorld = postWorld;
+            trace.ClothInheritPreCoord = preCoord;
+            trace.ClothInheritPostCoord = postCoord;
+            trace.ClothInheritDeltaCoord = deltaCoord;
+            trace.ClothInheritDeltaWorldLen = delta.magnitude;
+            trace.ClothInheritDeltaDirCoord = deltaDir;
+            trace.ClothInheritFinalOffsetCoord = ProjectVectorCoord(finalOffset, right, up, fwd);
+            trace.FwdClothInherit = postCoord.z;
+            trace.FwdFinal = postCoord.z;
+        }
+
+        static Vector3 ProjectPointCoord(Vector3 point, Vector3 center, Vector3 right, Vector3 up, Vector3 fwd)
+        {
+            return ProjectVectorCoord(point - center, right, up, fwd);
+        }
+
+        static Vector3 ProjectVectorCoord(Vector3 value, Vector3 right, Vector3 up, Vector3 fwd)
+        {
+            return new Vector3(
+                Vector3.Dot(value, right),
+                Vector3.Dot(value, up),
+                Vector3.Dot(value, fwd));
+        }
+
+        static string MeshDebugId(Mesh mesh)
+        {
+            if (mesh == null)
+                return string.Empty;
+            return (mesh.name ?? string.Empty) + "#" + mesh.GetInstanceID().ToString(CultureInfo.InvariantCulture);
+        }
+
+        static string MeshDebugId(BodyReferenceMesh mesh)
+        {
+            if (mesh == null)
+                return string.Empty;
+            return (mesh.MeshId ?? string.Empty) + "#" + mesh.MeshInstanceId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        static bool TryInheritFromNearestBodyFrame(
+            Vector3 originalPoint,
+            List<BodyReferencePoint> bodyRefs,
+            out Vector3 inherited,
+            out ClothInheritDebug debug)
+        {
+            inherited = originalPoint;
+            debug = new ClothInheritDebug();
+            if (bodyRefs == null || bodyRefs.Count == 0)
+            {
+                debug.FailReason = "body:no-reference-points";
+                return false;
+            }
+
+            int nearest = -1;
+            float bestDist = float.MaxValue;
+            for (int i = 0; i < bodyRefs.Count; i++)
+            {
+                float d = (bodyRefs[i].OriginalWorld - originalPoint).sqrMagnitude;
+                if (d >= bestDist) continue;
+                bestDist = d;
+                nearest = i;
+            }
+
+            if (nearest >= 0 && TryInheritFromBodyReference(originalPoint, bodyRefs[nearest], Mathf.Sqrt(bestDist), out inherited, out debug))
+                return true;
+
+            if (nearest < 0)
+                debug.FailReason = "body:no-nearest-point";
+            else if (string.IsNullOrEmpty(debug.FailReason))
+                debug.FailReason = "body:inherit-failed";
+            return false;
+        }
+
+        static bool TryInheritFromBodyReference(
+            Vector3 originalPoint,
+            BodyReferencePoint refPoint,
+            float nearestDistance,
+            out Vector3 inherited,
+            out ClothInheritDebug debug)
+        {
+            inherited = originalPoint;
+            debug = new ClothInheritDebug();
+            if (refPoint.Mesh == null)
+            {
+                debug.FailReason = "body:null-source-mesh";
+                return false;
+            }
+
+            debug.SourceMesh = (refPoint.Mesh.MeshId ?? string.Empty)
+                + "#" + refPoint.Mesh.MeshInstanceId.ToString(CultureInfo.InvariantCulture);
+            debug.OriginIndex = refPoint.Index;
+            debug.NearestDistance = nearestDistance;
+
+            MorphFrame originalFrame;
+            MorphFrame morphedFrame;
+            int pointA;
+            int pointB;
+            int candidateCount;
+            float frameScore;
+            string failReason;
+            if (!TryBuildFrameFromMeshVertices(
+                refPoint.Mesh.OriginalWorld,
+                refPoint.Mesh.MorphedWorld,
+                refPoint.Mesh.Neighbors,
+                refPoint.Mesh.Eligible,
+                refPoint.Index,
+                out originalFrame,
+                out morphedFrame,
+                out pointA,
+                out pointB,
+                out candidateCount,
+                out frameScore,
+                out failReason))
+            {
+                debug.CandidateCount = candidateCount;
+                debug.FrameScore = frameScore;
+                debug.FailReason = failReason;
+                return false;
+            }
+
+            if (!TryInheritPointByFrames(originalPoint, originalFrame, morphedFrame, out inherited, ref debug))
+                return false;
+
+            debug.PointAIndex = pointA;
+            debug.PointBIndex = pointB;
+            debug.CandidateCount = candidateCount;
+            debug.FrameScore = frameScore;
+            return true;
+        }
+
+        static void ApplySkirtHemThicknessInheritance(
+            Mesh mesh,
+            Vector3[] originalWorld,
+            Vector3[] oldMorphedWorld,
+            bool[] valid,
+            bool[] oldFinalChanged,
+            Vector3[] postWorld,
+            bool[] postChanged,
+            bool skirtLowerBoundaryValid,
+            float skirtLowerBoundaryUp,
+            Vector3 center,
+            Vector3 traceCenter,
+            Vector3 right,
+            Vector3 up,
+            Vector3 fwd,
+            VertexMorphTrace[] traces)
+        {
+            if (mesh == null || originalWorld == null || oldMorphedWorld == null || valid == null
+                || oldFinalChanged == null || postWorld == null || postChanged == null)
+                return;
+
+            int count = Mathf.Min(originalWorld.Length,
+                Mathf.Min(oldMorphedWorld.Length,
+                Mathf.Min(valid.Length,
+                Mathf.Min(oldFinalChanged.Length,
+                Mathf.Min(postWorld.Length, postChanged.Length)))));
+
+            float boundaryUp = skirtLowerBoundaryUp;
+            if (!skirtLowerBoundaryValid
+                && !TryComputeSkirtBoundaryUpFromOldChanged(originalWorld, oldMorphedWorld, valid, oldFinalChanged, center, up, fwd, out boundaryUp))
+                return;
+
+            float fwdThreshold = RelFwd(SkirtFrontPlaneFwdOffset);
+            bool[] lowerSkirtRange = new bool[count];
+            bool[] hem = new bool[count];
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i]) continue;
+
+                Vector3 rel = originalWorld[i] - center;
+                float localUp = Vector3.Dot(rel, up);
+                float localFwd = Vector3.Dot(rel, fwd);
+                bool front = localFwd > fwdThreshold;
+                lowerSkirtRange[i] = front && localUp < boundaryUp;
+                hem[i] = oldFinalChanged[i] && lowerSkirtRange[i];
+            }
+
+            List<BoundaryReferenceMesh> bodyBoundaryMeshes = BuildBodyBoundaryReferenceMeshes(boundaryUp, center, up, fwd);
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!hem[i]) continue;
+
+                Vector3 inherited;
+                ClothInheritDebug inheritDebug;
+                if (!TryInheritFromNearestBodyBoundaryFrame(
+                    originalWorld[i],
+                    bodyBoundaryMeshes,
+                    out inherited,
+                    out inheritDebug))
+                {
+                    VertexMorphTrace trace = traces != null && i < traces.Length ? traces[i] : null;
+                    RecordClothInheritFailTrace(trace, "skirtHem", "skirtHem:no-frame", inheritDebug);
+                    SetClothInheritSkipTrace(trace, "skirtHem:no-frame");
+                    if (trace != null)
+                        trace.SkirtHemReason = "skirtHem:no-frame";
+                    continue;
+                }
+
+                float blend = GetSkirtHemBodyRangeBlend(inherited, center, up);
+                inherited = Vector3.Lerp(originalWorld[i], inherited, blend);
+
+                Vector3 preWorld = postWorld[i];
+                postWorld[i] = inherited;
+                postChanged[i] = true;
+                RecordClothInheritTrace(
+                    traces != null && i < traces.Length ? traces[i] : null,
+                    "skirtHem",
+                    "skirtHem:applied",
+                    inheritDebug,
+                    preWorld,
+                    inherited,
+                    traceCenter,
+                    right,
+                    up,
+                    fwd);
+                VertexMorphTrace appliedTrace = traces != null && i < traces.Length ? traces[i] : null;
+                if (appliedTrace != null)
+                {
+                    appliedTrace.SkirtHemBlend = blend;
+                    appliedTrace.SkirtHemReason = "skirtHem:applied";
+                }
+            }
+        }
+
+        static float GetSkirtHemBodyRangeBlend(Vector3 originalPoint, Vector3 center, Vector3 up)
+        {
+            if (_morphReferenceContext == null || !_morphReferenceContext.BodyChangedUpRangeValid)
+                return 1f;
+
+            float a = _morphReferenceContext.BodyChangedMinUp;
+            float b = _morphReferenceContext.BodyChangedMaxUp;
+            float span = b - a;
+            if (span <= 1e-6f)
+                return 1f;
+
+            float pointUp = Vector3.Dot(originalPoint - center, up);
+            float fadeScale = Mathf.Max(0f, SkirtHemFadeRangeScale);
+            float c = a - fadeScale * span;
+            if (c >= a)
+                return pointUp >= a ? 1f : 0f;
+            if (pointUp >= a)
+                return 1f;
+            if (pointUp <= c)
+                return 0f;
+            return Mathf.Clamp01((pointUp - c) / (a - c));
+        }
+
+        static bool TryComputeSkirtBoundaryUpFromOldChanged(
+            Vector3[] originalWorld,
+            Vector3[] oldMorphedWorld,
+            bool[] valid,
+            bool[] oldFinalChanged,
+            Vector3 center,
+            Vector3 up,
+            Vector3 fwd,
+            out float boundaryUp)
+        {
+            boundaryUp = 0f;
+            if (originalWorld == null || oldMorphedWorld == null || valid == null || oldFinalChanged == null)
+                return false;
+
+            int count = Mathf.Min(originalWorld.Length,
+                Mathf.Min(oldMorphedWorld.Length, Mathf.Min(valid.Length, oldFinalChanged.Length)));
+            float minMove = RelGeneral(SkirtLowerMinDelta);
+            float fwdThreshold = RelFwd(SkirtFrontPlaneFwdOffset);
+            float maxMove = 0f;
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i] || !oldFinalChanged[i]) continue;
+                if (Vector3.Dot(originalWorld[i] - center, fwd) <= fwdThreshold) continue;
+                float move = (oldMorphedWorld[i] - originalWorld[i]).magnitude;
+                if (move > maxMove)
+                    maxMove = move;
+            }
+
+            if (maxMove <= minMove)
+                return false;
+
+            List<float> ups = new List<float>();
+            float strongMove = Mathf.Max(minMove, maxMove * 0.75f);
+            for (int i = 0; i < count; i++)
+            {
+                if (!valid[i] || !oldFinalChanged[i]) continue;
+                if (Vector3.Dot(originalWorld[i] - center, fwd) <= fwdThreshold) continue;
+                float move = (oldMorphedWorld[i] - originalWorld[i]).magnitude;
+                if (move < strongMove) continue;
+                ups.Add(Vector3.Dot(originalWorld[i] - center, up));
+            }
+
+            if (ups.Count < 3)
+            {
+                ups.Clear();
+                for (int i = 0; i < count; i++)
+                {
+                    if (!valid[i] || !oldFinalChanged[i]) continue;
+                    if (Vector3.Dot(originalWorld[i] - center, fwd) <= fwdThreshold) continue;
+                    float move = (oldMorphedWorld[i] - originalWorld[i]).magnitude;
+                    if (move <= minMove) continue;
+                    ups.Add(Vector3.Dot(originalWorld[i] - center, up));
+                }
+            }
+
+            if (ups.Count < 3)
+                return false;
+
+            boundaryUp = MedianFloat(ups) + RelUp(SkirtBoundaryUpOffset);
+            return true;
+        }
+
+        static List<BoundaryReferenceMesh> BuildBodyBoundaryReferenceMeshes(
+            float boundaryUp,
+            Vector3 center,
+            Vector3 up,
+            Vector3 fwd)
+        {
+            List<BoundaryReferenceMesh> result = new List<BoundaryReferenceMesh>();
+            if (_morphReferenceContext == null || _morphReferenceContext.BodyMeshes == null)
+                return result;
+
+            float fwdThreshold = RelFwd(SkirtFrontPlaneFwdOffset);
+            for (int m = 0; m < _morphReferenceContext.BodyMeshes.Count; m++)
+            {
+                BodyReferenceMesh refMesh = _morphReferenceContext.BodyMeshes[m];
+                if (refMesh == null || refMesh.OriginalWorld == null || refMesh.MorphedWorld == null
+                    || refMesh.Valid == null || refMesh.Neighbors == null)
+                    continue;
+
+                int count = Mathf.Min(refMesh.OriginalWorld.Length,
+                    Mathf.Min(refMesh.MorphedWorld.Length, Mathf.Min(refMesh.Valid.Length, refMesh.Neighbors.Length)));
+                if (count <= 0) continue;
+
+                bool[] upperEligible = new bool[count];
+                bool[] lowerRange = new bool[count];
+                bool[] boundary = new bool[count];
+                for (int i = 0; i < count; i++)
+                {
+                    if (!refMesh.Valid[i]) continue;
+
+                    float originalFwd = Vector3.Dot(refMesh.OriginalWorld[i] - center, fwd);
+                    if (originalFwd <= fwdThreshold) continue;
+
+                    float morphedUp = Vector3.Dot(refMesh.MorphedWorld[i] - center, up);
+                    if (morphedUp >= boundaryUp)
+                        upperEligible[i] = true;
+                    else
+                        lowerRange[i] = true;
+                }
+
+                bool hasBoundary = false;
+                for (int i = 0; i < count; i++)
+                {
+                    if (!upperEligible[i]) continue;
+
+                    List<int> ns = refMesh.Neighbors[i];
+                    if (ns == null) continue;
+                    for (int n = 0; n < ns.Count; n++)
+                    {
+                        int j = ns[n];
+                        if (j < 0 || j >= count || !lowerRange[j]) continue;
+                        boundary[i] = true;
+                        hasBoundary = true;
+                        break;
+                    }
+                }
+
+                if (!hasBoundary) continue;
+                result.Add(new BoundaryReferenceMesh
+                {
+                    Mesh = refMesh,
+                    Boundary = boundary,
+                    FrameEligible = upperEligible,
+                });
+            }
+
+            return result;
+        }
+
+        static bool TryInheritFromNearestBodyBoundaryFrame(
+            Vector3 originalPoint,
+            List<BoundaryReferenceMesh> boundaryMeshes,
+            out Vector3 inherited,
+            out ClothInheritDebug debug)
+        {
+            inherited = originalPoint;
+            debug = new ClothInheritDebug();
+            if (boundaryMeshes == null || boundaryMeshes.Count == 0)
+            {
+                debug.FailReason = "skirtHem:no-boundary-meshes";
+                return false;
+            }
+
+            BoundaryReferenceMesh nearestMesh = null;
+            int nearestIndex = -1;
+            float bestDist = float.MaxValue;
+            for (int m = 0; m < boundaryMeshes.Count; m++)
+            {
+                BoundaryReferenceMesh boundaryMesh = boundaryMeshes[m];
+                if (boundaryMesh == null || boundaryMesh.Mesh == null || boundaryMesh.Mesh.OriginalWorld == null
+                    || boundaryMesh.Boundary == null)
+                    continue;
+
+                int count = Mathf.Min(boundaryMesh.Mesh.OriginalWorld.Length, boundaryMesh.Boundary.Length);
+                for (int i = 0; i < count; i++)
+                {
+                    if (!boundaryMesh.Boundary[i]) continue;
+                    float d = (boundaryMesh.Mesh.OriginalWorld[i] - originalPoint).sqrMagnitude;
+                    if (d >= bestDist) continue;
+                    bestDist = d;
+                    nearestMesh = boundaryMesh;
+                    nearestIndex = i;
+                }
+            }
+
+            if (nearestMesh != null && nearestIndex >= 0 && TryInheritFromBoundaryReference(
+                originalPoint,
+                nearestMesh.Mesh.OriginalWorld,
+                nearestMesh.Mesh.MorphedWorld,
+                nearestMesh.Mesh.Neighbors,
+                nearestMesh.FrameEligible,
+                nearestIndex,
+                MeshDebugId(nearestMesh.Mesh),
+                Mathf.Sqrt(bestDist),
+                out inherited,
+                out debug))
+                return true;
+
+            if (nearestMesh == null || nearestIndex < 0)
+                debug.FailReason = "skirtHem:no-boundary-point";
+            else if (string.IsNullOrEmpty(debug.FailReason))
+                debug.FailReason = "skirtHem:inherit-failed";
+            return false;
+        }
+
+        static bool TryInheritFromBoundaryReference(
+            Vector3 originalPoint,
+            Vector3[] originalWorld,
+            Vector3[] morphedWorld,
+            List<int>[] neighbors,
+            bool[] frameEligible,
+            int originIndex,
+            string sourceMesh,
+            float nearestDistance,
+            out Vector3 inherited,
+            out ClothInheritDebug debug)
+        {
+            inherited = originalPoint;
+            debug = new ClothInheritDebug();
+            debug.SourceMesh = sourceMesh ?? string.Empty;
+            debug.OriginIndex = originIndex;
+            debug.NearestDistance = nearestDistance;
+            MorphFrame originalFrame;
+            MorphFrame morphedFrame;
+            int pointA;
+            int pointB;
+            int candidateCount;
+            float frameScore;
+            string failReason;
+            if (!TryBuildFrameFromMeshVertices(
+                originalWorld,
+                morphedWorld,
+                neighbors,
+                frameEligible,
+                originIndex,
+                out originalFrame,
+                out morphedFrame,
+                out pointA,
+                out pointB,
+                out candidateCount,
+                out frameScore,
+                out failReason))
+            {
+                debug.CandidateCount = candidateCount;
+                debug.FrameScore = frameScore;
+                debug.FailReason = failReason;
+                return false;
+            }
+
+            if (!TryInheritPointByFrames(originalPoint, originalFrame, morphedFrame, out inherited, ref debug))
+                return false;
+
+            debug.PointAIndex = pointA;
+            debug.PointBIndex = pointB;
+            debug.CandidateCount = candidateCount;
+            debug.FrameScore = frameScore;
+            return true;
+        }
+
+        static Vector3 InheritPointByFrames(Vector3 originalPoint, MorphFrame originalFrame, MorphFrame morphedFrame)
+        {
+            Vector3 inherited;
+            ClothInheritDebug debug = new ClothInheritDebug();
+            return TryInheritPointByFrames(originalPoint, originalFrame, morphedFrame, out inherited, ref debug)
+                ? inherited
+                : originalPoint;
+        }
+
+        static bool TryInheritPointByFrames(
+            Vector3 originalPoint,
+            MorphFrame originalFrame,
+            MorphFrame morphedFrame,
+            out Vector3 inherited,
+            ref ClothInheritDebug debug)
+        {
+            inherited = originalPoint;
+            Vector3 originalOffset = originalPoint - originalFrame.Origin;
+            float thicknessDistance = originalOffset.magnitude;
+            if (thicknessDistance <= 1e-8f)
+            {
+                inherited = morphedFrame.Origin;
+                debug.OriginalThickness = 0f;
+                debug.RawThickness = 0f;
+                debug.FinalThickness = 0f;
+                debug.MorphedOrigin = morphedFrame.Origin;
+                return true;
+            }
+
+            Vector3 localOffset;
+            if (!originalFrame.TryToLocal(originalOffset, out localOffset))
+            {
+                debug.FailReason = "inherit:original-frame-inverse-failed";
+                return false;
+            }
+
+            Vector3 morphedOffset = morphedFrame.ToWorld(localOffset);
+            float morphedDistance = morphedOffset.magnitude;
+            if (morphedDistance <= 1e-8f)
+            {
+                inherited = morphedFrame.Origin;
+                debug.OriginalThickness = thicknessDistance;
+                debug.RawThickness = 0f;
+                debug.FinalThickness = 0f;
+                debug.LocalOffset = localOffset;
+                debug.MorphedOrigin = morphedFrame.Origin;
+                return true;
+            }
+
+            inherited = morphedFrame.Origin + morphedOffset * (thicknessDistance / morphedDistance);
+            debug.OriginalThickness = thicknessDistance;
+            debug.RawThickness = morphedDistance;
+            debug.FinalThickness = (inherited - morphedFrame.Origin).magnitude;
+            debug.LocalOffset = localOffset;
+            debug.MorphedOrigin = morphedFrame.Origin;
+            return true;
+        }
+
+        static bool TryBuildFrameFromMeshVertices(
+            Vector3[] originalWorld,
+            Vector3[] morphedWorld,
+            List<int>[] neighbors,
+            bool[] eligible,
+            int originIndex,
+            out MorphFrame originalFrame,
+            out MorphFrame morphedFrame,
+            out int pointAIndex,
+            out int pointBIndex,
+            out int candidateCount,
+            out float frameScore,
+            out string failReason)
+        {
+            originalFrame = new MorphFrame();
+            morphedFrame = new MorphFrame();
+            pointAIndex = -1;
+            pointBIndex = -1;
+            candidateCount = 0;
+            frameScore = 0f;
+            failReason = string.Empty;
+            if (originalWorld == null || morphedWorld == null || neighbors == null || eligible == null)
+            {
+                failReason = "frame:null-input";
+                return false;
+            }
+            int count = Mathf.Min(originalWorld.Length, Mathf.Min(morphedWorld.Length, eligible.Length));
+            if (originIndex < 0 || originIndex >= count || !eligible[originIndex])
+            {
+                failReason = "frame:origin-not-eligible";
+                return false;
+            }
+
+            List<int> candidates = CollectFrameNeighborCandidates(neighbors, eligible, originIndex, count);
+            candidateCount = candidates.Count;
+            if (candidates.Count < 2)
+            {
+                failReason = "frame:not-enough-candidates";
+                return false;
+            }
+
+            bool found = false;
+            float bestScore = -1f;
+            MorphFrame bestOriginal = new MorphFrame();
+            MorphFrame bestMorphed = new MorphFrame();
+            int pairCount = 0;
+            int originalRejectCount = 0;
+            int morphedRejectCount = 0;
+            string lastOriginalFail = string.Empty;
+            string lastMorphedFail = string.Empty;
+            Vector3 originMotion = morphedWorld[originIndex] - originalWorld[originIndex];
+            for (int a = 0; a < candidates.Count; a++)
+            {
+                for (int b = a + 1; b < candidates.Count; b++)
+                {
+                    pairCount++;
+                    int ia = candidates[a];
+                    int ib = candidates[b];
+                    MorphFrame candidateOriginal;
+                    MorphFrame candidateMorphed;
+                    float score;
+                    string frameFail;
+                    bool originalCollinear = IsStrictCollinear(
+                        originalWorld[originIndex],
+                        originalWorld[ia],
+                        originalWorld[ib]);
+                    bool morphedCollinear = IsStrictCollinear(
+                        morphedWorld[originIndex],
+                        morphedWorld[ia],
+                        morphedWorld[ib]);
+                    if (originalCollinear || morphedCollinear)
+                    {
+                        if (!TryBuildMotionFallbackFrame(originalWorld[originIndex], originalWorld[ia], originMotion, out candidateOriginal, out score, out frameFail))
+                        {
+                            originalRejectCount++;
+                            lastOriginalFail = frameFail;
+                            continue;
+                        }
+                        float morphedScore;
+                        if (!TryBuildMotionFallbackFrame(morphedWorld[originIndex], morphedWorld[ia], originMotion, out candidateMorphed, out morphedScore, out frameFail))
+                        {
+                            morphedRejectCount++;
+                            lastMorphedFail = frameFail;
+                            continue;
+                        }
+                    }
+                    else if (!TryBuildFrame(originalWorld[originIndex], originalWorld[ia], originalWorld[ib], out candidateOriginal, out score, out frameFail))
+                    {
+                        originalRejectCount++;
+                        lastOriginalFail = frameFail;
+                        continue;
+                    }
+                    else if (!TryBuildFrame(morphedWorld[originIndex], morphedWorld[ia], morphedWorld[ib], out candidateMorphed, out frameFail))
+                    {
+                        morphedRejectCount++;
+                        lastMorphedFail = frameFail;
+                        continue;
+                    }
+
+                    if (!found || score > bestScore)
+                    {
+                        found = true;
+                        bestScore = score;
+                        bestOriginal = candidateOriginal;
+                        bestMorphed = candidateMorphed;
+                        pointAIndex = ia;
+                        pointBIndex = ib;
+                    }
+                }
+            }
+
+            if (!found)
+            {
+                failReason = "frame:no-valid-pair pairs=" + pairCount.ToString(CultureInfo.InvariantCulture)
+                    + " originalReject=" + originalRejectCount.ToString(CultureInfo.InvariantCulture)
+                    + " morphedReject=" + morphedRejectCount.ToString(CultureInfo.InvariantCulture)
+                    + " lastOriginal=" + lastOriginalFail
+                    + " lastMorphed=" + lastMorphedFail;
+                return false;
+            }
+
+            originalFrame = bestOriginal;
+            morphedFrame = bestMorphed;
+            frameScore = bestScore;
+            return true;
+        }
+
+        static List<int> CollectFrameNeighborCandidates(
+            List<int>[] neighbors,
+            bool[] eligible,
+            int originIndex,
+            int count)
+        {
+            List<int> candidates = new List<int>();
+            if (neighbors == null || originIndex < 0 || originIndex >= neighbors.Length)
+                return candidates;
+
+            List<int> direct = neighbors[originIndex];
+            for (int n = 0; n < direct.Count; n++)
+                AddFrameCandidate(candidates, eligible, direct[n], originIndex, count);
+
+            if (candidates.Count >= 2)
+                return candidates;
+
+            for (int n = 0; n < direct.Count; n++)
+            {
+                int j = direct[n];
+                if (j < 0 || j >= neighbors.Length) continue;
+
+                List<int> second = neighbors[j];
+                for (int s = 0; s < second.Count; s++)
+                    AddFrameCandidate(candidates, eligible, second[s], originIndex, count);
+
+                if (candidates.Count >= 2)
+                    break;
+            }
+
+            return candidates;
+        }
+
+        static void AddFrameCandidate(List<int> candidates, bool[] eligible, int index, int originIndex, int count)
+        {
+            if (index < 0 || index >= count || index == originIndex) return;
+            if (eligible == null || index >= eligible.Length || !eligible[index]) return;
+            if (!candidates.Contains(index))
+                candidates.Add(index);
+        }
+
+        static bool TryBuildFrame(Vector3 origin, Vector3 pointA, Vector3 pointB, out MorphFrame frame)
+        {
+            float score;
+            return TryBuildFrame(origin, pointA, pointB, out frame, out score);
+        }
+
+        static bool TryBuildFrame(Vector3 origin, Vector3 pointA, Vector3 pointB, out MorphFrame frame, out float score)
+        {
+            string failReason;
+            return TryBuildFrame(origin, pointA, pointB, out frame, out score, out failReason);
+        }
+
+        static bool TryBuildFrame(Vector3 origin, Vector3 pointA, Vector3 pointB, out MorphFrame frame, out string failReason)
+        {
+            float score;
+            return TryBuildFrame(origin, pointA, pointB, out frame, out score, out failReason);
+        }
+
+        static bool IsStrictCollinear(Vector3 origin, Vector3 pointA, Vector3 pointB)
+        {
+            Vector3 x = pointA - origin;
+            Vector3 y = pointB - origin;
+            return x.sqrMagnitude > 0f
+                && y.sqrMagnitude > 0f
+                && Vector3.Cross(x, y).sqrMagnitude == 0f;
+        }
+
+        static bool TryBuildMotionFallbackFrame(
+            Vector3 origin,
+            Vector3 pointA,
+            Vector3 originMotion,
+            out MorphFrame frame,
+            out float score,
+            out string failReason)
+        {
+            frame = new MorphFrame();
+            score = 0f;
+            failReason = string.Empty;
+
+            Vector3 x = pointA - origin;
+            if (x.sqrMagnitude == 0f)
+            {
+                failReason = "frame:fallback-x-zero";
+                return false;
+            }
+
+            Vector3 y = originMotion;
+            if (y.sqrMagnitude == 0f)
+            {
+                failReason = "frame:fallback-motion-zero";
+                return false;
+            }
+
+            Vector3 normal = Vector3.Cross(x, y);
+            float normalSq = normal.sqrMagnitude;
+            if (normalSq == 0f)
+            {
+                failReason = "frame:fallback-motion-collinear";
+                return false;
+            }
+
+            float tangentScale = Mathf.Sqrt(Mathf.Sqrt(x.sqrMagnitude * y.sqrMagnitude));
+            Vector3 z = normal.normalized * tangentScale;
+
+            frame.Origin = origin;
+            frame.X = x;
+            frame.Y = y;
+            frame.Z = z;
+            score = normalSq;
+            return true;
+        }
+
+        static bool TryBuildFrame(Vector3 origin, Vector3 pointA, Vector3 pointB, out MorphFrame frame, out float score, out string failReason)
+        {
+            frame = new MorphFrame();
+            score = 0f;
+            failReason = string.Empty;
+
+            Vector3 x = pointA - origin;
+            if (x.sqrMagnitude == 0f)
+            {
+                failReason = "frame:x-zero";
+                return false;
+            }
+
+            Vector3 y = pointB - origin;
+            if (y.sqrMagnitude == 0f)
+            {
+                failReason = "frame:y-zero";
+                return false;
+            }
+
+            Vector3 normal = Vector3.Cross(x, y);
+            float normalSq = normal.sqrMagnitude;
+            if (normalSq == 0f)
+            {
+                failReason = "frame:normal-zero";
+                return false;
+            }
+
+            float tangentScale = Mathf.Sqrt(Mathf.Sqrt(x.sqrMagnitude * y.sqrMagnitude));
+            Vector3 z = normal.normalized * tangentScale;
+
+            frame.Origin = origin;
+            frame.X = x;
+            frame.Y = y;
+            frame.Z = z;
+            score = normalSq;
             return true;
         }
 
@@ -2765,6 +6982,16 @@ namespace COM3D2.Pregnancy.Plugin
 
         public static string ExportSkirtVertexMorphDump(Maid maid)
         {
+            return ExportOuterClothVertexMorphDump(maid, true);
+        }
+
+        public static string ExportUpperClothVertexMorphDump(Maid maid)
+        {
+            return ExportOuterClothVertexMorphDump(maid, false);
+        }
+
+        public static string ExportNavelAccessoryTriangleDump(Maid maid)
+        {
             if (!IsValid(maid)) return string.Empty;
 
             PruneRecords(maid);
@@ -2774,11 +7001,254 @@ namespace COM3D2.Pregnancy.Plugin
             if (string.IsNullOrEmpty(root))
                 root = System.Environment.CurrentDirectory;
 
-            string dir = Path.Combine(root, "PregnancySkirtDumps");
+            string dir = Path.Combine(root, "PregnancyNavelAccessoryDumps");
             Directory.CreateDirectory(dir);
 
             string maidName = SafeDumpName(GetMaidName(maid));
-            string fileName = "skirt_vertices_"
+            string fileName = "navel_accessory_"
+                + maidName
+                + "_"
+                + System.DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture)
+                + ".tsv";
+            string path = Path.Combine(dir, fileName);
+
+            float progress = PregnancyManager.GetPregnant(maid)
+                ? PregnancyManager.GetProgress(maid)
+                : GetActiveProgress(maid);
+            progress = Mathf.Clamp01(progress);
+
+            MorphReferenceContext previousContext = _morphReferenceContext;
+            _morphReferenceContext = new MorphReferenceContext
+            {
+                MaidKey = maid.GetHashCode(),
+                CellSize = Mathf.Max(RelGeneral(0.025f), 0.005f),
+            };
+
+            try
+            {
+                bool bodyRefsOk = _bpWorldCached && BuildRuntimeBodyMorphReferences(maid, progress);
+                using (StreamWriter writer = new StreamWriter(path, false, Encoding.UTF8))
+                {
+                    writer.WriteLine("# COM3D2 Pregnancy navel accessory triangle dump");
+                    writer.WriteLine("# maid=" + EscapeDumpCell(GetMaidName(maid)));
+                    writer.WriteLine("# activeProgress=" + F(progress));
+                    writer.WriteLine("# frameCached=" + (_bpWorldCached ? "1" : "0"));
+                    writer.WriteLine("# bodyRefsOk=" + (bodyRefsOk ? "1" : "0"));
+                    writer.WriteLine("# rows are triangle vertices; ring 0 is the selected reference triangle, rings 1-2 are adjacent by shared vertex");
+                    writer.WriteLine(
+                        "meshId\trenderer\tmeshInstance\tactiveSelf\tactiveInHierarchy"
+                        + "\trefTriangle\trefReason\trefA\trefB\trefC\trefScore"
+                        + "\tring\ttriIndex\tcorner\tvertex\tvertexRole\trecordOk\tdeltaOk\tskinOk"
+                        + "\torigLocalX\torigLocalY\torigLocalZ"
+                        + "\tcurrentLocalX\tcurrentLocalY\tcurrentLocalZ"
+                        + "\tappliedTargetLocalX\tappliedTargetLocalY\tappliedTargetLocalZ"
+                        + "\tdeltaLocalX\tdeltaLocalY\tdeltaLocalZ\tdeltaLocalLen"
+                        + "\torigWorldX\torigWorldY\torigWorldZ"
+                        + "\tcurrentWorldX\tcurrentWorldY\tcurrentWorldZ"
+                        + "\tappliedTargetWorldX\tappliedTargetWorldY\tappliedTargetWorldZ"
+                        + "\tappliedDeltaWorldX\tappliedDeltaWorldY\tappliedDeltaWorldZ\tappliedDeltaWorldLen"
+                        + "\tsurfaceTargetOk\tsurfaceTargetWorldX\tsurfaceTargetWorldY\tsurfaceTargetWorldZ\tsurfaceDeltaWorldLen"
+                        + "\tsurfaceFailReason\tsurfaceSearchHit\tsurfaceFullScanHit\tsurfaceTriangleIndex\tsurfaceBodyMesh\tsurfaceBodyMeshInstance"
+                        + "\tsurfaceBodyA\tsurfaceBodyB\tsurfaceBodyC\tsurfaceDistance\tsurfaceOffsetLen\tsurfaceMoveLen\tsurfaceNormalDot"
+                        + "\tsurfaceBaryX\tsurfaceBaryY\tsurfaceBaryZ"
+                        + "\tsurfaceClosestX\tsurfaceClosestY\tsurfaceClosestZ"
+                        + "\tsurfaceMorphedX\tsurfaceMorphedY\tsurfaceMorphedZ"
+                        + "\tsurfaceOriginalNormalX\tsurfaceOriginalNormalY\tsurfaceOriginalNormalZ"
+                        + "\tsurfaceMorphedNormalX\tsurfaceMorphedNormalY\tsurfaceMorphedNormalZ"
+                        + "\tsurfaceBodyPointCount\tsurfaceTriangleCount"
+                        + "\trigidTargetOk\trigidTargetWorldX\trigidTargetWorldY\trigidTargetWorldZ\trigidDeltaWorldLen"
+                        + "\trigidTargetLocalX\trigidTargetLocalY\trigidTargetLocalZ"
+                        + "\tbone0\tboneW0\tbone1\tboneW1\tbone2\tboneW2\tbone3\tboneW3");
+
+                    int meshCount = 0;
+                    List<SkinnedMeshRenderer> renderers = CollectTargetRenderers(maid);
+                    foreach (SkinnedMeshRenderer smr in renderers)
+                    {
+                        if (smr == null || smr.sharedMesh == null) continue;
+                        if (ClassifyMesh(smr) != MeshMorphClass.NavelAccessory) continue;
+
+                        Mesh mesh = smr.sharedMesh;
+                        Vector3[] currentVerts = mesh.vertices;
+                        BoneWeight[] weights = mesh.boneWeights;
+                        Transform[] bones = smr.bones;
+                        int count = mesh.vertexCount;
+                        if (count <= 0) continue;
+
+                        MeshRecord rec = FindRecord(maid, smr);
+                        bool recordOk = rec != null
+                            && rec.Mesh == mesh
+                            && rec.OrigVerts != null
+                            && rec.OrigVerts.Length == count;
+                        bool deltaOk = recordOk
+                            && rec.LastDeltaVerts != null
+                            && rec.LastDeltaVerts.Length == count;
+                        bool currentOk = currentVerts != null && currentVerts.Length == count;
+                        bool weightsOk = weights != null && weights.Length == count;
+                        Vector3[] baseVerts = recordOk ? rec.OrigVerts : currentVerts;
+                        if (baseVerts == null || baseVerts.Length != count) continue;
+
+                        Matrix4x4[] boneMatrices = null;
+                        bool skinOk = weightsOk && TryBuildNavelAccessorySkinMatrices(smr, out boneMatrices);
+
+                        NavelAccessoryReference reference;
+                        if (!skinOk || !TryBuildNavelAccessoryReference(mesh, baseVerts, weights, boneMatrices, out reference))
+                        {
+                            writer.WriteLine("# navel reference failed meshId=" + EscapeDumpCell(GetMeshId(smr)));
+                            continue;
+                        }
+
+                        int[] triangles = null;
+                        try
+                        {
+                            triangles = mesh.triangles;
+                        }
+                        catch
+                        {
+                            writer.WriteLine("# triangle read failed meshId=" + EscapeDumpCell(GetMeshId(smr)));
+                            continue;
+                        }
+                        int[] rings = BuildTriangleRings(triangles, count, reference.Triangle, 2);
+                        if (rings == null) continue;
+
+                        bool rigidOk = false;
+                        Vector3 rigidOriginalCenter = Vector3.zero;
+                        Vector3 rigidTargetCenter = Vector3.zero;
+                        Quaternion rigidDeltaRotation = Quaternion.identity;
+                        if (bodyRefsOk)
+                            rigidOk = TryBuildNavelAccessoryRigidReference(reference, out rigidOriginalCenter, out rigidTargetCenter, out rigidDeltaRotation);
+
+                        meshCount++;
+                        for (int tri = 0; tri < rings.Length; tri++)
+                        {
+                            int ring = rings[tri];
+                            if (ring < 0) continue;
+
+                            int triBase = tri * 3;
+                            for (int corner = 0; corner < 3; corner++)
+                            {
+                                int vertex = triangles[triBase + corner];
+                                if (!IsValidVertexIndex(vertex, count)) continue;
+
+                                Vector3 origLocal = baseVerts[vertex];
+                                Vector3 currentLocal = currentOk ? currentVerts[vertex] : origLocal;
+                                Vector3 deltaLocal = deltaOk ? rec.LastDeltaVerts[vertex] : Vector3.zero;
+                                Vector3 appliedTargetLocal = origLocal + deltaLocal;
+                                bool vertexSkinOk = skinOk && HasValidBoneWeight(weights[vertex], boneMatrices);
+
+                                Vector3 origWorld;
+                                Vector3 currentWorld;
+                                Vector3 appliedTargetWorld;
+                                if (vertexSkinOk)
+                                {
+                                    Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[vertex]);
+                                    origWorld = skin.MultiplyPoint3x4(origLocal);
+                                    currentWorld = skin.MultiplyPoint3x4(currentLocal);
+                                    appliedTargetWorld = skin.MultiplyPoint3x4(appliedTargetLocal);
+                                }
+                                else
+                                {
+                                    origWorld = smr.transform.TransformPoint(origLocal);
+                                    currentWorld = smr.transform.TransformPoint(currentLocal);
+                                    appliedTargetWorld = smr.transform.TransformPoint(appliedTargetLocal);
+                                }
+
+                                Vector3 surfaceTargetWorld = origWorld;
+                                BodySurfaceTargetDebug surfaceDebug = CreateBodySurfaceTargetDebug(
+                                    bodyRefsOk ? "not-run" : "body-refs-not-ok",
+                                    _morphReferenceContext,
+                                    origWorld);
+                                bool surfaceTargetOk = bodyRefsOk
+                                    && TryGetBodySurfaceClothTargetDebug(_morphReferenceContext, origWorld, 1f, out surfaceTargetWorld, out surfaceDebug);
+
+                                Vector3 rigidTargetWorld = origWorld;
+                                Vector3 rigidTargetLocal = origLocal;
+                                if (rigidOk)
+                                {
+                                    rigidTargetWorld = rigidTargetCenter + rigidDeltaRotation * (origWorld - rigidOriginalCenter);
+                                    if (vertexSkinOk)
+                                    {
+                                        Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[vertex]);
+                                        rigidTargetLocal = skin.inverse.MultiplyPoint3x4(rigidTargetWorld);
+                                    }
+                                }
+
+                                Vector3 appliedDeltaWorld = appliedTargetWorld - origWorld;
+                                string role = GetNavelReferenceVertexRole(reference, vertex);
+
+                                bool first = true;
+                                WriteCell(writer, ref first, GetMeshId(smr));
+                                WriteCell(writer, ref first, smr.name);
+                                WriteCell(writer, ref first, mesh.GetInstanceID().ToString(CultureInfo.InvariantCulture));
+                                WriteCell(writer, ref first, smr.gameObject.activeSelf ? "1" : "0");
+                                WriteCell(writer, ref first, smr.gameObject.activeInHierarchy ? "1" : "0");
+                                WriteCell(writer, ref first, reference.Triangle.ToString(CultureInfo.InvariantCulture));
+                                WriteCell(writer, ref first, reference.Reason ?? string.Empty);
+                                WriteCell(writer, ref first, reference.A.ToString(CultureInfo.InvariantCulture));
+                                WriteCell(writer, ref first, reference.B.ToString(CultureInfo.InvariantCulture));
+                                WriteCell(writer, ref first, reference.C.ToString(CultureInfo.InvariantCulture));
+                                WriteCell(writer, ref first, F(reference.Score));
+                                WriteCell(writer, ref first, ring.ToString(CultureInfo.InvariantCulture));
+                                WriteCell(writer, ref first, tri.ToString(CultureInfo.InvariantCulture));
+                                WriteCell(writer, ref first, corner.ToString(CultureInfo.InvariantCulture));
+                                WriteCell(writer, ref first, vertex.ToString(CultureInfo.InvariantCulture));
+                                WriteCell(writer, ref first, role);
+                                WriteCell(writer, ref first, recordOk ? "1" : "0");
+                                WriteCell(writer, ref first, deltaOk ? "1" : "0");
+                                WriteCell(writer, ref first, vertexSkinOk ? "1" : "0");
+                                WriteVectorCells(writer, ref first, origLocal);
+                                WriteVectorCells(writer, ref first, currentLocal);
+                                WriteVectorCells(writer, ref first, appliedTargetLocal);
+                                WriteVectorCells(writer, ref first, deltaLocal);
+                                WriteCell(writer, ref first, F(deltaLocal.magnitude));
+                                WriteVectorCells(writer, ref first, origWorld);
+                                WriteVectorCells(writer, ref first, currentWorld);
+                                WriteVectorCells(writer, ref first, appliedTargetWorld);
+                                WriteVectorCells(writer, ref first, appliedDeltaWorld);
+                                WriteCell(writer, ref first, F(appliedDeltaWorld.magnitude));
+                                WriteCell(writer, ref first, surfaceTargetOk ? "1" : "0");
+                                WriteVectorCells(writer, ref first, surfaceTargetWorld);
+                                WriteCell(writer, ref first, F((surfaceTargetWorld - origWorld).magnitude));
+                                WriteBodySurfaceTargetDebugCells(writer, ref first, surfaceDebug);
+                                WriteCell(writer, ref first, rigidOk ? "1" : "0");
+                                WriteVectorCells(writer, ref first, rigidTargetWorld);
+                                WriteCell(writer, ref first, F((rigidTargetWorld - origWorld).magnitude));
+                                WriteVectorCells(writer, ref first, rigidTargetLocal);
+                                if (weightsOk)
+                                    WriteBoneWeightCells(writer, ref first, weights[vertex], bones);
+                                else
+                                    WriteEmptyBoneWeightCells(writer, ref first);
+                                writer.WriteLine();
+                            }
+                        }
+                    }
+
+                    writer.WriteLine("# navelAccessoryMeshes=" + meshCount.ToString(CultureInfo.InvariantCulture));
+                }
+            }
+            finally
+            {
+                _morphReferenceContext = previousContext;
+            }
+
+            return path;
+        }
+
+        static string ExportOuterClothVertexMorphDump(Maid maid, bool skirtLike)
+        {
+            if (!IsValid(maid)) return string.Empty;
+
+            PruneRecords(maid);
+            EnsureBindPoseWorldForDump(maid);
+
+            string root = BepInEx.Paths.BepInExRootPath;
+            if (string.IsNullOrEmpty(root))
+                root = System.Environment.CurrentDirectory;
+
+            string dir = Path.Combine(root, skirtLike ? "PregnancySkirtDumps" : "PregnancyUpperClothDumps");
+            Directory.CreateDirectory(dir);
+
+            string maidName = SafeDumpName(GetMaidName(maid));
+            string fileName = (skirtLike ? "skirt_vertices_" : "upper_vertices_")
                 + maidName
                 + "_"
                 + System.DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture)
@@ -2795,7 +7265,9 @@ namespace COM3D2.Pregnancy.Plugin
 
             using (StreamWriter writer = new StreamWriter(path, false, Encoding.UTF8))
             {
-                writer.WriteLine("# COM3D2 Pregnancy skirt vertex morph dump");
+                writer.WriteLine(skirtLike
+                    ? "# COM3D2 Pregnancy skirt vertex morph dump"
+                    : "# COM3D2 Pregnancy upper cloth vertex morph dump");
                 writer.WriteLine("# maid=" + EscapeDumpCell(GetMaidName(maid)));
                 writer.WriteLine("# activeProgress=" + F(GetActiveProgress(maid)));
                 writer.WriteLine("# frameCached=" + (_bpWorldCached ? "1" : "0"));
@@ -2814,24 +7286,46 @@ namespace COM3D2.Pregnancy.Plugin
                     + "\torigSide\torigUp\torigFwd"
                     + "\tdeltaSide\tdeltaUp\tdeltaFwd"
                     + "\ttraceOk\ttraceReason\ttraceSteps"
+                    + "\toldFinalChanged\toldFinalDeltaWorldLen\toldFinalMinDelta\toldFinalReason"
+                    + "\tclothInheritApplied\tclothInheritKind\tclothInheritReason\tclothInheritSourceMesh\tclothInheritSourceVertex"
+                    + "\tclothInheritFrameA\tclothInheritFrameB\tclothInheritFrameCandidateCount\tclothInheritFrameScore\tclothInheritNearestDistance"
+                    + "\tclothInheritOriginalThickness\tclothInheritRawThickness\tclothInheritFinalThickness"
+                    + "\tclothInheritLocalX\tclothInheritLocalY\tclothInheritLocalZ"
+                    + "\tclothInheritPreWorldX\tclothInheritPreWorldY\tclothInheritPreWorldZ"
+                    + "\tclothInheritPostWorldX\tclothInheritPostWorldY\tclothInheritPostWorldZ"
+                    + "\tclothInheritPreSide\tclothInheritPreUp\tclothInheritPreFwd"
+                    + "\tclothInheritPostSide\tclothInheritPostUp\tclothInheritPostFwd"
+                    + "\tclothInheritDeltaSide\tclothInheritDeltaUp\tclothInheritDeltaFwd\tclothInheritDeltaWorldLen"
+                    + "\tclothInheritDeltaDirSide\tclothInheritDeltaDirUp\tclothInheritDeltaDirFwd"
+                    + "\tclothInheritFinalOffsetSide\tclothInheritFinalOffsetUp\tclothInheritFinalOffsetFwd"
+                    + "\tclothInheritFailKind\tclothInheritFailReason\tclothInheritFailSourceMesh\tclothInheritFailSourceVertex"
+                    + "\tclothInheritFailFrameCandidateCount\tclothInheritFailFrameScore\tclothInheritFailNearestDistance"
+                    + "\tskirtHemBoundaryValid\tskirtHemBoundaryUp\tskirtHemFwdThreshold\tskirtHemFront\tskirtHemLowerRange\tskirtHemCandidate\tskirtHemBlend\tskirtHemReason"
                     + "\tbone0\tboneW0\tbone1\tboneW1\tbone2\tboneW2\tbone3\tboneW3"
                     + "\teffectiveProgress\tradiusScale\tradiusSide\tradiusFront\tradiusBack\tradiusUp\tradiusDown"
                     + "\tfwdRadius\tupRadius\tellip\tedgeRatio\tedgeFade\ttopEdgeStrength\tshapeWeight\tmorphWeight\toriginalRadius\tdirectionalRadius"
                     + "\tlowerBodyRestore\tinnerThighRestore\tbreastRestore\tbottomTaperInfluence\tbottomTaperLower\tbottomTaperFront\tbottomTaperGuardKeep"
-                    + "\tclothDepthFactor\tclothDepthDeltaFwd\tclothLayerDeltaFwd\tinwardGuardApplied\tinwardGuardDeltaFwd"
-                    + "\tskirtDrapeEnabled\tskirtDrapeReached\tskirtDrapeAddFwd\tskirtDrapeReason"
+                    + "\tinwardGuardApplied\tinwardGuardDeltaFwd"
                     + "\tskirtLowerEnabled\tskirtLowerBoundaryUp\tskirtLowerLowerLimit\tskirtLowerTopDeltaFwd\tskirtLowerGrowth\tskirtLowerDownT\tskirtLowerAddFwd\tskirtLowerReason"
-                    + "\tcrossLayerGuardDeltaFwd\tthighSmoothMask\tthighSmoothDeltaFwd"
+                    + "\tthighSmoothMask\tthighSmoothDeltaFwd"
                     + "\tfwdBase\tfwdSphere\tfwdSculpt\tfwdShift\tfwdStretch\tfwdRoundness\tfwdTaperY\tfwdTaperZ\tfwdFatFold\tfwdDrop"
-                    + "\tfwdSideSmooth\tfwdRibReduce\tfwdLowerRestore\tfwdDepthStretch\tfwdLayerOffset\tfwdInwardGuard\tfwdBreastRestore\tfwdInnerThighRestore"
-                    + "\tfwdBottomTaper\tfwdSkirtDrape\tfwdSkirtLower\tfwdCrossLayerGuard\tfwdThighSmooth\tfwdFinal");
+                    + "\tfwdSideSmooth\tfwdRibReduce\tfwdLowerRestore\tfwdInwardGuard\tfwdBreastRestore\tfwdInnerThighRestore"
+                    + "\tfwdBottomTaper\tfwdSkirtLower\tfwdThighSmooth\tfwdClothInherit\tfwdFinal");
 
                 List<SkinnedMeshRenderer> renderers = CollectTargetRenderers(maid);
                 foreach (SkinnedMeshRenderer smr in renderers)
                 {
                     if (smr == null || smr.sharedMesh == null) continue;
                     if (ClassifyMesh(smr) != MeshMorphClass.OuterCloth) continue;
-                    if (!IsSkirtLikeMesh(smr)) continue;
+                    if (skirtLike)
+                    {
+                        if (!IsSkirtLikeMesh(smr)) continue;
+                    }
+                    else
+                    {
+                        if (IsSkirtLikeMesh(smr)) continue;
+                        if (IsPantsLikeMesh(smr)) continue;
+                    }
 
                     Mesh mesh = smr.sharedMesh;
                     Vector3[] currentVerts = mesh.vertices;
@@ -2926,7 +7420,9 @@ namespace COM3D2.Pregnancy.Plugin
                 writer.WriteLine("# vertexCount=" + vertexCount.ToString(CultureInfo.InvariantCulture));
             }
 
-            _log.LogInfo("[Pregnancy] Skirt vertex dump written: " + path);
+            _log.LogInfo(skirtLike
+                ? "[Pregnancy] Skirt vertex dump written: " + path
+                : "[Pregnancy] Upper cloth vertex dump written: " + path);
             return path;
         }
 
@@ -2942,6 +7438,164 @@ namespace COM3D2.Pregnancy.Plugin
                 if (ClassifyMesh(smr) != MeshMorphClass.Body) continue;
                 if (TryCacheBindPoseWorldRef(smr)) return;
             }
+        }
+
+        static bool TryBuildNavelAccessoryRigidReference(
+            NavelAccessoryReference reference,
+            out Vector3 originalCenter,
+            out Vector3 targetCenter,
+            out Quaternion deltaRotation)
+        {
+            originalCenter = Vector3.zero;
+            targetCenter = Vector3.zero;
+            deltaRotation = Quaternion.identity;
+            if (_morphReferenceContext == null || _morphReferenceContext.SurfaceTriangles.Count == 0)
+                return false;
+
+            Vector3 targetA;
+            Vector3 targetB;
+            Vector3 targetC;
+            if (!TryGetBodySurfaceClothTarget(_morphReferenceContext, reference.OriginalAWorld, 1f, out targetA)
+                || !TryGetBodySurfaceClothTarget(_morphReferenceContext, reference.OriginalBWorld, 1f, out targetB)
+                || !TryGetBodySurfaceClothTarget(_morphReferenceContext, reference.OriginalCWorld, 1f, out targetC))
+            {
+                return false;
+            }
+
+            originalCenter = (reference.OriginalAWorld + reference.OriginalBWorld + reference.OriginalCWorld) / 3f;
+            Vector3 averageDelta =
+                ((targetA - reference.OriginalAWorld)
+                + (targetB - reference.OriginalBWorld)
+                + (targetC - reference.OriginalCWorld)) / 3f;
+            targetCenter = originalCenter + averageDelta;
+            deltaRotation = Quaternion.identity;
+            return IsFinite(originalCenter) && IsFinite(targetCenter) && IsFinite(averageDelta);
+        }
+
+        static BodySurfaceTargetDebug CreateBodySurfaceTargetDebug(
+            string reason,
+            MorphReferenceContext context,
+            Vector3 target)
+        {
+            return new BodySurfaceTargetDebug
+            {
+                FailReason = reason ?? string.Empty,
+                BodyPointCount = context != null && context.BodyPoints != null ? context.BodyPoints.Count : 0,
+                SurfaceTriangleCount = context != null && context.SurfaceTriangles != null ? context.SurfaceTriangles.Count : 0,
+                TriangleIndex = -1,
+                BodyMeshInstanceId = 0,
+                BodyA = -1,
+                BodyB = -1,
+                BodyC = -1,
+                Target = target,
+            };
+        }
+
+        static void WriteBodySurfaceTargetDebugCells(TextWriter writer, ref bool first, BodySurfaceTargetDebug debug)
+        {
+            WriteCell(writer, ref first, debug.FailReason ?? string.Empty);
+            WriteCell(writer, ref first, debug.SearchHit ? "1" : "0");
+            WriteCell(writer, ref first, debug.FullScanHit ? "1" : "0");
+            WriteCell(writer, ref first, debug.TriangleIndex.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, debug.BodyMeshId ?? string.Empty);
+            WriteCell(writer, ref first, debug.BodyMeshInstanceId.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, debug.BodyA.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, debug.BodyB.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, debug.BodyC.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, F(debug.Distance));
+            WriteCell(writer, ref first, F(debug.OffsetLen));
+            WriteCell(writer, ref first, F(debug.SurfaceMoveLen));
+            WriteCell(writer, ref first, F(debug.NormalDot));
+            WriteVectorCells(writer, ref first, debug.Barycentric);
+            WriteVectorCells(writer, ref first, debug.Closest);
+            WriteVectorCells(writer, ref first, debug.SurfaceMorphed);
+            WriteVectorCells(writer, ref first, debug.OriginalNormal);
+            WriteVectorCells(writer, ref first, debug.MorphedNormal);
+            WriteCell(writer, ref first, debug.BodyPointCount.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, debug.SurfaceTriangleCount.ToString(CultureInfo.InvariantCulture));
+        }
+
+        static int[] BuildTriangleRings(int[] triangles, int vertexCount, int referenceTriangle, int maxRing)
+        {
+            if (triangles == null || triangles.Length < 3 || vertexCount <= 0)
+                return null;
+
+            int triCount = triangles.Length / 3;
+            if (referenceTriangle < 0 || referenceTriangle >= triCount)
+                return null;
+
+            List<int>[] trisByVertex = new List<int>[vertexCount];
+            for (int i = 0; i < vertexCount; i++)
+                trisByVertex[i] = new List<int>();
+
+            for (int tri = 0; tri < triCount; tri++)
+            {
+                int triBase = tri * 3;
+                for (int corner = 0; corner < 3; corner++)
+                {
+                    int v = triangles[triBase + corner];
+                    if (IsValidVertexIndex(v, vertexCount))
+                        trisByVertex[v].Add(tri);
+                }
+            }
+
+            int[] rings = new int[triCount];
+            for (int i = 0; i < rings.Length; i++)
+                rings[i] = -1;
+
+            Queue<int> queue = new Queue<int>();
+            rings[referenceTriangle] = 0;
+            queue.Enqueue(referenceTriangle);
+            while (queue.Count > 0)
+            {
+                int tri = queue.Dequeue();
+                int ring = rings[tri];
+                if (ring >= maxRing) continue;
+
+                int triBase = tri * 3;
+                for (int corner = 0; corner < 3; corner++)
+                {
+                    int v = triangles[triBase + corner];
+                    if (!IsValidVertexIndex(v, vertexCount)) continue;
+
+                    List<int> neighbors = trisByVertex[v];
+                    for (int n = 0; n < neighbors.Count; n++)
+                    {
+                        int next = neighbors[n];
+                        if (next < 0 || next >= rings.Length || rings[next] >= 0) continue;
+                        rings[next] = ring + 1;
+                        queue.Enqueue(next);
+                    }
+                }
+            }
+
+            return rings;
+        }
+
+        static string GetNavelReferenceVertexRole(NavelAccessoryReference reference, int vertex)
+        {
+            if (vertex == reference.A) return "refA";
+            if (vertex == reference.B) return "refB";
+            if (vertex == reference.C) return "refC";
+            return string.Empty;
+        }
+
+        static void WriteBoneWeightCells(TextWriter writer, ref bool first, BoneWeight weight, Transform[] bones)
+        {
+            WriteCell(writer, ref first, FormatBoneCell(GetBoneName(bones, weight.boneIndex0), weight.boneIndex0));
+            WriteCell(writer, ref first, F(weight.weight0));
+            WriteCell(writer, ref first, FormatBoneCell(GetBoneName(bones, weight.boneIndex1), weight.boneIndex1));
+            WriteCell(writer, ref first, F(weight.weight1));
+            WriteCell(writer, ref first, FormatBoneCell(GetBoneName(bones, weight.boneIndex2), weight.boneIndex2));
+            WriteCell(writer, ref first, F(weight.weight2));
+            WriteCell(writer, ref first, FormatBoneCell(GetBoneName(bones, weight.boneIndex3), weight.boneIndex3));
+            WriteCell(writer, ref first, F(weight.weight3));
+        }
+
+        static void WriteEmptyBoneWeightCells(TextWriter writer, ref bool first)
+        {
+            for (int i = 0; i < 8; i++)
+                WriteCell(writer, ref first, string.Empty);
         }
 
         static string SafeDumpName(string value)
@@ -3011,20 +7665,13 @@ namespace COM3D2.Pregnancy.Plugin
             sb.Append(";SideSmoothStrength=").Append(F(SideSmoothStrength));
             sb.Append(";BreastGuardStrength=").Append(F(BreastGuardStrength));
             sb.Append(";OuterClothPregnancyScale=").Append(F(OuterClothPregnancyScale));
-            sb.Append(";OuterClothSkirtDrape=").Append(OuterClothSkirtDrape ? "1" : "0");
-            sb.Append(";OuterClothLayerGuard=").Append(F(OuterClothLayerGuard));
-            sb.Append(";InnerClothOffset=").Append(F(InnerClothOffset));
-            sb.Append(";OuterClothOffset=").Append(F(OuterClothOffset));
-            sb.Append(";ClothThicknessPreserve=").Append(F(ClothThicknessPreserve));
-            sb.Append(";ClothOffsetSideRatio=").Append(F(ClothOffsetSideRatio));
-            sb.Append(";ClothBackOffsetBoost=").Append(F(ClothBackOffsetBoost));
-            sb.Append(";ClothDepthStretch=").Append(F(ClothDepthStretch));
             sb.Append(";SkirtBoundarySmoothPasses=").Append(SkirtBoundarySmoothPasses.ToString(CultureInfo.InvariantCulture));
             sb.Append(";SkirtBoundarySmoothStrength=").Append(F(SkirtBoundarySmoothStrength));
             sb.Append(";SkirtBoundaryUpOffset=").Append(F(SkirtBoundaryUpOffset));
             sb.Append(";SkirtFrontPlaneFwdOffset=").Append(F(SkirtFrontPlaneFwdOffset));
             sb.Append(";SkirtTopRadiusSideScale=").Append(F(SkirtTopRadiusSideScale));
             sb.Append(";SkirtTopRadiusFwdScale=").Append(F(SkirtTopRadiusFwdScale));
+            sb.Append(";SkirtHemFadeRangeScale=").Append(F(SkirtHemFadeRangeScale));
             sb.Append(";SkirtLowerTipSide=").Append(F(SkirtLowerTipSide));
             sb.Append(";SkirtLowerTipUp=").Append(F(SkirtLowerTipUp));
             sb.Append(";SkirtLowerTipFwd=").Append(F(SkirtLowerTipFwd));
@@ -3064,8 +7711,6 @@ namespace COM3D2.Pregnancy.Plugin
                 if (trace.LowerBodyRestore > 0f)
                     AppendTraceStep(sb, "lowerBodyRestore=" + F(trace.LowerBodyRestore) + " speed=" + F(ThighGuardSpeed));
                 AppendTraceDelta(sb, "lowerBodyRestore", trace.FwdLowerRestore - trace.FwdRibReduce);
-                AppendTraceDelta(sb, "clothDepthStretch factor=" + F(trace.ClothDepthStretchFactor), trace.ClothDepthDeltaFwd);
-                AppendTraceDelta(sb, "clothLayerOffset", trace.ClothLayerDeltaFwd);
                 if (trace.InwardGuardApplied)
                     AppendTraceStep(sb, "inwardGuard dFwd=" + F(trace.InwardGuardDeltaFwd));
                 if (trace.BreastRestore > 0f)
@@ -3079,14 +7724,24 @@ namespace COM3D2.Pregnancy.Plugin
                         + " lower=" + F(trace.BottomTaperLower)
                         + " front=" + F(trace.BottomTaperFront));
                 AppendTraceDelta(sb, "bottomTaper", trace.FwdBottomTaper - trace.FwdInnerThighRestore);
-                if (trace.SkirtDrapeEnabled)
-                    AppendTraceStep(sb, trace.SkirtDrapeReason);
-                AppendTraceDelta(sb, "skirtDrape", trace.FwdSkirtDrape - trace.FwdBottomTaper);
                 if (trace.SkirtLowerEnabled)
                     AppendTraceStep(sb, trace.SkirtLowerReason);
-                AppendTraceDelta(sb, "skirtLower", trace.FwdSkirtLower - trace.FwdSkirtDrape);
-                AppendTraceDelta(sb, "crossLayerGuard", trace.CrossLayerGuardDeltaFwd);
+                AppendTraceDelta(sb, "skirtLower", trace.FwdSkirtLower - trace.FwdBottomTaper);
                 AppendTraceDelta(sb, "thighSmooth", trace.ThighSmoothDeltaFwd);
+                if (trace.ClothInheritApplied)
+                {
+                    AppendTraceStep(sb, "clothInherit=" + (trace.ClothInheritKind ?? string.Empty)
+                        + " src=" + (trace.ClothInheritSourceMesh ?? string.Empty)
+                        + ":" + trace.ClothInheritSourceVertex.ToString(CultureInfo.InvariantCulture)
+                        + " frame=" + trace.ClothInheritFrameA.ToString(CultureInfo.InvariantCulture)
+                        + "/" + trace.ClothInheritFrameB.ToString(CultureInfo.InvariantCulture)
+                        + " thickness=" + F(trace.ClothInheritOriginalThickness));
+                    AppendTraceDelta(sb, "clothInherit", trace.ClothInheritDeltaCoord.z);
+                }
+                else if (!string.IsNullOrEmpty(trace.ClothInheritReason))
+                {
+                    AppendTraceStep(sb, trace.ClothInheritReason);
+                }
             }
 
             return sb.ToString();
@@ -3107,7 +7762,7 @@ namespace COM3D2.Pregnancy.Plugin
 
         static void WriteTraceCells(TextWriter writer, ref bool first, VertexMorphTrace trace)
         {
-            const int blankColumnsAfterSteps = 76;
+            const int blankColumnsAfterSteps = 134;
             if (trace == null)
             {
                 WriteCell(writer, ref first, "0");
@@ -3121,6 +7776,51 @@ namespace COM3D2.Pregnancy.Plugin
             WriteCell(writer, ref first, "1");
             WriteCell(writer, ref first, trace.StopReason ?? string.Empty);
             WriteCell(writer, ref first, BuildTraceSteps(trace));
+
+            WriteCell(writer, ref first, trace.OldFinalChanged ? "1" : "0");
+            WriteCell(writer, ref first, F(trace.OldFinalDeltaWorldLen));
+            WriteCell(writer, ref first, F(trace.OldFinalMinDelta));
+            WriteCell(writer, ref first, trace.OldFinalReason ?? string.Empty);
+
+            WriteCell(writer, ref first, trace.ClothInheritApplied ? "1" : "0");
+            WriteCell(writer, ref first, trace.ClothInheritKind ?? string.Empty);
+            WriteCell(writer, ref first, trace.ClothInheritReason ?? string.Empty);
+            WriteCell(writer, ref first, trace.ClothInheritSourceMesh ?? string.Empty);
+            WriteCell(writer, ref first, trace.ClothInheritSourceVertex.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, trace.ClothInheritFrameA.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, trace.ClothInheritFrameB.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, trace.ClothInheritFrameCandidateCount.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, F(trace.ClothInheritFrameScore));
+            WriteCell(writer, ref first, F(trace.ClothInheritNearestDistance));
+            WriteCell(writer, ref first, F(trace.ClothInheritOriginalThickness));
+            WriteCell(writer, ref first, F(trace.ClothInheritRawThickness));
+            WriteCell(writer, ref first, F(trace.ClothInheritFinalThickness));
+            WriteVectorCells(writer, ref first, trace.ClothInheritLocalOffset);
+            WriteVectorCells(writer, ref first, trace.ClothInheritPreWorld);
+            WriteVectorCells(writer, ref first, trace.ClothInheritPostWorld);
+            WriteVectorCells(writer, ref first, trace.ClothInheritPreCoord);
+            WriteVectorCells(writer, ref first, trace.ClothInheritPostCoord);
+            WriteVectorCells(writer, ref first, trace.ClothInheritDeltaCoord);
+            WriteCell(writer, ref first, F(trace.ClothInheritDeltaWorldLen));
+            WriteVectorCells(writer, ref first, trace.ClothInheritDeltaDirCoord);
+            WriteVectorCells(writer, ref first, trace.ClothInheritFinalOffsetCoord);
+
+            WriteCell(writer, ref first, trace.ClothInheritFailKind ?? string.Empty);
+            WriteCell(writer, ref first, trace.ClothInheritFailReason ?? string.Empty);
+            WriteCell(writer, ref first, trace.ClothInheritFailSourceMesh ?? string.Empty);
+            WriteCell(writer, ref first, trace.ClothInheritFailSourceVertex.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, trace.ClothInheritFailFrameCandidateCount.ToString(CultureInfo.InvariantCulture));
+            WriteCell(writer, ref first, F(trace.ClothInheritFailFrameScore));
+            WriteCell(writer, ref first, F(trace.ClothInheritFailNearestDistance));
+
+            WriteCell(writer, ref first, trace.SkirtHemBoundaryValid ? "1" : "0");
+            WriteCell(writer, ref first, F(trace.SkirtHemBoundaryUp));
+            WriteCell(writer, ref first, F(trace.SkirtHemFwdThreshold));
+            WriteCell(writer, ref first, trace.SkirtHemFront ? "1" : "0");
+            WriteCell(writer, ref first, trace.SkirtHemLowerRange ? "1" : "0");
+            WriteCell(writer, ref first, trace.SkirtHemCandidate ? "1" : "0");
+            WriteCell(writer, ref first, F(trace.SkirtHemBlend));
+            WriteCell(writer, ref first, trace.SkirtHemReason ?? string.Empty);
 
             WriteCell(writer, ref first, FormatBoneCell(trace.BoneName0, trace.BoneIndex0));
             WriteCell(writer, ref first, F(trace.BoneWeight0));
@@ -3158,16 +7858,8 @@ namespace COM3D2.Pregnancy.Plugin
             WriteCell(writer, ref first, F(trace.BottomTaperFront));
             WriteCell(writer, ref first, F(trace.BottomTaperGuardKeep));
 
-            WriteCell(writer, ref first, F(trace.ClothDepthStretchFactor));
-            WriteCell(writer, ref first, F(trace.ClothDepthDeltaFwd));
-            WriteCell(writer, ref first, F(trace.ClothLayerDeltaFwd));
             WriteCell(writer, ref first, trace.InwardGuardApplied ? "1" : "0");
             WriteCell(writer, ref first, F(trace.InwardGuardDeltaFwd));
-
-            WriteCell(writer, ref first, trace.SkirtDrapeEnabled ? "1" : "0");
-            WriteCell(writer, ref first, trace.SkirtDrapeReached ? "1" : "0");
-            WriteCell(writer, ref first, F(trace.SkirtDrapeAddFwd));
-            WriteCell(writer, ref first, trace.SkirtDrapeReason ?? string.Empty);
 
             WriteCell(writer, ref first, trace.SkirtLowerEnabled ? "1" : "0");
             WriteCell(writer, ref first, F(trace.SkirtLowerBoundaryUp));
@@ -3178,7 +7870,6 @@ namespace COM3D2.Pregnancy.Plugin
             WriteCell(writer, ref first, F(trace.SkirtLowerAddFwd));
             WriteCell(writer, ref first, trace.SkirtLowerReason ?? string.Empty);
 
-            WriteCell(writer, ref first, F(trace.CrossLayerGuardDeltaFwd));
             WriteCell(writer, ref first, F(trace.ThighSmoothMask));
             WriteCell(writer, ref first, F(trace.ThighSmoothDeltaFwd));
 
@@ -3195,16 +7886,13 @@ namespace COM3D2.Pregnancy.Plugin
             WriteCell(writer, ref first, F(trace.FwdSideSmooth));
             WriteCell(writer, ref first, F(trace.FwdRibReduce));
             WriteCell(writer, ref first, F(trace.FwdLowerRestore));
-            WriteCell(writer, ref first, F(trace.FwdDepthStretch));
-            WriteCell(writer, ref first, F(trace.FwdLayerOffset));
             WriteCell(writer, ref first, F(trace.FwdInwardGuard));
             WriteCell(writer, ref first, F(trace.FwdBreastRestore));
             WriteCell(writer, ref first, F(trace.FwdInnerThighRestore));
             WriteCell(writer, ref first, F(trace.FwdBottomTaper));
-            WriteCell(writer, ref first, F(trace.FwdSkirtDrape));
             WriteCell(writer, ref first, F(trace.FwdSkirtLower));
-            WriteCell(writer, ref first, F(trace.FwdCrossLayerGuard));
             WriteCell(writer, ref first, F(trace.FwdThighSmooth));
+            WriteCell(writer, ref first, F(trace.FwdClothInherit));
             WriteCell(writer, ref first, F(trace.FwdFinal));
         }
 
@@ -3546,419 +8234,6 @@ namespace COM3D2.Pregnancy.Plugin
                 || lower.Contains("momotwist");
         }
 
-        const int SkirtDrapePropagatePasses = 48;
-        const float SkirtDrapePropagationDecay = 0.995f;
-        const float SkirtDrapeDeltaBoost = 1.03f;
-        const int SkirtDrapeSmoothPasses = 4;
-        const float SkirtDrapeSmoothStrength = 0.35f;
-
-        static void ApplyOuterClothSkirtDrapeToMesh(
-            Mesh mesh,
-            Vector3[] localOriginalVerts,
-            BoneWeight[] weights,
-            Matrix4x4[] boneMatrices,
-            Vector3[] originalWorldVerts,
-            Vector3[] morphedWorldVerts,
-            bool[] valid,
-            Vector3[] newLocalVerts,
-            Vector3 spineCenter,
-            Vector3 center,
-            Vector3 right,
-            Vector3 up,
-            Vector3 fwd,
-            float radiusSide,
-            float radiusDown,
-            VertexMorphTrace[] traces)
-        {
-            if (mesh == null || localOriginalVerts == null || weights == null || boneMatrices == null)
-                return;
-            if (originalWorldVerts == null || morphedWorldVerts == null || valid == null || newLocalVerts == null)
-                return;
-
-            int count = newLocalVerts.Length;
-            if (localOriginalVerts.Length != count || weights.Length != count
-                || originalWorldVerts.Length != count || morphedWorldVerts.Length != count || valid.Length != count)
-                return;
-
-            List<int>[] neighbors = BuildMeshNeighbors(mesh, count);
-            if (neighbors == null)
-                return;
-
-            Vector2[] propagatedDelta = new Vector2[count];
-            bool[] reached = new bool[count];
-
-            for (int i = 0; i < count; i++)
-            {
-                if (!valid[i]) continue;
-
-                Vector3 originalRel = originalWorldVerts[i] - center;
-                Vector3 deltaWorld = morphedWorldVerts[i] - originalWorldVerts[i];
-                float originalUp = Vector3.Dot(originalRel, up);
-                float originalFwd = Vector3.Dot(originalRel, fwd);
-                if (originalUp > 0f || originalFwd <= 0f) continue;
-                if (originalUp < -radiusDown * 0.70f) continue;
-
-                Vector2 delta = new Vector2(
-                    Vector3.Dot(deltaWorld, right),
-                    Vector3.Dot(deltaWorld, fwd));
-                if (delta.y <= 0f || delta.sqrMagnitude <= 1e-8f) continue;
-
-                propagatedDelta[i] = delta;
-                reached[i] = true;
-            }
-
-            PropagateSkirtDrapeDelta(neighbors, valid, originalWorldVerts, center, up, fwd, propagatedDelta, reached);
-            SmoothSkirtDrapeDelta(neighbors, valid, originalWorldVerts, center, up, fwd, radiusDown, propagatedDelta, reached);
-
-            for (int i = 0; i < count; i++)
-            {
-                if (!valid[i]) continue;
-                VertexMorphTrace trace = traces != null && i < traces.Length ? traces[i] : null;
-                if (!reached[i] || propagatedDelta[i].sqrMagnitude <= 1e-8f)
-                {
-                    if (trace != null) trace.SkirtDrapeReason = "drape:not-reached";
-                    continue;
-                }
-                if (trace != null) trace.SkirtDrapeReached = true;
-
-                Vector3 originalRel = originalWorldVerts[i] - center;
-                float originalUp = Vector3.Dot(originalRel, up);
-                float originalRight = Vector3.Dot(originalRel, right);
-                float originalFwd = Vector3.Dot(originalRel, fwd);
-                if (originalFwd <= 0f)
-                {
-                    if (trace != null) trace.SkirtDrapeReason = "drape:not-front";
-                    continue;
-                }
-
-                Vector2 delta = propagatedDelta[i] * SkirtDrapeDeltaBoost;
-                if (delta.y <= 0f)
-                {
-                    if (trace != null) trace.SkirtDrapeReason = "drape:no-forward-delta";
-                    continue;
-                }
-
-                float targetRight = originalRight + delta.x;
-                float targetFwd = originalFwd + delta.y;
-                float finalRight = Vector3.Dot(morphedWorldVerts[i] - center, right);
-                float finalFwd = Vector3.Dot(morphedWorldVerts[i] - center, fwd);
-                float addRight = targetRight - finalRight;
-                float addFwd = Mathf.Max(0f, targetFwd - finalFwd);
-                if (Mathf.Abs(addRight) <= 1e-5f && addFwd <= 1e-5f)
-                {
-                    if (trace != null) trace.SkirtDrapeReason = "drape:already-forward-enough";
-                    continue;
-                }
-
-                Vector3 adjustedWorld = morphedWorldVerts[i] + right * addRight + fwd * addFwd;
-                Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
-                newLocalVerts[i] = skin.inverse.MultiplyPoint3x4(adjustedWorld);
-                morphedWorldVerts[i] = adjustedWorld;
-                if (trace != null)
-                {
-                    trace.SkirtDrapeAddFwd = addFwd;
-                    trace.SkirtDrapeReason = "drape:applied";
-                }
-            }
-        }
-
-        static void ApplySkirtLowerShapeToMesh(
-            Mesh mesh,
-            Vector3[] localOriginalVerts,
-            BoneWeight[] weights,
-            Matrix4x4[] boneMatrices,
-            Vector3[] originalWorldVerts,
-            Vector3[] morphedWorldVerts,
-            bool[] valid,
-            Vector3[] newLocalVerts,
-            Vector3 spineCenter,
-            Vector3 center,
-            Vector3 right,
-            Vector3 up,
-            Vector3 fwd,
-            float radiusSide,
-            float radiusFront,
-            float radiusBack,
-            float radiusUp,
-            float radiusDown,
-            VertexMorphTrace[] traces)
-        {
-            if (mesh == null || localOriginalVerts == null || weights == null || boneMatrices == null)
-                return;
-            if (originalWorldVerts == null || morphedWorldVerts == null || valid == null || newLocalVerts == null)
-                return;
-
-            int count = newLocalVerts.Length;
-            if (localOriginalVerts.Length != count || weights.Length != count
-                || originalWorldVerts.Length != count || morphedWorldVerts.Length != count || valid.Length != count)
-                return;
-
-            List<int>[] neighbors = BuildMeshNeighbors(mesh, count);
-            if (neighbors == null)
-            {
-                SetSkirtLowerTraceReason(traces, valid, "lower:no-neighbors");
-                return;
-            }
-
-            SetSkirtLowerTraceReason(traces, valid, "lower:not-evaluated");
-
-            float[] side = new float[count];
-            float[] originalUp = new float[count];
-            float[] originalFwd = new float[count];
-            float[] spineFwd = new float[count];
-            float[] strength = new float[count];
-            Vector3[] deltaWorld = new Vector3[count];
-            float[] morphedFwd = new float[count];
-            float maxFront = float.MinValue;
-            float minDelta = RelGeneral(SkirtLowerMinDelta);
-
-            for (int i = 0; i < count; i++)
-            {
-                if (!valid[i]) continue;
-
-                Vector3 rel = originalWorldVerts[i] - center;
-                side[i] = Vector3.Dot(rel, right);
-                originalUp[i] = Vector3.Dot(rel, up);
-                originalFwd[i] = Vector3.Dot(rel, fwd);
-                spineFwd[i] = Vector3.Dot(originalWorldVerts[i] - spineCenter, fwd);
-
-                Vector3 delta = morphedWorldVerts[i] - originalWorldVerts[i];
-                float deltaSide = Vector3.Dot(delta, right);
-                float deltaFwd = Vector3.Dot(delta, fwd);
-                morphedFwd[i] = Vector3.Dot(morphedWorldVerts[i] - center, fwd);
-                if (deltaFwd <= minDelta || originalFwd[i] <= 0f)
-                    continue;
-
-                deltaWorld[i] = delta;
-                strength[i] = Mathf.Sqrt(deltaSide * deltaSide + deltaFwd * deltaFwd);
-                if (morphedFwd[i] > maxFront)
-                    maxFront = morphedFwd[i];
-            }
-
-            if (maxFront <= 0f)
-            {
-                SetSkirtLowerTraceReason(traces, valid, "lower:no-front-delta");
-                return;
-            }
-
-            float frontBand = Mathf.Max(radiusFront * SkirtBoundaryFrontBand, RelFwd(0.01f));
-            List<float> boundaryUps = new List<float>();
-
-            for (int i = 0; i < count; i++)
-            {
-                if (!valid[i] || strength[i] <= minDelta) continue;
-                if (originalFwd[i] <= 0f) continue;
-                if (morphedFwd[i] < maxFront - frontBand) continue;
-                boundaryUps.Add(originalUp[i]);
-            }
-
-            if (boundaryUps.Count < 3)
-            {
-                SetSkirtLowerTraceReason(traces, valid, "lower:not-enough-boundary");
-                return;
-            }
-
-            float boundaryUp = MedianFloat(boundaryUps) + RelUp(SkirtBoundaryUpOffset);
-            float boundaryBand = Mathf.Max(radiusDown * SkirtBoundaryPlaneBand, RelUp(0.012f));
-            bool[] boundaryMask = new bool[count];
-            Vector3[] boundaryDelta = new Vector3[count];
-            float[] boundaryStrength = new float[count];
-            if (traces != null)
-            {
-                int traceCount = Mathf.Min(traces.Length, count);
-                for (int i = 0; i < traceCount; i++)
-                {
-                    if (traces[i] == null || !valid[i]) continue;
-                    traces[i].SkirtLowerBoundaryUp = boundaryUp;
-                    traces[i].SkirtLowerReason = string.Empty;
-                }
-            }
-
-            for (int i = 0; i < count; i++)
-            {
-                if (!valid[i] || strength[i] <= minDelta) continue;
-                if (originalFwd[i] <= 0f) continue;
-                if (Mathf.Abs(originalUp[i] - boundaryUp) > boundaryBand) continue;
-
-                boundaryMask[i] = true;
-                boundaryDelta[i] = deltaWorld[i];
-                boundaryStrength[i] = strength[i];
-            }
-
-            SmoothSkirtBoundaryDeltas(neighbors, boundaryMask, boundaryDelta, boundaryStrength);
-
-            Vector3 topDelta = Vector3.zero;
-            float topWeight = 0f;
-            for (int i = 0; i < count; i++)
-            {
-                if (!boundaryMask[i]) continue;
-
-                float w = Mathf.Max(boundaryStrength[i], minDelta);
-                topDelta += boundaryDelta[i] * w;
-                topWeight += w;
-            }
-
-            if (topWeight <= 0f)
-            {
-                SetSkirtLowerTraceReason(traces, valid, "lower:no-top-weight");
-                return;
-            }
-
-            topDelta /= topWeight;
-
-            float topDeltaFwd = Mathf.Max(0f, Vector3.Dot(topDelta, fwd));
-            float lowerLimit = boundaryUp;
-            for (int i = 0; i < count; i++)
-            {
-                if (!valid[i]) continue;
-                if (originalFwd[i] <= 0f) continue;
-                if (originalUp[i] <= boundaryUp)
-                    lowerLimit = Mathf.Min(lowerLimit, originalUp[i]);
-            }
-
-            float verticalSpan = Mathf.Max(boundaryUp - lowerLimit, RelUp(0.02f));
-            Vector3[] inheritedDelta = new Vector3[count];
-            bool[] inheritedReached = new bool[count];
-            for (int i = 0; i < count; i++)
-            {
-                if (!boundaryMask[i]) continue;
-                inheritedDelta[i] = boundaryDelta[i];
-                inheritedReached[i] = true;
-            }
-
-            PropagateSkirtLowerBoundaryDeltas(
-                neighbors,
-                valid,
-                originalUp,
-                originalFwd,
-                boundaryUp,
-                inheritedDelta,
-                inheritedReached);
-
-            float growth = topDeltaFwd / Mathf.Max(radiusFront, minDelta);
-            if (traces != null)
-            {
-                int traceCount = Mathf.Min(traces.Length, count);
-                for (int i = 0; i < traceCount; i++)
-                {
-                    if (traces[i] == null || !valid[i]) continue;
-                    traces[i].SkirtLowerLowerLimit = lowerLimit;
-                    traces[i].SkirtLowerTopDeltaFwd = topDeltaFwd;
-                    traces[i].SkirtLowerGrowth = growth;
-                }
-            }
-
-            for (int i = 0; i < count; i++)
-            {
-                if (!valid[i]) continue;
-                VertexMorphTrace trace = traces != null && i < traces.Length ? traces[i] : null;
-                if (originalFwd[i] <= 0f)
-                {
-                    if (trace != null) trace.SkirtLowerReason = "lower:not-front";
-                    continue;
-                }
-                if (originalUp[i] > boundaryUp)
-                {
-                    if (trace != null) trace.SkirtLowerReason = "lower:above-boundary";
-                    continue;
-                }
-
-                float downT = Mathf.Clamp01((boundaryUp - originalUp[i]) / Mathf.Max(verticalSpan, 0.0001f));
-                if (trace != null) trace.SkirtLowerDownT = downT;
-                if (boundaryMask[i])
-                {
-                    if (trace != null) trace.SkirtLowerReason = "lower:boundary-kept";
-                    continue;
-                }
-                if (!inheritedReached[i])
-                {
-                    inheritedDelta[i] = topDelta;
-                    inheritedReached[i] = true;
-                }
-
-                Vector3 adjustedWorld = originalWorldVerts[i] + inheritedDelta[i];
-                Vector3 addWorld = adjustedWorld - morphedWorldVerts[i];
-                float addFwd = Vector3.Dot(addWorld, fwd);
-                if (addWorld.sqrMagnitude <= minDelta * minDelta)
-                {
-                    if (trace != null) trace.SkirtLowerReason = "lower:already-inherited";
-                    continue;
-                }
-
-                Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weights[i]);
-                newLocalVerts[i] = skin.inverse.MultiplyPoint3x4(adjustedWorld);
-                morphedWorldVerts[i] = adjustedWorld;
-                if (trace != null)
-                {
-                    trace.SkirtLowerAddFwd = addFwd;
-                    trace.SkirtLowerReason = "lower:inherited";
-                }
-            }
-        }
-
-        static void PropagateSkirtLowerBoundaryDeltas(
-            List<int>[] neighbors,
-            bool[] valid,
-            float[] originalUp,
-            float[] originalFwd,
-            float boundaryUp,
-            Vector3[] inheritedDelta,
-            bool[] inheritedReached)
-        {
-            if (neighbors == null || valid == null || originalUp == null || originalFwd == null
-                || inheritedDelta == null || inheritedReached == null)
-                return;
-
-            int count = Mathf.Min(
-                inheritedDelta.Length,
-                Mathf.Min(inheritedReached.Length, Mathf.Min(valid.Length, Mathf.Min(originalUp.Length, originalFwd.Length))));
-            int passes = Mathf.Min(count, 128);
-
-            for (int pass = 0; pass < passes; pass++)
-            {
-                bool changed = false;
-                Vector3[] nextDelta = (Vector3[])inheritedDelta.Clone();
-                bool[] nextReached = (bool[])inheritedReached.Clone();
-
-                for (int i = 0; i < count; i++)
-                {
-                    if (!valid[i] || inheritedReached[i]) continue;
-                    if (originalFwd[i] <= 0f || originalUp[i] > boundaryUp) continue;
-
-                    Vector3 sum = Vector3.zero;
-                    float sumWeight = 0f;
-                    List<int> ns = neighbors[i];
-                    for (int n = 0; n < ns.Count; n++)
-                    {
-                        int j = ns[n];
-                        if (j < 0 || j >= count || !inheritedReached[j]) continue;
-                        if (originalFwd[j] <= 0f) continue;
-                        if (originalUp[j] < originalUp[i] - 0.0001f) continue;
-
-                        float verticalStep = Mathf.Max(0f, originalUp[j] - originalUp[i]);
-                        float w = 1f / (1f + verticalStep * 40f);
-                        sum += inheritedDelta[j] * w;
-                        sumWeight += w;
-                    }
-
-                    if (sumWeight <= 0f) continue;
-
-                    nextDelta[i] = sum / sumWeight;
-                    nextReached[i] = true;
-                    changed = true;
-                }
-
-                for (int i = 0; i < count; i++)
-                {
-                    inheritedDelta[i] = nextDelta[i];
-                    inheritedReached[i] = nextReached[i];
-                }
-
-                if (!changed)
-                    break;
-            }
-        }
-
         static float MedianFloat(List<float> values)
         {
             if (values == null || values.Count == 0) return 0f;
@@ -3967,436 +8242,6 @@ namespace COM3D2.Pregnancy.Plugin
             if ((values.Count & 1) == 1)
                 return values[mid];
             return (values[mid - 1] + values[mid]) * 0.5f;
-        }
-
-        static void SmoothSkirtBoundaryDeltas(
-            List<int>[] neighbors,
-            bool[] boundaryMask,
-            Vector3[] boundaryDelta,
-            float[] boundaryStrength)
-        {
-            int passes = Mathf.Clamp(SkirtBoundarySmoothPasses, 0, 16);
-            float smooth = Mathf.Clamp01(SkirtBoundarySmoothStrength);
-            if (passes <= 0 || smooth <= 0f || neighbors == null || boundaryMask == null)
-                return;
-
-            int count = boundaryMask.Length;
-            for (int pass = 0; pass < passes; pass++)
-            {
-                Vector3[] nextDelta = (Vector3[])boundaryDelta.Clone();
-                float[] nextStrength = (float[])boundaryStrength.Clone();
-
-                for (int i = 0; i < count; i++)
-                {
-                    if (!boundaryMask[i]) continue;
-
-                    Vector3 sumDelta = boundaryDelta[i] * 2f;
-                    float sumStrength = boundaryStrength[i] * 2f;
-                    float sumWeight = 2f;
-                    List<int> ns = neighbors[i];
-                    for (int n = 0; n < ns.Count; n++)
-                    {
-                        int j = ns[n];
-                        if (j < 0 || j >= count || !boundaryMask[j]) continue;
-                        sumDelta += boundaryDelta[j];
-                        sumStrength += boundaryStrength[j];
-                        sumWeight += 1f;
-                    }
-
-                    if (sumWeight <= 2f) continue;
-                    nextDelta[i] = Vector3.Lerp(boundaryDelta[i], sumDelta / sumWeight, smooth);
-                    nextStrength[i] = Mathf.Lerp(boundaryStrength[i], sumStrength / sumWeight, smooth);
-                }
-
-                for (int i = 0; i < count; i++)
-                {
-                    boundaryDelta[i] = nextDelta[i];
-                    boundaryStrength[i] = nextStrength[i];
-                }
-            }
-        }
-
-        static void PropagateSkirtDrapeDelta(
-            List<int>[] neighbors,
-            bool[] valid,
-            Vector3[] originalWorldVerts,
-            Vector3 center,
-            Vector3 up,
-            Vector3 fwd,
-            Vector2[] propagatedDelta,
-            bool[] reached)
-        {
-            int count = propagatedDelta.Length;
-            for (int pass = 0; pass < SkirtDrapePropagatePasses; pass++)
-            {
-                bool changed = false;
-                Vector2[] nextDelta = (Vector2[])propagatedDelta.Clone();
-                bool[] nextReached = (bool[])reached.Clone();
-
-                for (int i = 0; i < count; i++)
-                {
-                    if (!valid[i]) continue;
-
-                    Vector3 rel = originalWorldVerts[i] - center;
-                    float originalUp = Vector3.Dot(rel, up);
-                    float originalFwd = Vector3.Dot(rel, fwd);
-                    if (originalFwd <= 0f) continue;
-
-                    Vector2 sumDelta = reached[i] ? propagatedDelta[i] : Vector2.zero;
-                    int sumCount = reached[i] ? 1 : 0;
-                    Vector2 bestDelta = reached[i] ? propagatedDelta[i] : Vector2.zero;
-                    float bestMagnitude = bestDelta.sqrMagnitude;
-                    List<int> ns = neighbors[i];
-                    for (int n = 0; n < ns.Count; n++)
-                    {
-                        int j = ns[n];
-                        if (!reached[j]) continue;
-
-                        Vector3 nr = originalWorldVerts[j] - center;
-                        float neighborUp = Vector3.Dot(nr, up);
-                        float neighborFwd = Vector3.Dot(nr, fwd);
-                        if (neighborFwd <= 0f) continue;
-                        if (neighborUp < originalUp - 0.0001f) continue;
-
-                        Vector2 candidate = propagatedDelta[j] * SkirtDrapePropagationDecay;
-                        if (candidate.y <= 0f || candidate.sqrMagnitude <= 1e-8f) continue;
-                        sumDelta += candidate;
-                        sumCount++;
-                        float candidateMagnitude = candidate.sqrMagnitude;
-                        if (candidateMagnitude > bestMagnitude)
-                        {
-                            bestDelta = candidate;
-                            bestMagnitude = candidateMagnitude;
-                        }
-                    }
-
-                    if (sumCount <= 0) continue;
-
-                    Vector2 averageDelta = sumDelta / sumCount;
-                    Vector2 targetDelta = reached[i]
-                        ? (averageDelta.sqrMagnitude > propagatedDelta[i].sqrMagnitude ? averageDelta : propagatedDelta[i])
-                        : Vector2.Lerp(averageDelta, bestDelta, 0.50f);
-
-                    if (targetDelta.y > 0f
-                        && targetDelta.sqrMagnitude > 1e-8f
-                        && (!nextReached[i] || targetDelta.sqrMagnitude > nextDelta[i].sqrMagnitude + 1e-8f))
-                    {
-                        nextDelta[i] = targetDelta;
-                        nextReached[i] = true;
-                        changed = true;
-                    }
-                }
-
-                for (int i = 0; i < count; i++)
-                {
-                    propagatedDelta[i] = nextDelta[i];
-                    reached[i] = nextReached[i];
-                }
-
-                if (!changed)
-                    break;
-            }
-        }
-
-        static void SmoothSkirtDrapeDelta(
-            List<int>[] neighbors,
-            bool[] valid,
-            Vector3[] originalWorldVerts,
-            Vector3 center,
-            Vector3 up,
-            Vector3 fwd,
-            float radiusDown,
-            Vector2[] propagatedDelta,
-            bool[] reached)
-        {
-            int count = propagatedDelta.Length;
-            float upRange = Mathf.Max(radiusDown * 0.16f, RelUp(0.01f));
-
-            for (int pass = 0; pass < SkirtDrapeSmoothPasses; pass++)
-            {
-                Vector2[] nextDelta = (Vector2[])propagatedDelta.Clone();
-
-                for (int i = 0; i < count; i++)
-                {
-                    if (!valid[i] || !reached[i]) continue;
-
-                    Vector3 rel = originalWorldVerts[i] - center;
-                    float originalUp = Vector3.Dot(rel, up);
-                    float originalFwd = Vector3.Dot(rel, fwd);
-                    if (originalFwd <= 0f) continue;
-
-                    Vector2 sum = propagatedDelta[i] * 2f;
-                    float weight = 2f;
-                    List<int> ns = neighbors[i];
-                    for (int n = 0; n < ns.Count; n++)
-                    {
-                        int j = ns[n];
-                        if (!valid[j] || !reached[j]) continue;
-
-                        Vector3 nr = originalWorldVerts[j] - center;
-                        float neighborUp = Vector3.Dot(nr, up);
-                        float neighborFwd = Vector3.Dot(nr, fwd);
-                        if (neighborFwd <= 0f) continue;
-
-                        float upDiff = Mathf.Abs(neighborUp - originalUp);
-                        float w = 1f - Mathf.Clamp01(upDiff / upRange);
-                        if (w <= 0f) continue;
-
-                        sum += propagatedDelta[j] * w;
-                        weight += w;
-                    }
-
-                    if (weight <= 2f) continue;
-
-                    Vector2 average = sum / weight;
-                    if (average.y <= 0f) continue;
-
-                    nextDelta[i] = Vector2.Lerp(propagatedDelta[i], average, SkirtDrapeSmoothStrength);
-                }
-
-                for (int i = 0; i < count; i++)
-                    propagatedDelta[i] = nextDelta[i];
-            }
-        }
-
-        struct LayerGuardCoord
-        {
-            public float Side;
-            public float Up;
-            public float Fwd;
-        }
-
-        static void ApplyCrossOuterClothLayerGuard(Maid maid, List<SkinnedMeshRenderer> smrs)
-        {
-            if (!_bpWorldCached || maid == null || smrs == null || smrs.Count == 0)
-                return;
-
-            float strength = Mathf.Max(0f, OuterClothLayerGuard);
-            if (strength <= 0f)
-                return;
-
-            float radiusScale = Mathf.Max(0.05f, 1f + InflationMultiplier);
-            float radiusSide = Mathf.Max(RelSide(RegionRadiusSide) * radiusScale, RelGeneral(0.0001f));
-            float radiusFront = Mathf.Max(RelFwd(RegionRadiusFront) * radiusScale, RelGeneral(0.0001f));
-            float radiusUp = Mathf.Max(RelUp(RegionRadiusUp) * radiusScale, RelGeneral(0.0001f));
-            float radiusDown = Mathf.Max(RelUp(RegionRadiusDown) * radiusScale, RelGeneral(0.0001f));
-            Vector3 center = _bpWorldFrame.Center + _bpWorldFrame.Up * RelUp(InflationMoveY) + _bpWorldFrame.Fwd * RelFwd(InflationMoveZ);
-            Vector3 right = _bpWorldFrame.Right;
-            Vector3 up = _bpWorldFrame.Up;
-            Vector3 fwd = _bpWorldFrame.Fwd;
-
-            float sideRange = Mathf.Max(radiusSide * 0.18f, RelSide(0.016f));
-            float upRange = Mathf.Max((radiusUp + radiusDown) * 0.08f, RelUp(0.014f));
-            float minOriginalGap = Mathf.Max(radiusFront * 0.006f, RelFwd(0.001f));
-            float maxOriginalGap = Mathf.Max(radiusFront * 0.80f, minOriginalGap * 2f);
-            float minFinalGap = Mathf.Max(RelFwd(0.001f), RelFwd(0.008f) * strength);
-
-            List<CrossLayerGuardMesh> meshes = new List<CrossLayerGuardMesh>();
-            Dictionary<long, List<LayerGuardRef>> buckets = new Dictionary<long, List<LayerGuardRef>>();
-            HashSet<int> seenMeshes = new HashSet<int>();
-
-            for (int m = 0; m < smrs.Count; m++)
-            {
-                SkinnedMeshRenderer smr = smrs[m];
-                if (smr == null || smr.sharedMesh == null) continue;
-                if (ClassifyMesh(smr) != MeshMorphClass.OuterCloth) continue;
-
-                Mesh mesh = smr.sharedMesh;
-                if (!seenMeshes.Add(mesh.GetInstanceID())) continue;
-
-                MeshRecord rec = FindRecord(maid, smr);
-                if (rec == null || rec.OrigVerts == null || rec.Mesh != mesh) continue;
-
-                Vector3[] currentVerts = mesh.vertices;
-                BoneWeight[] weights = mesh.boneWeights;
-                if (currentVerts == null || weights == null) continue;
-                if (currentVerts.Length != rec.OrigVerts.Length || weights.Length != currentVerts.Length) continue;
-
-                Matrix4x4[] boneMatrices;
-                if (!TryBuildBindPoseSkinMatrices(smr, out boneMatrices)) continue;
-
-                CrossLayerGuardMesh entry = new CrossLayerGuardMesh
-                {
-                    SMR = smr,
-                    Record = rec,
-                    Mesh = mesh,
-                    CurrentVerts = (Vector3[])currentVerts.Clone(),
-                    Weights = weights,
-                    BoneMatrices = boneMatrices,
-                    OriginalWorld = new Vector3[currentVerts.Length],
-                    MorphedWorld = new Vector3[currentVerts.Length],
-                    Valid = new bool[currentVerts.Length],
-                    Coords = new LayerGuardCoord[currentVerts.Length],
-                    Changed = false,
-                };
-
-                int meshIndex = meshes.Count;
-                for (int i = 0; i < entry.CurrentVerts.Length; i++)
-                {
-                    BoneWeight weight = weights[i];
-                    if (!HasValidBoneWeight(weight, boneMatrices)) continue;
-
-                    Matrix4x4 skin = GetWeightedSkinMatrix(boneMatrices, weight);
-                    Vector3 originalWorld = skin.MultiplyPoint3x4(rec.OrigVerts[i]);
-                    Vector3 morphedWorld = skin.MultiplyPoint3x4(entry.CurrentVerts[i]);
-                    Vector3 rel = originalWorld - center;
-                    float side = Vector3.Dot(rel, right);
-                    float originalUp = Vector3.Dot(rel, up);
-                    float originalFwd = Vector3.Dot(rel, fwd);
-
-                    entry.OriginalWorld[i] = originalWorld;
-                    entry.MorphedWorld[i] = morphedWorld;
-                    entry.Valid[i] = true;
-                    entry.Coords[i].Side = side;
-                    entry.Coords[i].Up = originalUp;
-                    entry.Coords[i].Fwd = originalFwd;
-
-                    if (originalFwd <= 0f) continue;
-                    if (GetOuterLayerGuardVerticalFade(originalUp, radiusUp, radiusDown) <= 0f) continue;
-
-                    int sideBin = Mathf.FloorToInt(side / sideRange);
-                    int upBin = Mathf.FloorToInt(originalUp / upRange);
-                    long key = LayerBucketKey(sideBin, upBin);
-                    if (!buckets.TryGetValue(key, out List<LayerGuardRef> list))
-                    {
-                        list = new List<LayerGuardRef>();
-                        buckets[key] = list;
-                    }
-                    list.Add(new LayerGuardRef(meshIndex, i));
-                }
-
-                meshes.Add(entry);
-            }
-
-            if (meshes.Count == 0 || buckets.Count == 0)
-                return;
-
-            for (int pass = 0; pass < 2; pass++)
-            {
-                bool changedThisPass = false;
-
-                for (int mi = 0; mi < meshes.Count; mi++)
-                {
-                    CrossLayerGuardMesh entry = meshes[mi];
-                    for (int i = 0; i < entry.CurrentVerts.Length; i++)
-                    {
-                        if (!entry.Valid[i]) continue;
-
-                        LayerGuardCoord c = entry.Coords[i];
-                        if (c.Fwd <= 0f) continue;
-                        float guardFade = GetOuterLayerGuardVerticalFade(c.Up, radiusUp, radiusDown);
-                        if (guardFade <= 0f) continue;
-
-                        int sideBin = Mathf.FloorToInt(c.Side / sideRange);
-                        int upBin = Mathf.FloorToInt(c.Up / upRange);
-                        int coverMesh = -1;
-                        int coverVertex = -1;
-                        float bestScore = float.MaxValue;
-
-                        for (int sy = -2; sy <= 2; sy++)
-                        {
-                            for (int uy = -2; uy <= 2; uy++)
-                            {
-                                long key = LayerBucketKey(sideBin + sy, upBin + uy);
-                                if (!buckets.TryGetValue(key, out List<LayerGuardRef> list)) continue;
-
-                                for (int n = 0; n < list.Count; n++)
-                                {
-                                    LayerGuardRef r = list[n];
-                                    if (r.MeshIndex == mi && r.VertexIndex == i) continue;
-
-                                    CrossLayerGuardMesh other = meshes[r.MeshIndex];
-                                    if (!other.Valid[r.VertexIndex]) continue;
-
-                                    LayerGuardCoord jc = other.Coords[r.VertexIndex];
-                                    float fwdGap = jc.Fwd - c.Fwd;
-                                    if (fwdGap < minOriginalGap || fwdGap > maxOriginalGap) continue;
-
-                                    float sideDiff = Mathf.Abs(jc.Side - c.Side);
-                                    if (sideDiff > sideRange * 1.6f) continue;
-                                    float upDiff = Mathf.Abs(jc.Up - c.Up);
-                                    if (upDiff > upRange * 1.6f) continue;
-
-                                    float sideScore = sideDiff / sideRange;
-                                    float upScore = upDiff / upRange;
-                                    float fwdScore = fwdGap / maxOriginalGap;
-                                    float sameMeshPenalty = r.MeshIndex == mi ? 0.15f : 0f;
-                                    float score = sideScore * sideScore + upScore * upScore + fwdScore * 0.20f + sameMeshPenalty;
-                                    if (score < bestScore)
-                                    {
-                                        bestScore = score;
-                                        coverMesh = r.MeshIndex;
-                                        coverVertex = r.VertexIndex;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (coverMesh < 0 || coverVertex < 0)
-                            continue;
-
-                        CrossLayerGuardMesh cover = meshes[coverMesh];
-                        float currentFwd = Vector3.Dot(entry.MorphedWorld[i] - center, fwd);
-                        float coverFwd = Vector3.Dot(cover.MorphedWorld[coverVertex] - center, fwd);
-                        float targetFwd = coverFwd - minFinalGap * guardFade;
-                        float overrun = currentFwd - targetFwd;
-                        if (overrun <= 0f)
-                            continue;
-
-                        Vector3 adjustedWorld = entry.MorphedWorld[i] - fwd * (overrun * guardFade);
-                        Matrix4x4 skin = GetWeightedSkinMatrix(entry.BoneMatrices, entry.Weights[i]);
-                        entry.CurrentVerts[i] = skin.inverse.MultiplyPoint3x4(adjustedWorld);
-                        VertexMorphTrace trace = entry.Record.LastMorphTrace != null && i < entry.Record.LastMorphTrace.Length
-                            ? entry.Record.LastMorphTrace[i]
-                            : null;
-                        if (trace != null)
-                        {
-                            float adjustedFwd = Vector3.Dot(adjustedWorld - center, fwd);
-                            trace.CrossLayerGuardDeltaFwd += adjustedFwd - currentFwd;
-                            trace.FwdCrossLayerGuard = adjustedFwd;
-                            trace.FwdFinal = adjustedFwd;
-                        }
-                        entry.MorphedWorld[i] = adjustedWorld;
-                        entry.Changed = true;
-                        changedThisPass = true;
-                    }
-                }
-
-                if (!changedThisPass)
-                    break;
-            }
-
-            for (int i = 0; i < meshes.Count; i++)
-            {
-                CrossLayerGuardMesh entry = meshes[i];
-                if (!entry.Changed) continue;
-
-                entry.Record.LastDeltaVerts = BuildDeltaVerts(entry.Record.OrigVerts, entry.CurrentVerts);
-                entry.Record.AppliedSignature = ComputeVertexSignature(entry.CurrentVerts);
-                entry.Mesh.vertices = entry.CurrentVerts;
-                ApplySmoothedNormals(entry.Mesh, entry.Record, entry.CurrentVerts);
-                entry.Mesh.RecalculateBounds();
-            }
-        }
-
-        static float GetOuterLayerGuardVerticalFade(float originalUp, float radiusUp, float radiusDown)
-        {
-            if (originalUp > radiusUp * 0.35f)
-                return 0f;
-
-            float fadeStart = -radiusDown * 0.55f;
-            float fadeEnd = -radiusDown * 1.15f;
-            if (originalUp >= fadeStart)
-                return 1f;
-            if (originalUp <= fadeEnd)
-                return 0f;
-
-            return Smooth01((originalUp - fadeEnd) / Mathf.Max(fadeStart - fadeEnd, 0.0001f));
-        }
-
-        static long LayerBucketKey(int sideBin, int upBin)
-        {
-            return ((long)sideBin << 32) ^ (uint)upBin;
         }
 
         static List<int>[] BuildMeshNeighbors(Mesh mesh, int count)
@@ -4435,122 +8280,53 @@ namespace COM3D2.Pregnancy.Plugin
             return neighbors;
         }
 
+        static void ExpandTriangleEligibilityFromAnyVertex(Mesh mesh, bool[] eligible, bool[] valid)
+        {
+            if (mesh == null || eligible == null || valid == null)
+                return;
+
+            int count = Mathf.Min(eligible.Length, valid.Length);
+            if (count <= 0)
+                return;
+
+            int[] triangles = null;
+            try
+            {
+                triangles = mesh.triangles;
+            }
+            catch
+            {
+                return;
+            }
+
+            if (triangles == null || triangles.Length < 3)
+                return;
+
+            bool[] source = (bool[])eligible.Clone();
+            for (int i = 0; i + 2 < triangles.Length; i += 3)
+            {
+                int a = triangles[i];
+                int b = triangles[i + 1];
+                int c = triangles[i + 2];
+                if (a < 0 || b < 0 || c < 0 || a >= count || b >= count || c >= count)
+                    continue;
+
+                if (!source[a] && !source[b] && !source[c])
+                    continue;
+
+                if (valid[a]) eligible[a] = true;
+                if (valid[b]) eligible[b] = true;
+                if (valid[c]) eligible[c] = true;
+            }
+        }
+
         static void AddNeighbor(List<int>[] neighbors, int index, int neighbor)
         {
             if (!neighbors[index].Contains(neighbor))
                 neighbors[index].Add(neighbor);
         }
 
-        static Vector3 ApplyClothLayerOffsetWorld(
-            MeshMorphClass meshClass,
-            Vector3 original,
-            Vector3 morphed,
-            Vector3 center,
-            float shapeWeight,
-            float directionalRadius,
-            float originalRadius,
-            float edgeRatio,
-            float upDot,
-            float radiusDown,
-            Vector3 right,
-            Vector3 up,
-            Vector3 fwd)
-        {
-            if (meshClass == MeshMorphClass.Body || meshClass == MeshMorphClass.Ignore)
-                return morphed;
 
-            bool isOuterCloth = meshClass == MeshMorphClass.OuterCloth;
-            float layerOffset = meshClass == MeshMorphClass.OuterCloth
-                ? RelGeneral(OuterClothOffset)
-                : RelGeneral(InnerClothOffset);
-            float preserve = isOuterCloth ? ClothThicknessPreserve : 0f;
-
-            if (layerOffset == 0f && preserve == 0f) return morphed;
-
-            Vector3 rel = original - center;
-            if (rel.sqrMagnitude < 1e-8f)
-                rel = morphed - center;
-            if (rel.sqrMagnitude < 1e-8f)
-                return morphed;
-
-            Vector3 displacement = morphed - original;
-            Vector3 offsetBase = displacement.sqrMagnitude > 1e-8f
-                ? displacement.normalized
-                : rel.normalized;
-
-            float side = Vector3.Dot(offsetBase, right);
-            float vertical = Vector3.Dot(offsetBase, up);
-            float forward = Vector3.Dot(offsetBase, fwd);
-            float sideRatio = isOuterCloth ? ClothOffsetSideRatio : 1f;
-            Vector3 offsetDir = right * (side * sideRatio)
-                + up * vertical
-                + fwd * forward;
-            float directionScale = offsetDir.magnitude;
-            if (offsetDir.sqrMagnitude < 1e-8f)
-                return morphed;
-            else
-                offsetDir.Normalize();
-
-            float shellRatio = originalRadius / Mathf.Max(directionalRadius, 0.0001f);
-            float surface = Smooth01((shellRatio - 0.35f) / 0.65f);
-            float boundaryFade = Smooth01((1f - edgeRatio) / 0.35f);
-            float fade = Smooth01(shapeWeight) * boundaryFade;
-            float baseThickness = layerOffset + directionalRadius * 0.10f * preserve * surface;
-            float back = Mathf.Clamp01(-forward);
-            float backScale = isOuterCloth ? Mathf.Lerp(1f, ClothBackOffsetBoost, back) : 1f;
-            float baseAmount = baseThickness * fade;
-
-            return morphed + offsetDir * (baseAmount * directionScale * backScale);
-        }
-
-        static Vector3 ApplyClothDepthStretchWorld(
-            MeshMorphClass meshClass,
-            Vector3 original,
-            Vector3 morphed,
-            float directionalRadius,
-            float originalRadius,
-            float upDot,
-            float radiusDown)
-        {
-            if (meshClass != MeshMorphClass.OuterCloth || ClothDepthStretch == 0f)
-                return morphed;
-
-            Vector3 displacement = morphed - original;
-            if (displacement.sqrMagnitude < 1e-10f)
-                return morphed;
-
-            float depthStretch = GetClothDepthStretchFactor(
-                meshClass,
-                originalRadius,
-                directionalRadius,
-                upDot,
-                radiusDown);
-
-            return original + displacement * depthStretch;
-        }
-
-        static float GetClothDepthStretchFactor(
-            MeshMorphClass meshClass,
-            float originalRadius,
-            float directionalRadius,
-            float upDot,
-            float radiusDown)
-        {
-            if (meshClass != MeshMorphClass.OuterCloth)
-                return 1f;
-
-            float shellRatio = Mathf.Clamp01(originalRadius / Mathf.Max(directionalRadius, 0.0001f));
-            float outerSurface = Smooth01((shellRatio - 0.20f) / 0.80f);
-            float lower = upDot < 0f
-                ? Smooth01((-upDot / Mathf.Max(radiusDown, 0.0001f) - 0.25f) / 0.75f)
-                : 0f;
-            float minFollow = Mathf.Lerp(0.30f, 0.16f, lower);
-            float oldCompressionFollow = Mathf.Lerp(minFollow, 1f, outerSurface);
-            float stretchControl = ClothDepthStretch * Mathf.Lerp(1f, 1.35f, lower);
-            float inverseCompression = (oldCompressionFollow - minFollow) / Mathf.Max(1f - minFollow, 0.0001f);
-
-            return 1f + inverseCompression * stretchControl;
-        }
 
         static void ApplySmoothedNormals(Mesh mesh, MeshRecord rec, Vector3[] newVerts)
         {
@@ -5033,6 +8809,10 @@ namespace COM3D2.Pregnancy.Plugin
             void LateUpdate()
             {
                 if (_maid == null) return;
+                if (IsDebugMeshLoggingEnabled())
+                    MaybeLogMeshInventory(_maid, CollectTargetRenderers(_maid), "monitor");
+                else
+                    _meshInventorySignatures.Remove(_maid.GetHashCode());
                 BellyMorphController.FlushMorphDirty(_maid);
                 ProcessFullRefresh();
                 ProcessVisibilityApply();
@@ -5040,4 +8820,3 @@ namespace COM3D2.Pregnancy.Plugin
         }
     }
 }
-

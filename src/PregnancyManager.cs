@@ -26,19 +26,17 @@ namespace COM3D2.Pregnancy.Plugin
                 {
                     string json = File.ReadAllText(SettingsPath);
                     bool hasOuterClothPregnancyScale = json.Contains("bellyOuterClothPregnancyScale");
-                    bool hasOuterClothLayerGuard = json.Contains("bellyOuterClothLayerGuard");
                     bool hasSkirtLowerParams = json.Contains("bellySkirtLowerTipUp");
+                    bool hasSkirtHemFadeRangeScale = json.Contains("bellySkirtHemFadeRangeScale");
                     Settings = JsonUtility.FromJson<PregSettings>(
                         json) ?? new PregSettings();
                     if (!hasOuterClothPregnancyScale)
                         Settings.bellyOuterClothPregnancyScale = 1.0f;
-                    if (!hasOuterClothLayerGuard)
-                        Settings.bellyOuterClothLayerGuard = 0.0f;
                     if (!hasSkirtLowerParams)
                     {
                         Settings.bellySkirtBoundarySmoothPasses = 2;
                         Settings.bellySkirtBoundarySmoothStrength = 0.35f;
-                        Settings.bellySkirtBoundaryUpOffset = 0.0f;
+                        Settings.bellySkirtBoundaryUpOffset = 0.08f;
                         Settings.bellySkirtFrontPlaneFwdOffset = 0.0f;
                         Settings.bellySkirtLowerTipSide = 0.0f;
                         Settings.bellySkirtLowerTipUp = -0.42f;
@@ -47,6 +45,8 @@ namespace COM3D2.Pregnancy.Plugin
                         Settings.bellySkirtLowerRadiusUp = 1.0f;
                         Settings.bellySkirtLowerRadiusFwd = 1.0f;
                     }
+                    if (!hasSkirtHemFadeRangeScale)
+                        Settings.bellySkirtHemFadeRangeScale = 1.0f;
                 }
                 catch { }
             }
@@ -91,20 +91,13 @@ namespace COM3D2.Pregnancy.Plugin
             BellyMorphController.SideSmoothStrength = Settings.bellySideSmoothStrength;
             BellyMorphController.BreastGuardStrength = Settings.bellyBreastGuardStrength;
             BellyMorphController.OuterClothPregnancyScale = Settings.bellyOuterClothPregnancyScale;
-            BellyMorphController.OuterClothSkirtDrape = Settings.bellyOuterClothSkirtDrape;
-            BellyMorphController.OuterClothLayerGuard = Settings.bellyOuterClothLayerGuard;
-            BellyMorphController.InnerClothOffset = Settings.bellyInnerClothOffset;
-            BellyMorphController.OuterClothOffset = Settings.bellyOuterClothOffset;
-            BellyMorphController.ClothThicknessPreserve = Settings.bellyClothThicknessPreserve;
-            BellyMorphController.ClothOffsetSideRatio = Settings.bellyClothOffsetSideRatio;
-            BellyMorphController.ClothBackOffsetBoost = Settings.bellyClothBackOffsetBoost;
-            BellyMorphController.ClothDepthStretch = Settings.bellyClothDepthStretch;
             BellyMorphController.SkirtBoundarySmoothPasses = Settings.bellySkirtBoundarySmoothPasses;
             BellyMorphController.SkirtBoundarySmoothStrength = Settings.bellySkirtBoundarySmoothStrength;
             BellyMorphController.SkirtBoundaryUpOffset = Settings.bellySkirtBoundaryUpOffset;
             BellyMorphController.SkirtFrontPlaneFwdOffset = Settings.bellySkirtFrontPlaneFwdOffset;
             BellyMorphController.SkirtTopRadiusSideScale = Settings.bellySkirtTopRadiusSideScale;
             BellyMorphController.SkirtTopRadiusFwdScale = Settings.bellySkirtTopRadiusFwdScale;
+            BellyMorphController.SkirtHemFadeRangeScale = Settings.bellySkirtHemFadeRangeScale;
             BellyMorphController.SkirtLowerTipSide = Settings.bellySkirtLowerTipSide;
             BellyMorphController.SkirtLowerTipUp = Settings.bellySkirtLowerTipUp;
             BellyMorphController.SkirtLowerTipFwd = Settings.bellySkirtLowerTipFwd;
@@ -144,20 +137,13 @@ namespace COM3D2.Pregnancy.Plugin
             Settings.bellySideSmoothStrength = BellyMorphController.SideSmoothStrength;
             Settings.bellyBreastGuardStrength = BellyMorphController.BreastGuardStrength;
             Settings.bellyOuterClothPregnancyScale = BellyMorphController.OuterClothPregnancyScale;
-            Settings.bellyOuterClothSkirtDrape = BellyMorphController.OuterClothSkirtDrape;
-            Settings.bellyOuterClothLayerGuard = BellyMorphController.OuterClothLayerGuard;
-            Settings.bellyInnerClothOffset = BellyMorphController.InnerClothOffset;
-            Settings.bellyOuterClothOffset = BellyMorphController.OuterClothOffset;
-            Settings.bellyClothThicknessPreserve = BellyMorphController.ClothThicknessPreserve;
-            Settings.bellyClothOffsetSideRatio = BellyMorphController.ClothOffsetSideRatio;
-            Settings.bellyClothBackOffsetBoost = BellyMorphController.ClothBackOffsetBoost;
-            Settings.bellyClothDepthStretch = BellyMorphController.ClothDepthStretch;
             Settings.bellySkirtBoundarySmoothPasses = BellyMorphController.SkirtBoundarySmoothPasses;
             Settings.bellySkirtBoundarySmoothStrength = BellyMorphController.SkirtBoundarySmoothStrength;
             Settings.bellySkirtBoundaryUpOffset = BellyMorphController.SkirtBoundaryUpOffset;
             Settings.bellySkirtFrontPlaneFwdOffset = BellyMorphController.SkirtFrontPlaneFwdOffset;
             Settings.bellySkirtTopRadiusSideScale = BellyMorphController.SkirtTopRadiusSideScale;
             Settings.bellySkirtTopRadiusFwdScale = BellyMorphController.SkirtTopRadiusFwdScale;
+            Settings.bellySkirtHemFadeRangeScale = BellyMorphController.SkirtHemFadeRangeScale;
             Settings.bellySkirtLowerTipSide = BellyMorphController.SkirtLowerTipSide;
             Settings.bellySkirtLowerTipUp = BellyMorphController.SkirtLowerTipUp;
             Settings.bellySkirtLowerTipFwd = BellyMorphController.SkirtLowerTipFwd;
