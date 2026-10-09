@@ -1,3 +1,25 @@
+# COM3D2 Pregnancy Plugin
+
+## Clothing preview — 2026-10-10
+
+[Download the preview DLL](https://github.com/rock-1995/COM3D2.Pregnancy.Plugin.dll-on-going-/releases/tag/clothing-preview-20261010) · [Changes and validation](CHANGELOG.md) · [Build and tests](BUILDING.md)
+
+This snapshot contains the current AL-based body and clothing implementation. Tight clothing now follows the actual animated body surface at the abdomen/chest boundary. Breast guarding is selected from the body's breast-physics region instead of freezing abdominal fabric just because the garment has a breast-bone influence. Skirt drape and pose caching from the preceding local versions are retained.
+
+**Preview limitation:** a small edge-interior intersection remains in one simulated upper-abdomen pose (about 0.4 mm in front-depth projection). Offline mesh and pose tests passed; this specific build has not received an in-game visual pass. It is published as a prerelease, without replacing the existing stable release.
+
+### Installation
+
+Back up your current plugin, close the game, and replace `COM3D2.Pregnancy.Plugin.dll` in `BepInEx/plugins/`. Keep only one copy of the plugin DLL in the plugin search path. Existing settings are retained. The release does not contain game assemblies, model assets, private dumps, or user saves.
+
+The plugin identifier and embedded version are retained from the tested build. Use the release tag and SHA-256 file to identify this preview.
+
+---
+
+## Earlier feature overview
+
+The original project description is preserved below. See the preview notes above for the current deformation status.
+
 The pregnancy mod is basically complete. Here is a breakdown of the features:
 
 Menstrual Cycle Design
