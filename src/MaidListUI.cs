@@ -1,147 +1,153 @@
 using System.Collections.Generic;
+using MaidStatus;
 using UnityEngine;
 
-namespace COM3D2.Pregnancy.Plugin
+namespace COM3D2.Pregnancy.Plugin;
+
+public class MaidListUI : MonoBehaviour
 {
-    public class MaidListUI : MonoBehaviour
-    {
-        struct MaidRow
-        {
-            public string Name;
-            public string Status;
-            public bool Pregnant;
-        }
+	private struct MaidRow
+	{
+		public string Name;
 
-        bool _visible = false;
-        Rect _win = new Rect(20f, 80f, 340f, 400f);
-        int _winId;
-        Vector2 _scroll = Vector2.zero;
-        List<MaidRow> _rows = new List<MaidRow>();
+		public string Status;
 
-        void Awake()
-        {
-            _winId = GetHashCode();
-        }
+		public bool Pregnant;
+	}
 
-        void Update()
-        {
-            if (Input.GetKeyDown(PregnancyPlugin.CfgMaidListKey.Value))
-            {
-                _visible = !_visible;
-                if (_visible)
-                    RefreshData();
-            }
-        }
+	private bool _visible;
 
-        void RefreshData()
-        {
-            _rows.Clear();
-            var cm = GameMain.Instance?.CharacterMgr;
-            if (cm == null) return;
+	private Rect _win = new Rect(20f, 80f, 340f, 400f);
 
-            FertilityCycleMode mode = PregnancyManager.GetCycleMode();
-            bool cyclic = PregnancyManager.IsCyclicMode(mode);
-            int cycleLength = PregnancyManager.GetCycleLength(mode);
-            int totalDays = PregnancyPlugin.CfgPregnancyWeeks != null
-                ? PregnancyPlugin.CfgPregnancyWeeks.Value * 7 : 280;
+	private int _winId;
 
-            int count = cm.GetStockMaidCount();
-            for (int i = 0; i < count; i++)
-            {
-                Maid maid = cm.GetStockMaid(i);
-                if (maid == null) continue;
+	private Vector2 _scroll = Vector2.zero;
 
-                bool preg = PregnancyManager.GetPregnant(maid);
-                string statusStr;
+	private List<MaidRow> _rows = new List<MaidRow>();
 
-                if (preg)
-                {
-                    float prog = PregnancyManager.GetProgress(maid);
-                    int curDay = Mathf.RoundToInt(prog * totalDays);
-                    statusStr = string.Format("Pregnant {0}/{1}d", curDay, totalDays);
-                }
-                else
-                {
-                    float cp = PregnancyManager.EnsureCycleProgress(maid);
-                    int displayLength = cyclic ? cycleLength : 28;
-                    int cd = PregnancyManager.GetCycleDay(cp, displayLength);
-                    statusStr = string.Format("Cycle {0}/{1}d", cd, displayLength);
-                }
+	private void Awake()
+	{
+		_winId = GetHashCode();
+	}
 
-                _rows.Add(new MaidRow
-                {
-                    Name = GetMaidDisplayName(maid),
-                    Status = statusStr,
-                    Pregnant = preg
-                });
-            }
-        }
+	private void Update()
+	{
+		if (Input.GetKeyDown(PregnancyPlugin.CfgMaidListKey.Value))
+		{
+			_visible = !_visible;
+			if (_visible)
+			{
+				RefreshData();
+			}
+		}
+	}
 
-        void OnGUI()
-        {
-            if (!_visible) return;
-            _win = GUI.Window(_winId, _win, DrawWindow, "Pregnancy - Maid Status");
-        }
+	private void RefreshData()
+	{
+		_rows.Clear();
+		CharacterMgr characterMgr = GameMain.Instance?.CharacterMgr;
+		if (characterMgr == null)
+		{
+			return;
+		}
+		FertilityCycleMode cycleMode = PregnancyManager.GetCycleMode();
+		bool flag = PregnancyManager.IsCyclicMode(cycleMode);
+		int cycleLength = PregnancyManager.GetCycleLength(cycleMode);
+		int num = ((PregnancyPlugin.CfgPregnancyWeeks != null) ? (PregnancyPlugin.CfgPregnancyWeeks.Value * 7) : 280);
+		int stockMaidCount = characterMgr.GetStockMaidCount();
+		for (int i = 0; i < stockMaidCount; i++)
+		{
+			Maid stockMaid = characterMgr.GetStockMaid(i);
+			if (!(stockMaid == null))
+			{
+				bool pregnant = PregnancyManager.GetPregnant(stockMaid);
+				string status;
+				if (pregnant)
+				{
+					int num2 = Mathf.RoundToInt(PregnancyManager.GetProgress(stockMaid) * (float)num);
+					status = $"Pregnant {num2}/{num}d";
+				}
+				else
+				{
+					float cycleProgress = PregnancyManager.EnsureCycleProgress(stockMaid);
+					int num3 = (flag ? cycleLength : 28);
+					int cycleDay = PregnancyManager.GetCycleDay(cycleProgress, num3);
+					status = $"Cycle {cycleDay}/{num3}d";
+				}
+				_rows.Add(new MaidRow
+				{
+					Name = GetMaidDisplayName(stockMaid),
+					Status = status,
+					Pregnant = pregnant
+				});
+			}
+		}
+	}
 
-        void DrawWindow(int id)
-        {
-            GUI.DragWindow(new Rect(0, 0, _win.width, 20f));
+	private void OnGUI()
+	{
+		if (_visible)
+		{
+			_win = GUI.Window(_winId, _win, DrawWindow, "Pregnancy - Maid Status");
+		}
+	}
 
-            if (GUI.Button(new Rect(_win.width - 26f, 2f, 22f, 18f), "X"))
-            {
-                _visible = false;
-                return;
-            }
+	private void DrawWindow(int id)
+	{
+		GUI.DragWindow(new Rect(0f, 0f, _win.width, 20f));
+		if (GUI.Button(new Rect(_win.width - 26f, 2f, 22f, 18f), "X"))
+		{
+			_visible = false;
+			return;
+		}
+		if (_rows.Count == 0)
+		{
+			GUI.Label(new Rect(8f, 26f, _win.width - 16f, 22f), "No maids found.");
+			return;
+		}
+		float num = 8f;
+		float num2 = 26f;
+		float num3 = _win.width - 16f;
+		float num4 = 150f;
+		float width = num3 - num4 - 4f;
+		GUI.Label(new Rect(num, num2, num4, 18f), "Name");
+		GUI.Label(new Rect(num + num4, num2, width, 18f), "Status");
+		num2 += 20f;
+		float num5 = 22f;
+		float num6 = _win.height - num2 - 8f;
+		float a = num5 * (float)_rows.Count;
+		_scroll = GUI.BeginScrollView(new Rect(num, num2, num3, num6), _scroll, new Rect(0f, 0f, num3 - 18f, Mathf.Max(a, num6)));
+		float num7 = 0f;
+		for (int i = 0; i < _rows.Count; i++)
+		{
+			MaidRow maidRow = _rows[i];
+			if (maidRow.Pregnant)
+			{
+				GUI.color = new Color(1f, 0.85f, 0.85f);
+			}
+			GUI.Label(new Rect(0f, num7, num4, num5), maidRow.Name);
+			GUI.Label(new Rect(num4, num7, width, num5), maidRow.Status);
+			GUI.color = Color.white;
+			num7 += num5;
+		}
+		GUI.EndScrollView();
+	}
 
-            if (_rows.Count == 0)
-            {
-                GUI.Label(new Rect(8f, 26f, _win.width - 16f, 22f), "No maids found.");
-                return;
-            }
-
-            float x = 8f, y = 26f;
-            float w = _win.width - 16f;
-            float nameW = 150f;
-            float statusW = w - nameW - 4f;
-
-            GUI.Label(new Rect(x, y, nameW, 18f), "Name");
-            GUI.Label(new Rect(x + nameW, y, statusW, 18f), "Status");
-            y += 20f;
-
-            float rowH = 22f;
-            float viewH = _win.height - y - 8f;
-            float contentH = rowH * _rows.Count;
-
-            _scroll = GUI.BeginScrollView(
-                new Rect(x, y, w, viewH),
-                _scroll,
-                new Rect(0, 0, w - 18f, Mathf.Max(contentH, viewH)));
-
-            float ry = 0f;
-            for (int i = 0; i < _rows.Count; i++)
-            {
-                MaidRow row = _rows[i];
-                if (row.Pregnant)
-                    GUI.color = new Color(1f, 0.85f, 0.85f);
-                GUI.Label(new Rect(0f, ry, nameW, rowH), row.Name);
-                GUI.Label(new Rect(nameW, ry, statusW, rowH), row.Status);
-                GUI.color = Color.white;
-                ry += rowH;
-            }
-
-            GUI.EndScrollView();
-        }
-
-        static string GetMaidDisplayName(Maid maid)
-        {
-            try
-            {
-                var status = maid?.status;
-                if (status == null) return "(null)";
-                string name = ((status.lastName ?? "") + " " + (status.firstName ?? "")).Trim();
-                return name.Length > 0 ? name : "(unnamed)";
-            }
-            catch { return "(error)"; }
-        }
-    }
+	private static string GetMaidDisplayName(Maid maid)
+	{
+		try
+		{
+			Status status = maid?.status;
+			if (status == null)
+			{
+				return "(null)";
+			}
+			string text = (status.lastName + " " + status.firstName).Trim();
+			return (text.Length > 0) ? text : "(unnamed)";
+		}
+		catch
+		{
+			return "(error)";
+		}
+	}
 }

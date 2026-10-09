@@ -14,13 +14,13 @@ namespace COM3D2.Pregnancy.Plugin
 
         internal static PregnancyPlugin Instance;
         internal static ConfigEntry<KeyCode> CfgToggleKey;
+        internal static ConfigEntry<KeyCode> CfgMaidListKey;
         internal static ConfigEntry<int> CfgPregnancyWeeks;
         internal static ConfigEntry<float> CfgFertilityRate;
         internal static ConfigEntry<FertilityCycleMode> CfgCycleMode;
         internal static ConfigEntry<MorphTriggerMode> CfgMorphTriggerMode;
         internal static ConfigEntry<bool> CfgMorphSpyLogging;
         internal static ConfigEntry<bool> CfgDebugMeshLogging;
-        internal static ConfigEntry<KeyCode> CfgMaidListKey;
         Harmony _harmony;
         int _aysHookAttempts;
         bool _aysHookReady;
@@ -31,6 +31,9 @@ namespace COM3D2.Pregnancy.Plugin
             CfgToggleKey = Config.Bind(
                 "General", "Toggle UI Key", KeyCode.F8,
                 "Hotkey to open/close the Pregnancy UI window.");
+            CfgMaidListKey = Config.Bind(
+                "General", "Maid List UI Key", KeyCode.F9,
+                "Hotkey to open/close the Maid Status list window.");
 
             CfgPregnancyWeeks = Config.Bind(
                 "General", "Pregnancy Weeks", 40,
@@ -55,10 +58,6 @@ namespace COM3D2.Pregnancy.Plugin
             CfgDebugMeshLogging = Config.Bind(
                 "Debug", "Mesh Logging", false,
                 "Log mesh load spy and belly morph diagnostics.");
-
-            CfgMaidListKey = Config.Bind(
-                "General", "Maid List UI Key", KeyCode.F9,
-                "Hotkey to open/close the Maid Status list window.");
 
             try
             {

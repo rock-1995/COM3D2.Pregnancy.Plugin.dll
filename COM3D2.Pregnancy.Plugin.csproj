@@ -1,11 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net46</TargetFramework>
+    <TargetFramework>net35</TargetFramework>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
     <AssemblyName>COM3D2.Pregnancy.Plugin</AssemblyName>
     <RootNamespace>COM3D2.Pregnancy.Plugin</RootNamespace>
-    <LangVersion>7.3</LangVersion>
+    <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <!-- 编译完直接放进 BepInEx\plugins，不用手动复制 -->
     <OutputPath>$(GameDir)/BepInEx/plugins/</OutputPath>
@@ -18,9 +21,20 @@
        ================================================================ -->
   <PropertyGroup>
     <GameDir>E:\com3d2</GameDir>
+    <!-- Compile against the same legacy Mono profile used by this Unity player. -->
+    <FrameworkPathOverride>$(GameDir)\COM3D2x64_Data\Managed</FrameworkPathOverride>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="src/**/*.cs" />
+    <Reference Include="System">
+      <HintPath>$(FrameworkPathOverride)\System.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Core">
+      <HintPath>$(FrameworkPathOverride)\System.Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <!-- BepInEx 核心 -->
     <Reference Include="BepInEx">
       <HintPath>$(GameDir)\BepInEx\core\BepInEx.dll</HintPath>
