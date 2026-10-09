@@ -10,7 +10,7 @@ V13 includes a downward belly-sag control, gradual navel protrusion from the con
 - Navel accessories follow the final bones, weights and matrices of the navel support vertices while preserving the accessory's rigid shape.
 - The **背中 / accSenaka** category now participates in outer-clothing deformation.
 
-The tested DLL is published as a prerelease. Production compilation and offline geometry, pose, refresh and multi-maid checks passed; this exact build has not yet had an in-game visual pass. The previous clothing preview's small edge-interior clipping limitation remains documented in [CHANGELOG.md](CHANGELOG.md).
+V13 is the current stable release. Production compilation and offline geometry, pose, refresh and multi-maid checks passed. The previous clothing preview's small edge-interior clipping limitation remains documented in [CHANGELOG.md](CHANGELOG.md).
 
 ### Installation
 
