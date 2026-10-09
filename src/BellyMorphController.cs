@@ -1,4 +1,4 @@
-using COM3D2.Pregnancy.Plugin.Growth;
+﻿using COM3D2.Pregnancy.Plugin.Growth;
 using NVector = COM3D2.Pregnancy.Plugin.Growth.Numerics.Vector3;
 using NMatrix = COM3D2.Pregnancy.Plugin.Growth.Numerics.Matrix4x4;
 using System.Collections.Generic;
@@ -64,6 +64,11 @@ namespace COM3D2.Pregnancy.Plugin
             public SkirtDrapePlan Skirt;
             public ClothingMotionPlan ClothingMotion;
             public int AppliedSignature;
+            public bool RefreshReady,HadBinding;
+            public ALContext AppliedContext;
+            public int RefreshShapeSignature,RefreshStructureSignature,AppliedExactSignature,AppliedNormalSignature;
+            public BodySurfaceHit[] RestHits;
+            public byte[] RestHitState;
         }
 
         class MorphBaseBakeState
@@ -153,13 +158,18 @@ namespace COM3D2.Pregnancy.Plugin
 
         public static void ApplyProgress(Maid maid, float progress)
         {
-            if (!IsValid(maid)) return;
-            _bpWorldCached = false;
-            _activeProgress[maid.GetHashCode()] = Mathf.Clamp01(progress);
-            EnsureMonitor(maid);
-            PruneRecords(maid);
+            using(new RefreshTrace(maid,"apply"))
+            {
+                if (!IsValid(maid)) return;
+                _bpWorldCached = false;
+                _activeProgress[maid.GetHashCode()] = Mathf.Clamp01(progress);
+                if(progress<=0){ResetInternal(maid);return;}
+                _maidShapes[maid.GetHashCode()]=Shape.Copy();
+                EnsureMonitor(maid);
+                PruneRecords(maid);
 
-            ApplyToSlots(maid, Mathf.Clamp01(progress), false);
+                ApplyToSlots(maid, Mathf.Clamp01(progress), false);
+            }
         }
 
         public static void SetBelly(Maid maid, float sliderValue)
@@ -184,6 +194,7 @@ namespace COM3D2.Pregnancy.Plugin
         {
             int key = maid.GetHashCode();
             _activeProgress.Remove(key);
+            _maidShapes.Remove(key);
             _morphDirtySkins.Remove(key);
             ReleaseALBindings(maid);
             _alContexts.Remove(key);
@@ -249,7 +260,7 @@ namespace COM3D2.Pregnancy.Plugin
 
                 AttachNotifier(smr.gameObject, maid);
 
-                bool willApply = includeInactive || smr.gameObject.activeInHierarchy;
+                bool willApply = includeInactive || (smr.enabled && smr.gameObject.activeInHierarchy);
                 if (IsDebugMeshLoggingEnabled())
                     LogMorphScan(maid, smr, meshClass, includeInactive, willApply);
 
@@ -374,7 +385,7 @@ namespace COM3D2.Pregnancy.Plugin
             if (id.Contains("accheso")) return MeshMorphClass.NavelAccessory;
             if (ContainsAny(id, "body", "base", "karada", "inmou", "nip", "under")) return MeshMorphClass.Body;
             if (ContainsAny(id, "bra", "pants", "psnts", "stkg", "mizugi", "zurashi")) return MeshMorphClass.InnerCloth;
-            if (ContainsAny(id, "wear", "onep", "skrt", "zubon", "skirt", "mekure")) return MeshMorphClass.OuterCloth;
+            if (ContainsAny(id, "wear", "onep", "skrt", "zubon", "skirt", "mekure", "accsenaka")) return MeshMorphClass.OuterCloth;
 
             return MeshMorphClass.Ignore;
         }
@@ -584,114 +595,133 @@ namespace COM3D2.Pregnancy.Plugin
 
         static bool TryBakeRuntimeMorphBase(Maid maid, TMorph morph, float progress)
         {
-            Vector3[] currentVerts = morph.m_vOriVert;
-            if (currentVerts == null || currentVerts.Length == 0) return false;
-
-            SkinnedMeshRenderer smr = FindRendererForMorph(maid, morph);
-            if (smr == null || smr.sharedMesh == null) return false;
-
-            MeshMorphClass meshClass = ClassifyMesh(smr);
-            if (meshClass == MeshMorphClass.Ignore) return false;
-
-            Mesh mesh = smr.sharedMesh;
-            int meshId = mesh.GetInstanceID();
-            int shapeSignature = ComputeMorphBakeSignature(progress, meshClass);
-            int currentSignature = ComputeVertexSignature(currentVerts);
-
-            MorphBaseBakeState state;
-            bool hasState = _morphBaseBakeStates.TryGetValue(morph, out state)
-                && state != null
-                && state.MeshInstanceId == meshId
-                && state.OriginalVerts != null
-                && state.OriginalVerts.Length == currentVerts.Length;
-
-            bool currentIsKnownBaked = hasState
-                && state.AppliedSignature != 0
-                && currentSignature == state.AppliedSignature;
-
-            if (currentIsKnownBaked && state.ShapeSignature == shapeSignature)
-                return false;
-
-            Vector3[] baseVerts;
-            Vector3[] baseNormals;
-            bool reusedStoredBase = false;
-            if (currentIsKnownBaked)
+            using(new MaidShapeScope(maid))
+            using(new RefreshTrace(maid,"morph-base"))
             {
-                baseVerts = (Vector3[])state.OriginalVerts.Clone();
-                baseNormals = CloneVectorArray(state.OriginalNormals);
-                reusedStoredBase = true;
+                Vector3[] currentVerts = morph.m_vOriVert;
+                if (currentVerts == null || currentVerts.Length == 0) return false;
+
+                SkinnedMeshRenderer smr = FindRendererForMorph(maid, morph);
+                if (smr == null || smr.sharedMesh == null) return false;
+
+                MeshMorphClass meshClass = ClassifyMesh(smr);
+                if (meshClass == MeshMorphClass.Ignore) return false;
+
+                Mesh mesh = smr.sharedMesh;
+                int meshId = mesh.GetInstanceID();
+                int shapeSignature = ComputeMorphBakeSignature(progress, meshClass);
+                int currentSignature = ComputeVertexSignature(currentVerts);
+
+                MorphBaseBakeState state;
+                bool hasState = _morphBaseBakeStates.TryGetValue(morph, out state)
+                    && state != null
+                    && state.MeshInstanceId == meshId
+                    && state.OriginalVerts != null
+                    && state.OriginalVerts.Length == currentVerts.Length;
+
+                bool currentIsKnownBaked = hasState
+                    && state.AppliedSignature != 0
+                    && currentSignature == state.AppliedSignature;
+
+                if (currentIsKnownBaked && state.ShapeSignature == shapeSignature)
+                    return false;
+
+                Vector3[] baseVerts;
+                Vector3[] baseNormals;
+                bool reusedStoredBase = false;
+                if (currentIsKnownBaked)
+                {
+                    baseVerts = (Vector3[])state.OriginalVerts.Clone();
+                    baseNormals = CloneVectorArray(state.OriginalNormals);
+                    reusedStoredBase = true;
+                }
+                else
+                {
+                    baseVerts = (Vector3[])currentVerts.Clone();
+                    baseNormals = CloneNormalsForMorph(morph.m_vOriNorm, mesh, currentVerts.Length);
+                }
+
+                if (!CacheBindPoseWorldForMaid(maid)) return false;
+                PrepareALContext(maid, CollectTargetRenderers(maid), progress);
+
+                MeshRecord rec = new MeshRecord
+                {
+                    SMR = smr,
+                    Mesh = mesh,
+                    OrigVerts = baseVerts,
+                    OrigNormals = baseNormals,
+                };
+
+                bool[] mask = BuildVertexMask(smr, rec, meshClass);
+                if (!HasAnyMaskedVertex(mask)) return false;
+
+                float effectiveProgress = GetEffectiveMorphProgress(progress, meshClass);
+                Vector3[] bakedVerts;
+                DeformStats stats;
+                long deformStarted=System.Diagnostics.Stopwatch.GetTimestamp();
+                if(_refreshStats!=null)_refreshStats.Rebuilt++;
+                if (!TryDeformVertsInBindPoseWorld(
+                    smr,
+                    rec,
+                    mask,
+                    meshClass,
+                    effectiveProgress,
+                    out bakedVerts,
+                    out stats))
+                {
+                    return false;
+                }
+
+                if(_refreshStats!=null)_refreshStats.DeformTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-deformStarted;
+                long normalStarted=System.Diagnostics.Stopwatch.GetTimestamp();
+                Vector3[] bakedNormals = BuildMorphBaseNormals(mesh, rec, bakedVerts);
+                if (bakedNormals == null || bakedNormals.Length != bakedVerts.Length)
+                    bakedNormals = CloneVectorArray(baseNormals);
+                if(_refreshStats!=null)_refreshStats.NormalTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-normalStarted;
+
+                int originalSignature = ComputeVertexSignature(baseVerts);
+                int appliedSignature = ComputeVertexSignature(bakedVerts);
+                int oldOriVertId = currentVerts.GetHashCode();
+
+                morph.m_vOriVert = bakedVerts;
+                if (bakedNormals != null && bakedNormals.Length == bakedVerts.Length)
+                    morph.m_vOriNorm = bakedNormals;
+
+                MorphBaseBakeState newState = new MorphBaseBakeState
+                {
+                    Maid = maid,
+                    Skin = morph.bodyskin,
+                    Renderer = smr,
+                    Mesh = mesh,
+                    OriginalVerts = baseVerts,
+                    OriginalNormals = baseNormals,
+                    BakedVerts = bakedVerts,
+                    BakedNormals = bakedNormals,
+                    OriginalSignature = originalSignature,
+                    AppliedSignature = appliedSignature,
+                    ShapeSignature = shapeSignature,
+                    Progress = progress,
+                    MeshInstanceId = meshId,
+                    MeshClass = meshClass,
+                };
+                _morphBaseBakeStates[morph] = newState;
+                _maidShapes[maid.GetHashCode()]=Shape.Copy();
+
+                ForceFixBlendValues(morph);
+                long bindingStarted=System.Diagnostics.Stopwatch.GetTimestamp();
+                InstallALBinding(maid, rec, bakedVerts, progress);
+                if(_refreshStats!=null)_refreshStats.BindingTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-bindingStarted;
+                if(ComputeVertexSignature(mesh.vertices)==appliedSignature)
+                {
+                    rec.LastDeltaVerts=BuildDeltaVerts(baseVerts,bakedVerts);rec.AppliedSignature=appliedSignature;
+                    if(!_records.TryGetValue(maid.GetHashCode(),out var records))_records[maid.GetHashCode()]=records=new List<MeshRecord>();
+                    records.RemoveAll(r=>r.SMR==smr);records.Add(rec);
+                    RememberAppliedMesh(rec,bakedVerts,progress,meshClass,MeshStructureSignature(smr));
+                }
+                LogMorphBaseBake(maid, morph, smr, meshClass, progress, effectiveProgress, oldOriVertId, newState, stats, reusedStoredBase);
+
+                return true;
             }
-            else
-            {
-                baseVerts = (Vector3[])currentVerts.Clone();
-                baseNormals = CloneNormalsForMorph(morph.m_vOriNorm, mesh, currentVerts.Length);
-            }
-
-            if (!CacheBindPoseWorldForMaid(maid)) return false;
-            PrepareALContext(maid, CollectTargetRenderers(maid), progress);
-
-            MeshRecord rec = new MeshRecord
-            {
-                SMR = smr,
-                Mesh = mesh,
-                OrigVerts = baseVerts,
-                OrigNormals = baseNormals,
-            };
-
-            bool[] mask = BuildVertexMask(smr, rec, meshClass);
-            if (!HasAnyMaskedVertex(mask)) return false;
-
-            float effectiveProgress = GetEffectiveMorphProgress(progress, meshClass);
-            Vector3[] bakedVerts;
-            DeformStats stats;
-            if (!TryDeformVertsInBindPoseWorld(
-                smr,
-                rec,
-                mask,
-                meshClass,
-                effectiveProgress,
-                out bakedVerts,
-                out stats))
-            {
-                return false;
-            }
-
-            Vector3[] bakedNormals = BuildMorphBaseNormals(mesh, rec, bakedVerts);
-            if (bakedNormals == null || bakedNormals.Length != bakedVerts.Length)
-                bakedNormals = CloneVectorArray(baseNormals);
-
-            int originalSignature = ComputeVertexSignature(baseVerts);
-            int appliedSignature = ComputeVertexSignature(bakedVerts);
-            int oldOriVertId = currentVerts.GetHashCode();
-
-            morph.m_vOriVert = bakedVerts;
-            if (bakedNormals != null && bakedNormals.Length == bakedVerts.Length)
-                morph.m_vOriNorm = bakedNormals;
-
-            MorphBaseBakeState newState = new MorphBaseBakeState
-            {
-                Maid = maid,
-                Skin = morph.bodyskin,
-                Renderer = smr,
-                Mesh = mesh,
-                OriginalVerts = baseVerts,
-                OriginalNormals = baseNormals,
-                BakedVerts = bakedVerts,
-                BakedNormals = bakedNormals,
-                OriginalSignature = originalSignature,
-                AppliedSignature = appliedSignature,
-                ShapeSignature = shapeSignature,
-                Progress = progress,
-                MeshInstanceId = meshId,
-                MeshClass = meshClass,
-            };
-            _morphBaseBakeStates[morph] = newState;
-
-            ForceFixBlendValues(morph);
-            InstallALBinding(maid, rec, bakedVerts, progress);
-            LogMorphBaseBake(maid, morph, smr, meshClass, progress, effectiveProgress, oldOriVertId, newState, stats, reusedStoredBase);
-
-            return true;
         }
 
         static SkinnedMeshRenderer FindRendererForMorph(Maid maid, TMorph morph)
@@ -929,6 +959,7 @@ namespace COM3D2.Pregnancy.Plugin
                 AddBakeSignatureFloat(ref hash, Shape.VerticalRange);
                 AddBakeSignatureFloat(ref hash, Shape.WallSmoothing);
                 AddBakeSignatureFloat(ref hash, Shape.SagStrength);
+                AddBakeSignatureFloat(ref hash, Shape.BellySag);
                 AddBakeSignatureFloat(ref hash, Shape.MidVolume);
                 AddBakeSignatureFloat(ref hash, Shape.LowerPoleLift);
                 AddBakeSignatureFloat(ref hash, Shape.LateForwardShift);
@@ -1039,31 +1070,35 @@ namespace COM3D2.Pregnancy.Plugin
             if (maid == null) return;
             int key = maid.GetHashCode();
             if (!_morphDirtySkins.TryGetValue(key, out var skins) || skins.Count == 0) return;
-
-            var toProcess = new List<TBodySkin>(skins);
-            skins.Clear();
-
-            if (!IsValid(maid)) return;
-
-            float progress = PregnancyManager.GetPregnant(maid)
-                ? PregnancyManager.GetProgress(maid)
-                : GetActiveProgress(maid);
-            progress = Mathf.Clamp01(progress);
-            if (progress <= 0f) return;
-
-            _bpWorldCached = false;
-            _bpBoneWorld.Clear();
-            PruneRecords(maid);
-
-            foreach (SkinnedMeshRenderer smr in CollectTargetRenderers(maid))
+            using(new MaidShapeScope(maid))
+            using(new RefreshTrace(maid,"morph-dirty"))
             {
-                if (smr?.sharedMesh == null) continue;
-                if (ClassifyMesh(smr) != MeshMorphClass.Body) continue;
-                if (TryCacheBindPoseWorldRef(smr)) break;
-            }
 
-            foreach (TBodySkin skin in toProcess)
-                ApplyToBodySkin(maid, skin, progress);
+                var toProcess = new List<TBodySkin>(skins);
+                skins.Clear();
+
+                if (!IsValid(maid)) return;
+
+                float progress = PregnancyManager.GetPregnant(maid)
+                    ? PregnancyManager.GetProgress(maid)
+                    : GetActiveProgress(maid);
+                progress = Mathf.Clamp01(progress);
+                if (progress <= 0f) return;
+
+                _bpWorldCached = false;
+                _bpBoneWorld.Clear();
+                PruneRecords(maid);
+
+                foreach (SkinnedMeshRenderer smr in CollectTargetRenderers(maid))
+                {
+                    if (smr?.sharedMesh == null) continue;
+                    if (ClassifyMesh(smr) != MeshMorphClass.Body) continue;
+                    if (TryCacheBindPoseWorldRef(smr)) break;
+                }
+
+                foreach (TBodySkin skin in toProcess)
+                    ApplyToBodySkin(maid, skin, progress);
+            }
         }
 
         static Maid FindMaidForBodySkin(TBodySkin skin)
@@ -1586,6 +1621,11 @@ namespace COM3D2.Pregnancy.Plugin
             MeshRecord rec = records.Find(r => r.SMR == smr && r.Mesh == mesh);
             Vector3[] currentVerts = mesh.vertices;
             Vector3[] currentNormals = mesh.normals;
+            int structure=MeshStructureSignature(smr);
+            if(rec!=null && !refreshBase && CanReuseAppliedMesh(rec,currentVerts,currentNormals,progress,meshClass,structure))
+            {if(_refreshStats!=null)_refreshStats.Reused++;return;}
+            if(_refreshStats!=null)_refreshStats.Rebuilt++;
+            if(rec!=null && rec.RefreshStructureSignature!=structure)rec.Neighbors=null;
             if (rec == null)
             {
                 rec = new MeshRecord
@@ -1633,6 +1673,7 @@ namespace COM3D2.Pregnancy.Plugin
 
             Vector3[] newVerts;
             DeformStats stats;
+            long deformStarted=System.Diagnostics.Stopwatch.GetTimestamp();
             if (!TryDeformVertsInBindPoseWorld(
                 smr,
                 rec,
@@ -1646,6 +1687,7 @@ namespace COM3D2.Pregnancy.Plugin
                 return;
             }
 
+            if(_refreshStats!=null)_refreshStats.DeformTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-deformStarted;
             Vector3[] deltaVerts = BuildDeltaVerts(rec.OrigVerts, newVerts);
             // CleanVertices retains current game morphs and removes only our known
             // baked delta. Evaluate once from that base, even after TMorph rewrites it.
@@ -1654,9 +1696,14 @@ namespace COM3D2.Pregnancy.Plugin
             rec.LastDeltaVerts = deltaVerts;
             rec.AppliedSignature = ComputeVertexSignature(appliedVerts);
             mesh.vertices = appliedVerts;
+            long normalStarted=System.Diagnostics.Stopwatch.GetTimestamp();
             ApplySmoothedNormals(mesh, rec, appliedVerts);
+            if(_refreshStats!=null)_refreshStats.NormalTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-normalStarted;
             mesh.RecalculateBounds();
+            long bindingStarted=System.Diagnostics.Stopwatch.GetTimestamp();
             InstallALBinding(maid, rec, appliedVerts, progress);
+            if(_refreshStats!=null)_refreshStats.BindingTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-bindingStarted;
+            RememberAppliedMesh(rec,appliedVerts,progress,meshClass,structure);
 
             if (ShouldLogMorphDiagnostics(smr, meshClass))
             {
@@ -1879,30 +1926,7 @@ namespace COM3D2.Pregnancy.Plugin
         }
 
         static int ComputeVertexSignature(Vector3[] verts)
-        {
-            if (verts == null) return 0;
-
-            unchecked
-            {
-                int count = verts.Length;
-                int hash = 17;
-                hash = hash * 31 + count;
-
-                if (count == 0) return hash;
-
-                int samples = Mathf.Min(12, count);
-                for (int i = 0; i < samples; i++)
-                {
-                    int idx = samples == 1 ? 0 : (int)((long)i * (count - 1) / (samples - 1));
-                    Vector3 v = verts[idx];
-                    hash = hash * 31 + Mathf.RoundToInt(v.x * 1000f);
-                    hash = hash * 31 + Mathf.RoundToInt(v.y * 1000f);
-                    hash = hash * 31 + Mathf.RoundToInt(v.z * 1000f);
-                }
-
-                return hash;
-            }
-        }
+        { return ExactVectors(verts); }
 
         public static int GetCurrentMeshSignature(Maid maid)
         {
@@ -2129,12 +2153,11 @@ namespace COM3D2.Pregnancy.Plugin
                 _needsFullRefresh = false;
                 _refreshStableFrames = 0;
                 _refreshPreviousSignatures.Clear();
-                ForgetRecords(_maid);
                 PruneRecords(_maid);
 
                 float pFull = GetActiveProgress(_maid);
                 if (pFull > 0f)
-                    ApplyToSlots(_maid, pFull, false);
+                    RefreshProgress(_maid, pFull);
             }
 
             void ProcessVisibilityApply()
@@ -2170,7 +2193,7 @@ namespace COM3D2.Pregnancy.Plugin
                 float progress = PregnancyManager.GetProgress(_maid);
                 if (progress <= 0f) return;
 
-                PregnancyUI.TriggerApplyBelly(_maid, progress);
+                RefreshProgress(_maid, progress);
             }
 
             void LateUpdate()
@@ -2191,6 +2214,7 @@ namespace COM3D2.Pregnancy.Plugin
                 if (object.ReferenceEquals(_maid, null)) return;
                 ReleaseALBindings(_maid);
                 _alContexts.Remove(_maid.GetHashCode());
+                _maidShapes.Remove(_maid.GetHashCode());
             }
         }
     }

@@ -18,6 +18,11 @@ namespace COM3D2.Pregnancy.Plugin
             public Transform[] Bones;
             public BoneWeight[] Weights;
             public Matrix4x4[] Binds, Palette;
+            // Exact arrays installed on the renderer. Attachments use the same
+            // final skinning data instead of reconstructing an analytic blend.
+            public Transform[] SkinBones;
+            public BoneWeight[] SkinWeights;
+            public Vector3[] SkinVertices;
             public VirtualWeights.Recipe[] Recipes;
             public NMatrix ToReference;
             public ALContext Context;
@@ -135,8 +140,10 @@ namespace COM3D2.Pregnancy.Plugin
                         if(w.Weight>0)b.Envelope.Native[w.Bone].Include(N(deformed[i]));
                 // Restoration is registered before the first Unity mutation.
                 _alBindings[renderer]=b;
-                renderer.bones=b.Bones.Concat(Enumerable.Repeat(c.Pelvis,recipeCount+clothingCount)).ToArray();
-                b.Mesh.bindposes=b.Palette;b.Mesh.boneWeights=packed;
+                b.SkinBones=b.Bones.Concat(Enumerable.Repeat(c.Pelvis,recipeCount+clothingCount)).ToArray();
+                b.SkinWeights=packed;b.SkinVertices=deformed;
+                renderer.bones=b.SkinBones;
+                b.Mesh.bindposes=b.Palette;b.Mesh.boneWeights=b.SkinWeights;
                 renderer.quality=SkinQuality.Bone4;
                 renderer.updateWhenOffscreen=true;
                 EnsureMonitor(maid);
@@ -152,7 +159,7 @@ namespace COM3D2.Pregnancy.Plugin
             if(c.Pelvis==null || c.Spine==null)throw new InvalidOperationException("Virtual axis bone destroyed.");
             var carrier=MatrixBridge.ToManaged(c.Pelvis.localToWorldMatrix);
             if(!NMatrix.Invert(carrier,out var inverseCarrier))throw new InvalidOperationException("Singular virtual carrier.");
-            var virtualTransform=VirtualAxisMath.Evaluate(c.Axis,c.PelvisBind*carrier,c.SpineBind*MatrixBridge.ToManaged(c.Spine.localToWorldMatrix),Shape).Transform;
+            var virtualTransform=VirtualAxisMath.Evaluate(c.Axis,c.PelvisBind*carrier,c.SpineBind*MatrixBridge.ToManaged(c.Spine.localToWorldMatrix),c.Settings).Transform;
             var virtualMesh=b.ToReference*virtualTransform;
             var boundsRoot=b.Renderer.rootBone!=null?b.Renderer.rootBone:b.Renderer.transform;
             var rootInverse=MatrixBridge.ToManaged(boundsRoot.worldToLocalMatrix);

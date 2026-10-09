@@ -30,9 +30,19 @@ namespace COM3D2.Pregnancy.Plugin
             return name.Contains("_yure_skirt_") || name.Contains("_yure_skirt_h_");
         }
 
+        // Exact runtime model root from the user's vertex dump. Mesh.name may
+        // be empty; similar model names and all other skirts stay unchanged.
+        static bool UseOrdinaryClothing(SkinnedMeshRenderer renderer)
+        {
+            for(var node=renderer.transform;node!=null;node=node.parent)
+                if(string.Equals(node.name,"_SM_dress652_onep",StringComparison.OrdinalIgnoreCase))return true;
+            return false;
+        }
+
         static void PrepareSkirtDrape(MeshRecord record,Vector3[] deformed,float stage)
         {
             record.Skirt=null;
+            if(UseOrdinaryClothing(record.SMR))return;
             if(stage<=0 || Shape.ClothOffset<=0)return;
             var renderer=record.SMR;var bones=NativeBones(renderer);var weights=NativeWeights(renderer);
             int count=bones.Length;
