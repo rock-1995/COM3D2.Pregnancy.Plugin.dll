@@ -92,7 +92,9 @@ internal static class BellyShape
         float support=f.Support(original);
         if(support<=0)return original;
         var deformed=DeformBase(original,torso,f);
-        return original+(NavelPatch(original,deformed,torso,stage,p,f)-original)*support;
+        var result=original+(NavelPatch(original,deformed,torso,stage,p,f)-original)*support;
+        if(p.BellySag!=0)result.Y-=TranslationSag(original,torso,p,f)*support;
+        return result;
     }
     internal static Vector3 DeformOuterCloth(Vector3 original,TorsoProfile torso,float stage,VtxSettings p)
     {
@@ -102,7 +104,44 @@ internal static class BellyShape
         // turning its displacement off outside the original skin's narrow band.
         // Preserve the existing result at full support and keep remote fabric
         // out of the skin's local navel correction.
-        return Deform(original,torso,stage,p)+(DeformBase(original,torso,field)-original)*(1-field.Support(original));
+        var result=Deform(original,torso,stage,p)+(DeformBase(original,torso,field)-original)*(1-field.Support(original));
+        if(p.BellySag!=0)result.Y-=TranslationSag(original,torso,p,field)*(1-field.Support(original));
+        return result;
+    }
+    // A final vertical translation, separate from the legacy skin advection.
+    // Measure the smooth envelope's forward growth, never the navel's depth or
+    // protrusion. Do not resample the envelope at the newly lowered height.
+    private static float TranslationSag(Vector3 original,TorsoProfile torso,VtxSettings p,Field f)
+    {
+        float ForwardGrowth(Vector3 point)
+        {
+            f.Sample(point,out float push,out float slide,out float angle);
+            if(push<torso.Span*.0001f && slide<torso.Span*.0001f)return 0;
+            f.SampleAtHeight(point.Y-slide,angle,out float growth,out _);
+            return growth*Scalar.Max(0,Scalar.Cos(angle));
+        }
+        float growth=ForwardGrowth(original);
+        if(original.Z<=torso.AxisAt(original.Y))return 0;
+        if(Scalar.IsFinite(torso.SkinNavelZ))
+        {
+            // Translate the complete navel patch rigidly (including its native
+            // depression and the optional shifted eversion patch). Blend back
+            // into the sag field outside it so the rim does not get rotated.
+            float radius=Scalar.Max(Scalar.Abs(p.NavelRadius)*torso.Span,torso.Span*.005f);
+            float shiftedY=torso.SkinNavelY+p.NavelVerticalOffset*torso.Span;
+            float nearestY=Scalar.Clamp(original.Y,Scalar.Min(torso.SkinNavelY,shiftedY),Scalar.Max(torso.SkinNavelY,shiftedY));
+            float u=original.X/radius,v=(original.Y-nearestY)/(1.3f*radius);
+            float r=Scalar.Sqrt(u*u+v*v);
+            // Include the adjacent triangle vertices supporting the navel rim.
+            float blend=1-Smooth(r-1.5f);
+            if(blend>0)
+            {
+                float y=(torso.SkinNavelY+shiftedY)*.5f;
+                float centerGrowth=ForwardGrowth(new Vector3(0,y,torso.FrontAt(y)));
+                growth+=(centerGrowth-growth)*blend;
+            }
+        }
+        return .075f*p.BellySag*growth;
     }
     private static Vector3 DeformBase(Vector3 original,TorsoProfile torso,Field f)
     {
@@ -119,7 +158,15 @@ internal static class BellyShape
         return new Vector3(radius*Scalar.Sin(angle),y,Scalar.Max(original.Z,newAxis+radius*Scalar.Cos(angle)));
     }
     internal static float NavelStageResponse(float stage,VtxSettings p)
-        => stage<=0 ? 0 : p.NavelPreviewFull ? 1 : Smooth((stage-p.NavelStart)/VirtualAxisMath.NonZero(1-p.NavelStart));
+    {
+        if(stage<=0)return 0;
+        if(p.NavelPreviewFull || stage>=1)return 1;
+        // Use actual pregnancy progress, independent of the belly growth remap.
+        // A linear ramp keeps advancing through the final part of pregnancy;
+        // the old smoothstep visually reached its plateau before full term.
+        float start=Scalar.Clamp(p.NavelStart,0,1);
+        return stage<=start ? 0 : (stage-start)/(1-start);
+    }
 
     private static Vector3 NavelPatch(Vector3 original,Vector3 deformed,TorsoProfile torso,float stage,VtxSettings p,Field f)
     {
