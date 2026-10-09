@@ -13,7 +13,9 @@ namespace COM3D2.Pregnancy.Plugin.Growth
         public float LateSettle = 0.502008f;
         public float VerticalRange = 0.993976f;
         public float WallSmoothing = 0.35f;
-        public float SagStrength = -0.349999994f;
+        // Keep the legacy JSON key and value for the renamed skin-slide control.
+        public float SagStrength = -0.8f;
+        public float BellySag = 2f;
         public float MidVolume = 1.1551205f;
         public float LowerPoleLift = 0f;
         public float LateForwardShift = 0.05f;
@@ -44,9 +46,9 @@ namespace COM3D2.Pregnancy.Plugin.Growth
         public float AxisPullAngle = 35f;
         public float AxisAnchorY = 0f;
         public float AxisAnchorZ = 0f;
-        public bool NavelPreviewFull = true;
+        public bool NavelPreviewFull = false;
         public float NavelEversion = 0.800000012f;
-        public float NavelStart = 0.8518868f;
+        public float NavelStart = 0.4f;
         public float NavelHeight = 0.0134433955f;
         public float NavelVerticalOffset = -0.0270000007f;
         public float NavelRadius = 0.046194777f;
@@ -60,6 +62,7 @@ namespace COM3D2.Pregnancy.Plugin.Growth
             // Only absent fields receive defaults; an explicitly saved zero
             // remains a user choice, as do all pre-existing shape settings.
             var defaults=new VtxSettings();
+            if(!savedJson.Contains("\"BellySag\""))BellySag=defaults.BellySag;
             if(!savedJson.Contains("\"SubtleStageProgress\""))SubtleStageProgress=defaults.SubtleStageProgress;
             if(!savedJson.Contains("\"VisibleStageProgress\""))VisibleStageProgress=defaults.VisibleStageProgress;
             if(!savedJson.Contains("\"MidStageProgress\""))MidStageProgress=defaults.MidStageProgress;
