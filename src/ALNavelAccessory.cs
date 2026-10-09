@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -15,6 +15,11 @@ namespace COM3D2.Pregnancy.Plugin
         {
             public MeshRecord Source;
             public ALContext Context;
+            public ALBinding SkinBinding;
+            public MeshRecord SkinRecord;
+            public int SkinSignature;
+            public bool SkinReady,PredictedHiddenSkin;
+            public V[] SkinVertices;
             public int[] Indices,SampleIndices,Triangles;
             public V[] Barycentric,OriginalRing,MorphedRing,PosedRing,PosedVertices,Morphed;
             public BoneWeight[] Weights;
@@ -47,6 +52,7 @@ namespace COM3D2.Pregnancy.Plugin
                 a.Weights[k]=weights[i];a.Alpha[k]=Attachment(source,i,a.Context.Stage);
             }
             FillNavelRing(a,a.Morphed,a.MorphedRing);
+            a.SkinReady=false;
         }
         static bool TryNavelBoundary(MeshRecord body,float radius,float centerY,out NavelAttachment attachment)
         {
@@ -125,18 +131,57 @@ namespace COM3D2.Pregnancy.Plugin
             }
             catch(Exception e){ReleaseALBinding(renderer);_log.LogWarning("[NavelAccessory] Binding restored: "+e.Message);}
         }
+        static void SyncNavelSkin(NavelAttachment a)
+        {
+            var renderer=a.Source.SMR;
+            var binding=ActiveBinding(renderer);
+            bool hidden=!renderer.enabled || !renderer.gameObject.activeInHierarchy;
+            bool predicted=hidden && (binding==null || binding.Context!=a.Context);
+            // The navel update may run before the body in dictionary order. Its
+            // support must use this frame's palette, not the previous frame's.
+            if(binding!=null && !predicted)UpdateALBinding(binding);
+            var record=binding==null?FindRecord(a.Context.Maid,renderer):null;
+            int signature=record==null?0:record.AppliedSignature;
+            if(a.SkinReady && a.SkinBinding==binding && a.PredictedHiddenSkin==predicted &&
+                (binding!=null || (a.SkinRecord==record && a.SkinSignature==signature)))return;
+            var vertices=predicted?a.Source.LastNewV:binding!=null?binding.SkinVertices:renderer.sharedMesh.vertices;
+            var weights=predicted?NativeWeights(renderer):binding!=null?binding.SkinWeights:renderer.sharedMesh.boneWeights;
+            a.Bones=predicted?NativeBones(renderer):binding!=null?binding.SkinBones:renderer.bones;
+            a.Binds=predicted?NativeBinds(renderer):binding!=null?binding.Palette:renderer.sharedMesh.bindposes;
+            if(vertices==null || weights==null || a.Bones==null || a.Binds==null)
+                throw new InvalidOperationException("Navel source skin is unavailable.");
+            a.SkinVertices=new V[a.Indices.Length];
+            for(int k=0;k<a.Indices.Length;k++)
+            {
+                int i=a.Indices[k];
+                if(i>=vertices.Length || i>=weights.Length)throw new InvalidOperationException("Navel source topology changed.");
+                a.SkinVertices[k]=N(vertices[i]);a.Weights[k]=weights[i];
+                a.Alpha[k]=predicted?Attachment(a.Source,i,a.Context.Stage):0;
+                if(binding!=null && !predicted)
+                    foreach(var w in Influences(weights[i]))
+                        if(w.Weight>0 && w.Bone>=binding.Bones.Length && w.Bone-binding.Bones.Length<binding.Recipes.Length)
+                            a.Alpha[k]+=w.Weight*binding.Recipes[w.Bone-binding.Bones.Length].VirtualShare;
+            }
+            a.NativePalette=new M[a.Bones.Length];a.NativeTicks=new int[a.Bones.Length];a.Tick=0;
+            a.SkinBinding=binding;a.SkinRecord=record;a.SkinSignature=signature;
+            a.PredictedHiddenSkin=predicted;a.SkinReady=true;
+        }
         static V PoseNavelVertex(NavelAttachment a,int k,M virtualTransform)
         {
-            var point=a.Morphed[k];var w=a.Weights[k];var native=V.Zero;
+            var point=a.SkinVertices[k];var w=a.Weights[k];var posed=V.Zero;
             void Add(int i,float weight)
             {
                 if(weight<=0)return;
                 if(i<0||i>=a.Bones.Length||i>=a.Binds.Length||a.Bones[i]==null)throw new InvalidOperationException("Navel support bone missing.");
-                if(a.NativeTicks[i]!=a.Tick){a.NativePalette[i]=a.ToBody*MatrixBridge.ToManaged(a.Binds[i])*MatrixBridge.ToManaged(a.Bones[i].localToWorldMatrix);a.NativeTicks[i]=a.Tick;}
-                native+=V.Transform(point,a.NativePalette[i])*weight;
+                if(a.NativeTicks[i]!=a.Tick){a.NativePalette[i]=MatrixBridge.ToManaged(a.Binds[i])*MatrixBridge.ToManaged(a.Bones[i].localToWorldMatrix);a.NativeTicks[i]=a.Tick;}
+                posed+=V.Transform(point,a.NativePalette[i])*weight;
             }
             Add(w.boneIndex0,w.weight0);Add(w.boneIndex1,w.weight1);Add(w.boneIndex2,w.weight2);Add(w.boneIndex3,w.weight3);
-            return native*(1-a.Alpha[k])+V.Transform(point,virtualTransform)*a.Alpha[k];
+            if(!a.PredictedHiddenSkin)return posed;
+            // Hidden bodies that have not been applied retain the existing
+            // calibrated support until an actual body binding is available.
+            var reference=V.Transform(point,a.Source.ToReference);
+            return posed*(1-a.Alpha[k])+V.Transform(reference,virtualTransform)*a.Alpha[k];
         }
         static void UpdateNavelBinding(ALBinding b)
         {
@@ -151,10 +196,11 @@ namespace COM3D2.Pregnancy.Plugin
                 SetNavelSource(a,replacement);
             }
             if(a.Source.SMR==null||a.Source.SMR.sharedMesh!=a.Source.Mesh||a.Context.Pelvis==null||a.Context.Spine==null)throw new InvalidOperationException("Navel support destroyed.");
+            SyncNavelSkin(a);
             var c=a.Context;var carrier=MatrixBridge.ToManaged(c.Pelvis.localToWorldMatrix);
             if(!M.Invert(carrier,out var invCarrier))throw new InvalidOperationException("Singular navel carrier.");
             var pelvis=c.PelvisBind*carrier;
-            var virtualTransform=VirtualAxisMath.Evaluate(c.Axis,pelvis,c.SpineBind*MatrixBridge.ToManaged(c.Spine.localToWorldMatrix),Shape).Transform;
+            var virtualTransform=a.PredictedHiddenSkin?VirtualAxisMath.Evaluate(c.Axis,pelvis,c.SpineBind*MatrixBridge.ToManaged(c.Spine.localToWorldMatrix),c.Settings).Transform:M.Identity;
             a.Tick++;for(int i=0;i<a.Indices.Length;i++)a.PosedVertices[i]=PoseNavelVertex(a,i,virtualTransform);
             FillNavelRing(a,a.PosedVertices,a.PosedRing);
             var px=V.TransformNormal(V.UnitX,pelvis);var py=V.TransformNormal(V.UnitY,pelvis);var pz=V.TransformNormal(V.UnitZ,pelvis);

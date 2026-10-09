@@ -69,7 +69,20 @@ namespace UnityEngine
         public static int CeilToInt(float v)=>(int)MathF.Ceiling(v);
         public static int RoundToInt(float v)=>(int)MathF.Round(v);
     }
-    public class GameObject {public bool activeInHierarchy=true;}
+    public class MonoBehaviour {public GameObject gameObject;}
+    public class Object
+    {
+        public static void DestroyImmediate(MonoBehaviour component)
+        {component.GetType().GetMethod("OnDestroy",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)?.Invoke(component,null);component.gameObject.Components.Remove(component.GetType());}
+    }
+    public class GameObject
+    {
+        public string name="";
+        public bool activeInHierarchy=true,activeSelf=true;
+        internal Dictionary<System.Type,object> Components=new();
+        public T GetComponent<T>() where T:class=>Components.TryGetValue(typeof(T),out var c)?(T)c:null;
+        public T AddComponent<T>() where T:MonoBehaviour,new(){var c=new T{gameObject=this};Components[typeof(T)]=c;return c;}
+    }
     public class Transform {public string name;public Transform parent;public Matrix4x4 localToWorldMatrix=Matrix4x4.identity;public Matrix4x4 worldToLocalMatrix=>localToWorldMatrix.inverse;}
     public struct BoneWeight {public int boneIndex0,boneIndex1,boneIndex2,boneIndex3;public float weight0,weight1,weight2,weight3;}
     public struct Bounds {public Vector3 center,size;public Bounds(Vector3 center,Vector3 size){this.center=center;this.size=size;}public void Expand(float n){size+=new Vector3(n,n,n);}}
@@ -90,9 +103,11 @@ namespace UnityEngine
         public int vertexCount=>v.Length;
         public int GetInstanceID()=>GetHashCode();
         public void RecalculateBounds(){}
+        public void RecalculateNormals(){normals=new Vector3[v.Length];}
     }
     public class SkinnedMeshRenderer
     {
+        public int GetInstanceID()=>GetHashCode();
         public string name=>sharedMesh.name;
         public Mesh sharedMesh;
         public Material[] sharedMaterials=Array.Empty<Material>();
@@ -107,8 +122,19 @@ namespace UnityEngine
     }
     public class Material {public string name;}
 }
-public class Maid {public TBody body0;}
+public class Maid {public TBody body0;public UnityEngine.GameObject gameObject=new();public List<UnityEngine.SkinnedMeshRenderer> Renderers=new();public bool Pregnant=true;public float Progress=1;}
 public class TBodySkin {public TMorph morph;}
-public class TMorph {public UnityEngine.Vector3[] m_vOriVert;public int[][] m_nSubMeshOriTri;private UnityEngine.SkinnedMeshRenderer smr_src;public void SetRenderer(UnityEngine.SkinnedMeshRenderer r)=>smr_src=r;}
-public class TBody {public Maid maid;public List<TBodySkin> goSlot=new();}
+public class TMorph {public UnityEngine.Vector3[] m_vOriVert,m_vOriNorm;public TBodySkin bodyskin;public UnityEngine.Vector3[] ExtraDelta;public int[][] m_nSubMeshOriTri;private UnityEngine.SkinnedMeshRenderer smr_src;public UnityEngine.SkinnedMeshRenderer Renderer=>smr_src;public void SetRenderer(UnityEngine.SkinnedMeshRenderer r)=>smr_src=r;public void FixBlendValues(){smr_src.sharedMesh.vertices=m_vOriVert.Select((v,i)=>ExtraDelta==null?v:v+ExtraDelta[i]).ToArray();smr_src.sharedMesh.normals=m_vOriNorm;}}
+public class TBody {public Maid maid;public List<TBodySkin> goSlot=new();public bool isLoadedBody=true;}
+namespace COM3D2.Pregnancy.Plugin
+{
+    enum MorphTriggerMode {ManualOnly,VisibilityChange}
+    static class PregnancyManager
+    {
+        public static bool GetPregnant(Maid m)=>m.Pregnant;
+        public static float GetProgress(Maid m)=>m.Progress;
+        public static float EnsureCycleProgress(Maid m)=>0;
+        public static void CaptureCurrentBellySettings(){}
+    }
+}
 namespace HarmonyLib { public class HarmonyPatch:System.Attribute {public HarmonyPatch(System.Type type,string method){}} }
