@@ -21,7 +21,7 @@
 - The focused navel support test matches final body skinning within 0.0000002 model units, including replaced source weights/vertices and reversed update order.
 - The seven-pose bra replay matches the preceding local V12 output exactly. The body-shape/default formulas and V12 refresh, ordinary skirt and inner-clothing motion implementations are unchanged by the final three fixes.
 
-Tests exercise production algorithms and extracted lifecycle methods with Unity/game stubs and locally owned meshes. The back category uses a synthetic garment fixture. This exact build has not had in-game visual or timing validation. Model assets, personal dumps and local backups are not published. The earlier preview's garment edge-interior clipping limitation below is not claimed fixed.
+Tests exercise production algorithms and extracted lifecycle methods with Unity/game stubs and locally owned meshes. The back category uses a synthetic garment fixture. Model assets, personal dumps and local backups are not published. The earlier preview's garment edge-interior clipping limitation below is not claimed fixed.
 
 ## clothing-preview-20261010
 
