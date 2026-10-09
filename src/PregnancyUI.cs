@@ -22,48 +22,10 @@ namespace COM3D2.Pregnancy.Plugin
         private Rect _dropRect;
         private Vector2 _scrollPos = Vector2.zero;
 
-        private string _sInflationMultiplier = "0";
-        private string _sInflationMoveY = "0.05";
-        private string _sInflationMoveZ = "0";
-        private string _sInflationStretchX = "0.3";
-        private string _sInflationStretchY = "0";
-        private string _sInflationStretchZ = "0.5";
-        private string _sInflationShiftY = "0.04";
-        private string _sInflationShiftZ = "-0.3";
-        private string _sInflationTaperY = "-0.01";
-        private string _sInflationTaperZ = "-0.05";
-        private string _sInflationRoundness = "0.033";
-        private string _sInflationDrop = "0.15";
-        private string _sInflationFatFold = "0";
-        private string _sInflationFatFoldHeight = "0";
-        private string _sInflationFatFoldGap = "0";
-        private string _sRegionRadiusSide = "0.23";
-        private string _sRegionRadiusFront = "0.33";
-        private string _sRegionRadiusBack = "0.13";
-        private string _sRegionRadiusUp = "0.58";
-        private string _sRegionRadiusDown = "0.35";
-        private string _sThighGuardSpeed = "3";
-        private string _sInnerThighGuardStrength = "1";
-        private string _sThighGuardSmoothStrength = "0";
-        private string _sTopEdgeTaper = "-1";
-        private string _sBottomEdgeTaper = "0";
-        private string _sSideSmoothWidth = "0.8";
-        private string _sSideSmoothStrength = "1.4";
-        private string _sBreastGuardStrength = "1";
-        private string _sOuterClothPregnancyScale = "1";
-        private string _sSkirtBoundarySmoothPasses = "2";
-        private string _sSkirtBoundarySmoothStrength = "0.35";
-        private string _sSkirtBoundaryUpOffset = "0.08";
-        private string _sSkirtFrontPlaneFwdOffset = "0";
-        private string _sSkirtTopRadiusSideScale = "1.15";
-        private string _sSkirtTopRadiusFwdScale = "1.15";
-        private string _sSkirtHemFadeRangeScale = "1";
-        private string _sSkirtLowerTipSide = "0";
-        private string _sSkirtLowerTipUp = "-0.42";
-        private string _sSkirtLowerTipFwd = "0";
-        private string _sSkirtLowerRadiusSide = "1";
-        private string _sSkirtLowerRadiusUp = "1";
-        private string _sSkirtLowerRadiusFwd = "1";
+        private Growth.VtxSettings _shape;
+        private readonly Dictionary<string,string> _shapeText = new Dictionary<string,string>();
+        private readonly Dictionary<string,float> _shapeLastValue = new Dictionary<string,float>();
+        private float _shapeContentHeight = 2250f;
 
         void Awake()
         {
@@ -105,7 +67,7 @@ namespace COM3D2.Pregnancy.Plugin
 
             float scrollBarW = 18f;
             float contentW = _win.width - scrollBarW;
-            float contentH = 1442f;
+            float contentH = _shapeContentHeight;
 
             _scrollPos = GUI.BeginScrollView(
                 new Rect(0, 20f, _win.width, _win.height - 20f),
@@ -155,7 +117,7 @@ namespace COM3D2.Pregnancy.Plugin
             int totalDays = PregnancyPlugin.CfgPregnancyWeeks.Value * 7;
             int curDay = Mathf.RoundToInt(_curProg * totalDays);
             GUI.Label(new Rect(x, y, w, 18f),
-                string.Format("Progress / P+ Size: {0:F3}  (day {1}/{2})", _curProg, curDay, totalDays));
+                string.Format("Growth stage: {0:F3}  (day {1}/{2})", _curProg, curDay, totalDays));
             y += 20f;
 
             float newProg = GUI.HorizontalSlider(new Rect(x, y, w, 18f), _curProg, 0f, 1f);
@@ -204,98 +166,72 @@ namespace COM3D2.Pregnancy.Plugin
             }
             y += 32f;
 
-            DrawField(ref y, x, lw, fx, fw, "Multiplier (-2..2)", ref _sInflationMultiplier);
-            DrawField(ref y, x, lw, fx, fw, "Move Y", ref _sInflationMoveY);
-            DrawField(ref y, x, lw, fx, fw, "Move Z", ref _sInflationMoveZ);
-            DrawField(ref y, x, lw, fx, fw, "Stretch X", ref _sInflationStretchX);
-            DrawField(ref y, x, lw, fx, fw, "Stretch Y", ref _sInflationStretchY);
-            DrawField(ref y, x, lw, fx, fw, "Stretch Z", ref _sInflationStretchZ);
-            DrawField(ref y, x, lw, fx, fw, "Shift Y", ref _sInflationShiftY);
-            DrawField(ref y, x, lw, fx, fw, "Shift Z", ref _sInflationShiftZ);
-            DrawField(ref y, x, lw, fx, fw, "Taper Y", ref _sInflationTaperY);
-            DrawField(ref y, x, lw, fx, fw, "Taper Z", ref _sInflationTaperZ);
-            DrawField(ref y, x, lw, fx, fw, "Roundness", ref _sInflationRoundness);
-            DrawField(ref y, x, lw, fx, fw, "Drop", ref _sInflationDrop);
-            DrawField(ref y, x, lw, fx, fw, "Fat Fold", ref _sInflationFatFold);
-            DrawField(ref y, x, lw, fx, fw, "Fat Fold Height", ref _sInflationFatFoldHeight);
-            DrawField(ref y, x, lw, fx, fw, "Fat Fold Gap", ref _sInflationFatFoldGap);
-
-            DrawField(ref y, x, lw, fx, fw, "Region Side", ref _sRegionRadiusSide);
-            DrawField(ref y, x, lw, fx, fw, "Region Front", ref _sRegionRadiusFront);
-            DrawField(ref y, x, lw, fx, fw, "Region Back", ref _sRegionRadiusBack);
-            DrawField(ref y, x, lw, fx, fw, "Region Up", ref _sRegionRadiusUp);
-            DrawField(ref y, x, lw, fx, fw, "Region Down", ref _sRegionRadiusDown);
-            DrawField(ref y, x, lw, fx, fw, "Thigh Guard Speed", ref _sThighGuardSpeed);
-            DrawField(ref y, x, lw, fx, fw, "Inner Thigh Guard", ref _sInnerThighGuardStrength);
-            DrawField(ref y, x, lw, fx, fw, "Thigh Guard Smooth", ref _sThighGuardSmoothStrength);
-            DrawField(ref y, x, lw, fx, fw, "Top Edge Taper", ref _sTopEdgeTaper);
-            DrawField(ref y, x, lw, fx, fw, "Bottom Edge Taper", ref _sBottomEdgeTaper);
-            DrawField(ref y, x, lw, fx, fw, "Side Smooth Width", ref _sSideSmoothWidth);
-            DrawField(ref y, x, lw, fx, fw, "Side Smooth Strength", ref _sSideSmoothStrength);
-            DrawField(ref y, x, lw, fx, fw, "Breast Guard Strength", ref _sBreastGuardStrength);
-            DrawField(ref y, x, lw, fx, fw, "Outer Cloth Pregnancy Scale", ref _sOuterClothPregnancyScale);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Boundary Smooth Passes", ref _sSkirtBoundarySmoothPasses);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Boundary Smooth Strength", ref _sSkirtBoundarySmoothStrength);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Boundary Up Offset", ref _sSkirtBoundaryUpOffset);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Front Plane Fwd Offset", ref _sSkirtFrontPlaneFwdOffset);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Top Radius Side Scale", ref _sSkirtTopRadiusSideScale);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Top Radius Fwd Scale", ref _sSkirtTopRadiusFwdScale);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Hem Fade Range Scale", ref _sSkirtHemFadeRangeScale);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Lower Tip Side Offset", ref _sSkirtLowerTipSide);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Lower Tip Up", ref _sSkirtLowerTipUp);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Lower Tip Fwd Offset", ref _sSkirtLowerTipFwd);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Lower Radius Side Scale", ref _sSkirtLowerRadiusSide);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Lower Radius Up Scale", ref _sSkirtLowerRadiusUp);
-            DrawField(ref y, x, lw, fx, fw, "Skirt Lower Radius Fwd Scale", ref _sSkirtLowerRadiusFwd);
-
-            if (GUI.Button(new Rect(x, y, 120f, 22f), "Log to BepInEx"))
-            {
-                var log = BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
-                log.LogInfo("[Pregnancy] ===== PregnancyPlus Shape Params =====");
-                log.LogInfo("  InflationMultiplier = " + BellyMorphController.InflationMultiplier);
-                log.LogInfo("  InflationMoveY      = " + BellyMorphController.InflationMoveY);
-                log.LogInfo("  InflationMoveZ      = " + BellyMorphController.InflationMoveZ);
-                log.LogInfo("  InflationStretchX   = " + BellyMorphController.InflationStretchX);
-                log.LogInfo("  InflationStretchY   = " + BellyMorphController.InflationStretchY);
-                log.LogInfo("  InflationStretchZ   = " + BellyMorphController.InflationStretchZ);
-                log.LogInfo("  InflationShiftY     = " + BellyMorphController.InflationShiftY);
-                log.LogInfo("  InflationShiftZ     = " + BellyMorphController.InflationShiftZ);
-                log.LogInfo("  InflationTaperY     = " + BellyMorphController.InflationTaperY);
-                log.LogInfo("  InflationTaperZ     = " + BellyMorphController.InflationTaperZ);
-                log.LogInfo("  InflationRoundness  = " + BellyMorphController.InflationRoundness);
-                log.LogInfo("  InflationDrop       = " + BellyMorphController.InflationDrop);
-                log.LogInfo("  InflationFatFold    = " + BellyMorphController.InflationFatFold);
-                log.LogInfo("  InflationFatFoldHeight = " + BellyMorphController.InflationFatFoldHeight);
-                log.LogInfo("  InflationFatFoldGap = " + BellyMorphController.InflationFatFoldGap);
-                log.LogInfo("  RegionRadiusSide    = " + BellyMorphController.RegionRadiusSide);
-                log.LogInfo("  RegionRadiusFront   = " + BellyMorphController.RegionRadiusFront);
-                log.LogInfo("  RegionRadiusBack    = " + BellyMorphController.RegionRadiusBack);
-                log.LogInfo("  RegionRadiusUp      = " + BellyMorphController.RegionRadiusUp);
-                log.LogInfo("  RegionRadiusDown    = " + BellyMorphController.RegionRadiusDown);
-                log.LogInfo("  ThighGuardSpeed     = " + BellyMorphController.ThighGuardSpeed);
-                log.LogInfo("  InnerThighGuardStrength = " + BellyMorphController.InnerThighGuardStrength);
-                log.LogInfo("  ThighGuardSmoothStrength = " + BellyMorphController.ThighGuardSmoothStrength);
-                log.LogInfo("  TopEdgeTaper        = " + BellyMorphController.TopEdgeTaper);
-                log.LogInfo("  BottomEdgeTaper     = " + BellyMorphController.BottomEdgeTaper);
-                log.LogInfo("  SideSmoothWidth     = " + BellyMorphController.SideSmoothWidth);
-                log.LogInfo("  SideSmoothStrength  = " + BellyMorphController.SideSmoothStrength);
-                log.LogInfo("  BreastGuardStrength = " + BellyMorphController.BreastGuardStrength);
-                log.LogInfo("  OuterClothPregnancyScale = " + BellyMorphController.OuterClothPregnancyScale);
-                log.LogInfo("  SkirtBoundarySmoothPasses = " + BellyMorphController.SkirtBoundarySmoothPasses);
-                log.LogInfo("  SkirtBoundarySmoothStrength = " + BellyMorphController.SkirtBoundarySmoothStrength);
-                log.LogInfo("  SkirtBoundaryUpOffset = " + BellyMorphController.SkirtBoundaryUpOffset);
-                log.LogInfo("  SkirtFrontPlaneFwdOffset = " + BellyMorphController.SkirtFrontPlaneFwdOffset);
-                log.LogInfo("  SkirtTopRadiusSideScale = " + BellyMorphController.SkirtTopRadiusSideScale);
-                log.LogInfo("  SkirtTopRadiusFwdScale = " + BellyMorphController.SkirtTopRadiusFwdScale);
-                log.LogInfo("  SkirtHemFadeRangeScale = " + BellyMorphController.SkirtHemFadeRangeScale);
-                log.LogInfo("  SkirtLowerTipSide   = " + BellyMorphController.SkirtLowerTipSide);
-                log.LogInfo("  SkirtLowerTipUp     = " + BellyMorphController.SkirtLowerTipUp);
-                log.LogInfo("  SkirtLowerTipFwd    = " + BellyMorphController.SkirtLowerTipFwd);
-                log.LogInfo("  SkirtLowerRadiusSide = " + BellyMorphController.SkirtLowerRadiusSide);
-                log.LogInfo("  SkirtLowerRadiusUp  = " + BellyMorphController.SkirtLowerRadiusUp);
-                log.LogInfo("  SkirtLowerRadiusFwd = " + BellyMorphController.SkirtLowerRadiusFwd);
-                log.LogInfo("=========================");
-            }
+            var p = _shape;
+            GUI.Label(new Rect(x,y,w,22),"Type any finite value; sliders are only suggested ranges."); y+=24;
+            GUI.Label(new Rect(x,y,w,22),"Press Apply Belly to apply edited values."); y+=26;
+            GUI.Label(new Rect(x,y,w,22),"Shape timing (pregnancy duration stays the same)");y+=24;
+            p.SubtleStageProgress = ShapeSlider("Subtle belly at progress (~3 months)", p.SubtleStageProgress, .15f, .6f, x, w, ref y);
+            p.VisibleStageProgress = ShapeSlider("Visible belly at progress (~4 months)", p.VisibleStageProgress, .2f, .75f, x, w, ref y);
+            p.MidStageProgress = ShapeSlider("Mid belly at progress (~5 months)", p.MidStageProgress, .3f, .9f, x, w, ref y);
+            if(!Growth.GrowthTimeline.Valid(p))
+            {GUI.Label(new Rect(x,y,w,44),"Need 0 < subtle < visible < mid < 1.\nInvalid timing: using default stage positions.");y+=46;}
+            p.GrowthFullness = ShapeSlider("Forward fullness", p.GrowthFullness, 0.5f, 1.6f, x, w, ref y);
+            p.GrowthWidth = ShapeSlider("Belly width", p.GrowthWidth, 0.5f, 2f, x, w, ref y);
+            p.UpperReach = ShapeSlider("Upper abdomen reach (after 5 months)", p.UpperReach, 0.75f, 1.2f, x, w, ref y);
+            p.VerticalRange = ShapeSlider("Vertical influence range", p.VerticalRange, .6f, 1.2f, x, w, ref y);
+            p.WallSmoothing = ShapeSlider("Whole-abdomen smoothing", p.WallSmoothing, 0, 2, x, w, ref y);
+            p.SagStrength = ShapeSlider("Belly sag (0 = off)", p.SagStrength, 0, 2, x, w, ref y);
+            p.MidVolume = ShapeSlider("Second-stage volume (near 4 months)", p.MidVolume, .75f, 1.5f, x, w, ref y);
+            p.LowerPoleLift = ShapeSlider("Late lower-pole lift (0 = cervix)", p.LowerPoleLift, 0, 2, x, w, ref y);
+            p.LateForwardShift = ShapeSlider("Late whole-volume forward / torso span", p.LateForwardShift, -.1f, .2f, x, w, ref y);
+            p.GrowthAxisTilt = ShapeSlider("All-stage axis tilt (0 = upright)", p.GrowthAxisTilt, 0, 1, x, w, ref y);
+            p.LateHeightScale = ShapeSlider("Late volume height multiplier", p.LateHeightScale, .8f, 1.4f, x, w, ref y);
+            p.LateDepthScale = ShapeSlider("Late front-back depth multiplier", p.LateDepthScale, .8f, 1.4f, x, w, ref y);
+            p.LateWidthScale = ShapeSlider("Late left-right width multiplier", p.LateWidthScale, .8f, 1.4f, x, w, ref y);
+            p.SkinClearance = ShapeSlider("Skin clearance", p.SkinClearance, 0, .2f, x, w, ref y);
+            p.LateSettle = ShapeSlider("Late upper settling (base fixed)", p.LateSettle, 0, 1, x, w, ref y);
+            p.ClothOffset = ShapeSlider("Clothing displacement", p.ClothOffset, 0.8f, 1.3f, x, w, ref y);
+            p.ThighGuardSpeed = ShapeSlider("Thigh Guard Speed (0 = off)", p.ThighGuardSpeed, 0, 8, x, w, ref y);
+            p.InnerThighGuardStrength = ShapeSlider("Inner Thigh Guard (0 = off)", p.InnerThighGuardStrength, 0, 4, x, w, ref y);
+            p.ThighGuardSmoothStrength = ShapeSlider("Thigh Guard Smooth (0 = off)", p.ThighGuardSmoothStrength, 0, 1, x, w, ref y);
+            GUI.Label(new Rect(x,y,w,22),"Guard smoothing requires Speed or Inner Guard above 0.");y+=24;
+            GUI.Label(new Rect(x,y,w,22),"Binding controls affect bending poses.");y+=24;
+            p.VirtualAxisStrength = ShapeSlider("Virtual axis strength (0 = native)", p.VirtualAxisStrength, 0, 1, x, w, ref y);
+            p.AxisBlendStart = ShapeSlider("Blend start / torso span", p.AxisBlendStart, 0, .15f, x, w, ref y);
+            p.AxisBlendFull = ShapeSlider("Full blend / torso span", p.AxisBlendFull, .05f, .6f, x, w, ref y);
+            p.LowerTransitionStart = ShapeSlider("Lower start above pelvic floor / span", p.LowerTransitionStart, -.50f, .75f, x, w, ref y);
+            p.LowerTransitionWidth = ShapeSlider("Lower transition width / span", p.LowerTransitionWidth, .02f, 1.50f, x, w, ref y);
+            p.LowerTransitionBias = ShapeSlider("Lower curve bias (- earlier / + later)", p.LowerTransitionBias, -2, 2, x, w, ref y);
+            p.UpperTransitionStart = ShapeSlider("Upper start above waist datum / span", p.UpperTransitionStart, -.50f, 1f, x, w, ref y);
+            p.UpperTransitionWidth = ShapeSlider("Upper transition width / span", p.UpperTransitionWidth, .02f, 1.50f, x, w, ref y);
+            p.UpperTransitionBias = ShapeSlider("Upper curve bias (- hold / + release)", p.UpperTransitionBias, -2, 2, x, w, ref y);
+            p.UpperTransitionJoin = ShapeSlider("Upper join / transition width", p.UpperTransitionJoin, .02f, 1f, x, w, ref y);
+            p.UpperTransitionActivation = ShapeSlider("Upper activation displacement / span", p.UpperTransitionActivation, .001f, .15f, x, w, ref y);
+            p.AxisPullLow = ShapeSlider("Pull at small angles", p.AxisPullLow, 0, 1, x, w, ref y);
+            p.AxisPullHigh = ShapeSlider("Pull at large angles", p.AxisPullHigh, 0, 1, x, w, ref y);
+            p.AxisPullAngle = ShapeSlider("Full-pull angle (degrees)", p.AxisPullAngle, 10, 120, x, w, ref y);
+            p.AxisAnchorY = ShapeSlider("Anchor height / torso span", p.AxisAnchorY, -.2f, .2f, x, w, ref y);
+            p.AxisAnchorZ = ShapeSlider("Anchor forward / torso span", p.AxisAnchorZ, -.2f, .2f, x, w, ref y);
+            GUI.Label(new Rect(x,y,w,22),"Navel start only applies with full navel preview OFF.");y+=24;
+            p.NavelEversion = ShapeSlider("Navel eversion (0 = off)", p.NavelEversion, 0, 2, x, w, ref y);
+            p.NavelStart = ShapeSlider("Navel change starts at stage", p.NavelStart, .3f, .95f, x, w, ref y);
+            p.NavelHeight = ShapeSlider("Navel protrusion depth / torso span", p.NavelHeight, 0, .03f, x, w, ref y);
+            p.NavelVerticalOffset = ShapeSlider("Navel vertical offset / torso span (- = down)", p.NavelVerticalOffset, -.03f, .03f, x, w, ref y);
+            p.NavelRadius = ShapeSlider("Navel patch radius / torso span", p.NavelRadius, .015f, .08f, x, w, ref y);
+            p.NavelProportion = ShapeSlider("Navel proportion retention", p.NavelProportion, 0, 1, x, w, ref y);
+            p.BreastExclusionEnabled = GUI.Toggle(new Rect(x,y,w,24),p.BreastExclusionEnabled,"Exclude breast-weighted vertices"); y+=28;
+            p.UpperBoneFilterEnabled = GUI.Toggle(new Rect(x,y,w,24),p.UpperBoneFilterEnabled,"Upper abdomen bone-weight filter"); y+=28;
+            p.UpperFieldFadeEnabled = GUI.Toggle(new Rect(x,y,w,24),p.UpperFieldFadeEnabled,"Extra shape-field top fade"); y+=28;
+            p.NavelPreviewFull = GUI.Toggle(new Rect(x,y,w,24),p.NavelPreviewFull,"Preview full navel response at current belly size"); y+=28;
+            GUI.Label(new Rect(x,y,w,24),BellyMorphController.GetALNavelStatus(_curMaid)); y+=28;
+            GUI.Label(new Rect(x,y,w,24),BellyMorphController.GetALAnchorStatus(_curMaid)); y+=28;
+            GUI.Label(new Rect(x,y,w,24),string.Format("Navel stage response: {0:F1}%",Growth.BellyShape.NavelStageResponse(_curProg,p)*100)); y+=28;
+            if (GUI.Button(new Rect(x,y,w/2-4,26),"Navel visible preset"))
+            { p.NavelPreviewFull=true; p.NavelEversion=1; p.NavelHeight=.012f; p.NavelRadius=.06f; p.NavelProportion=.85f; }
+            if (GUI.Button(new Rect(x+w/2+4,y,w/2-4,26),"Navel off")) {p.NavelEversion=0;p.NavelProportion=0;}
+            y+=32;
+            if (GUI.Button(new Rect(x,y,120,22),"Log to BepInEx"))
+                BellyMorphController.LogShapeParameters(_shape);
             if (GUI.Button(new Rect(x + 128f, y, 150f, 22f), "Dump Skirt Verts"))
             {
                 var log = BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
@@ -309,37 +245,53 @@ namespace COM3D2.Pregnancy.Plugin
                     log.LogWarning("[Pregnancy] Dump Skirt Verts failed: " + e);
                 }
             }
-            if (GUI.Button(new Rect(x + 286f, y, 128f, 22f), "Dump Upper Verts"))
-            {
-                var log = BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
-                try
-                {
-                    string path = BellyMorphController.ExportUpperClothVertexMorphDump(_curMaid);
-                    log.LogInfo("[Pregnancy] Dump Upper Verts: " + path);
-                }
-                catch (System.Exception e)
-                {
-                    log.LogWarning("[Pregnancy] Dump Upper Verts failed: " + e);
-                }
-            }
-            y += 26f;
-            if (GUI.Button(new Rect(x, y, 170f, 22f), "Dump Navel Accessory"))
-            {
-                var log = BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
-                try
-                {
-                    string path = BellyMorphController.ExportNavelAccessoryTriangleDump(_curMaid);
-                    log.LogInfo("[Pregnancy] Dump Navel Accessory: " + path);
-                }
-                catch (System.Exception e)
-                {
-                    log.LogWarning("[Pregnancy] Dump Navel Accessory failed: " + e);
-                }
-            }
+            if (GUI.Button(new Rect(x+286,y,w-286,22),"Dump All Verts"))
+                DumpDiagnostic("All");
             y += 26f;
 
+            if (GUI.Button(new Rect(x,y,180,24),"Dump Upper Verts"))
+                DumpDiagnostic("Upper");
+            if (GUI.Button(new Rect(x+188,y,190,24),"Dump Navel Accessory"))
+                DumpDiagnostic("Navel");
+            y += 30f;
+
+            _shapeContentHeight = y + 20f;
             GUI.EndScrollView();
         }
+
+        float ShapeSlider(string label,float value,float min,float max,float x,float width,ref float y)
+        {
+            GUI.Label(new Rect(x,y,width,20),label);
+            string text;
+            if(!_shapeText.TryGetValue(label,out text))text=value.ToString("R",CultureInfo.InvariantCulture);
+            float previous;
+            if(_shapeLastValue.TryGetValue(label,out previous) && previous!=value)text=value.ToString("R",CultureInfo.InvariantCulture);
+            float shown=Mathf.Clamp(value,min,max);
+            float slide=GUI.HorizontalSlider(new Rect(x,y+25,width-182,18),shown,min,max);
+            // Merely repainting a slider must never overwrite an out-of-range number.
+            if(slide!=shown){value=slide;text=value.ToString("R",CultureInfo.InvariantCulture);}
+            string edited=GUI.TextField(new Rect(x+width-174,y+22,116,23),text);
+            float parsed;
+            bool valid=TryShapeNumber(edited,out parsed);
+            if(valid)value=parsed;
+            float step=(float)System.Math.Pow(10,System.Math.Floor(System.Math.Log10((max-min)/100f)));
+            if(GUI.Button(new Rect(x+width-52,y+22,24,23),"-")){value-=step;edited=value.ToString("R",CultureInfo.InvariantCulture);}
+            if(GUI.Button(new Rect(x+width-26,y+22,24,23),"+")){value+=step;edited=value.ToString("R",CultureInfo.InvariantCulture);}
+            _shapeText[label]=edited;
+            _shapeLastValue[label]=value;
+            if(!valid){GUI.Label(new Rect(x,y+47,width,18),"Enter a finite number (scientific notation is supported).");y+=20;}
+            y+=52;
+            return value;
+        }
+        void DumpDiagnostic(string selection)
+        {
+            var log=BepInEx.Logging.Logger.CreateLogSource("Pregnancy");
+            try { log.LogInfo("[Pregnancy] Dump: "+(selection=="All"?BellyMorphController.ExportAllVertexMorphDump(_curMaid):selection=="Navel"?BellyMorphController.ExportNavelAccessoryTriangleDump(_curMaid):BellyMorphController.ExportUpperClothVertexMorphDump(_curMaid))); }
+            catch(System.Exception e){log.LogWarning("[Pregnancy] Dump failed: "+e);}
+        }
+        static bool TryShapeNumber(string text,out float value)
+            => float.TryParse(text,NumberStyles.Float,CultureInfo.InvariantCulture,out value)
+                && !float.IsNaN(value) && !float.IsInfinity(value);
 
         static void DrawField(ref float y, float x, float lw, float fx, float fw, string label, ref string value)
         {
@@ -398,100 +350,9 @@ namespace COM3D2.Pregnancy.Plugin
             }
         }
 
-        void SyncShapeFieldsFromController()
-        {
-            _sInflationMultiplier = FormatShape(BellyMorphController.InflationMultiplier);
-            _sInflationMoveY = FormatShape(BellyMorphController.InflationMoveY);
-            _sInflationMoveZ = FormatShape(BellyMorphController.InflationMoveZ);
-            _sInflationStretchX = FormatShape(BellyMorphController.InflationStretchX);
-            _sInflationStretchY = FormatShape(BellyMorphController.InflationStretchY);
-            _sInflationStretchZ = FormatShape(BellyMorphController.InflationStretchZ);
-            _sInflationShiftY = FormatShape(BellyMorphController.InflationShiftY);
-            _sInflationShiftZ = FormatShape(BellyMorphController.InflationShiftZ);
-            _sInflationTaperY = FormatShape(BellyMorphController.InflationTaperY);
-            _sInflationTaperZ = FormatShape(BellyMorphController.InflationTaperZ);
-            _sInflationRoundness = FormatShape(BellyMorphController.InflationRoundness);
-            _sInflationDrop = FormatShape(BellyMorphController.InflationDrop);
-            _sInflationFatFold = FormatShape(BellyMorphController.InflationFatFold);
-            _sInflationFatFoldHeight = FormatShape(BellyMorphController.InflationFatFoldHeight);
-            _sInflationFatFoldGap = FormatShape(BellyMorphController.InflationFatFoldGap);
-            _sRegionRadiusSide = FormatShape(BellyMorphController.RegionRadiusSide);
-            _sRegionRadiusFront = FormatShape(BellyMorphController.RegionRadiusFront);
-            _sRegionRadiusBack = FormatShape(BellyMorphController.RegionRadiusBack);
-            _sRegionRadiusUp = FormatShape(BellyMorphController.RegionRadiusUp);
-            _sRegionRadiusDown = FormatShape(BellyMorphController.RegionRadiusDown);
-            _sThighGuardSpeed = FormatShape(BellyMorphController.ThighGuardSpeed);
-            _sInnerThighGuardStrength = FormatShape(BellyMorphController.InnerThighGuardStrength);
-            _sThighGuardSmoothStrength = FormatShape(BellyMorphController.ThighGuardSmoothStrength);
-            _sTopEdgeTaper = FormatShape(BellyMorphController.TopEdgeTaper);
-            _sBottomEdgeTaper = FormatShape(BellyMorphController.BottomEdgeTaper);
-            _sSideSmoothWidth = FormatShape(BellyMorphController.SideSmoothWidth);
-            _sSideSmoothStrength = FormatShape(BellyMorphController.SideSmoothStrength);
-            _sBreastGuardStrength = FormatShape(BellyMorphController.BreastGuardStrength);
-            _sOuterClothPregnancyScale = FormatShape(BellyMorphController.OuterClothPregnancyScale);
-            _sSkirtBoundarySmoothPasses = BellyMorphController.SkirtBoundarySmoothPasses.ToString(CultureInfo.InvariantCulture);
-            _sSkirtBoundarySmoothStrength = FormatShape(BellyMorphController.SkirtBoundarySmoothStrength);
-            _sSkirtBoundaryUpOffset = FormatShape(BellyMorphController.SkirtBoundaryUpOffset);
-            _sSkirtFrontPlaneFwdOffset = FormatShape(BellyMorphController.SkirtFrontPlaneFwdOffset);
-            _sSkirtTopRadiusSideScale = FormatShape(BellyMorphController.SkirtTopRadiusSideScale);
-            _sSkirtTopRadiusFwdScale = FormatShape(BellyMorphController.SkirtTopRadiusFwdScale);
-            _sSkirtHemFadeRangeScale = FormatShape(BellyMorphController.SkirtHemFadeRangeScale);
-            _sSkirtLowerTipSide = FormatShape(BellyMorphController.SkirtLowerTipSide);
-            _sSkirtLowerTipUp = FormatShape(BellyMorphController.SkirtLowerTipUp);
-            _sSkirtLowerTipFwd = FormatShape(BellyMorphController.SkirtLowerTipFwd);
-            _sSkirtLowerRadiusSide = FormatShape(BellyMorphController.SkirtLowerRadiusSide);
-            _sSkirtLowerRadiusUp = FormatShape(BellyMorphController.SkirtLowerRadiusUp);
-            _sSkirtLowerRadiusFwd = FormatShape(BellyMorphController.SkirtLowerRadiusFwd);
-        }
+        void SyncShapeFieldsFromController() { _shape = BellyMorphController.Shape.Copy(); _shapeText.Clear(); _shapeLastValue.Clear(); }
 
-        void ApplyShapeFieldsToController()
-        {
-            float v;
-            if (PregnancyManager.TryParseFloat(_sInflationMultiplier, out v)) BellyMorphController.InflationMultiplier = v;
-            if (PregnancyManager.TryParseFloat(_sInflationMoveY, out v)) BellyMorphController.InflationMoveY = v;
-            if (PregnancyManager.TryParseFloat(_sInflationMoveZ, out v)) BellyMorphController.InflationMoveZ = v;
-            if (PregnancyManager.TryParseFloat(_sInflationStretchX, out v)) BellyMorphController.InflationStretchX = v;
-            if (PregnancyManager.TryParseFloat(_sInflationStretchY, out v)) BellyMorphController.InflationStretchY = v;
-            if (PregnancyManager.TryParseFloat(_sInflationStretchZ, out v)) BellyMorphController.InflationStretchZ = v;
-            if (PregnancyManager.TryParseFloat(_sInflationShiftY, out v)) BellyMorphController.InflationShiftY = v;
-            if (PregnancyManager.TryParseFloat(_sInflationShiftZ, out v)) BellyMorphController.InflationShiftZ = v;
-            if (PregnancyManager.TryParseFloat(_sInflationTaperY, out v)) BellyMorphController.InflationTaperY = v;
-            if (PregnancyManager.TryParseFloat(_sInflationTaperZ, out v)) BellyMorphController.InflationTaperZ = v;
-            if (PregnancyManager.TryParseFloat(_sInflationRoundness, out v)) BellyMorphController.InflationRoundness = v;
-            if (PregnancyManager.TryParseFloat(_sInflationDrop, out v)) BellyMorphController.InflationDrop = v;
-            if (PregnancyManager.TryParseFloat(_sInflationFatFold, out v)) BellyMorphController.InflationFatFold = v;
-            if (PregnancyManager.TryParseFloat(_sInflationFatFoldHeight, out v)) BellyMorphController.InflationFatFoldHeight = v;
-            if (PregnancyManager.TryParseFloat(_sInflationFatFoldGap, out v)) BellyMorphController.InflationFatFoldGap = v;
-            if (PregnancyManager.TryParseFloat(_sRegionRadiusSide, out v)) BellyMorphController.RegionRadiusSide = v;
-            if (PregnancyManager.TryParseFloat(_sRegionRadiusFront, out v)) BellyMorphController.RegionRadiusFront = v;
-            if (PregnancyManager.TryParseFloat(_sRegionRadiusBack, out v)) BellyMorphController.RegionRadiusBack = v;
-            if (PregnancyManager.TryParseFloat(_sRegionRadiusUp, out v)) BellyMorphController.RegionRadiusUp = v;
-            if (PregnancyManager.TryParseFloat(_sRegionRadiusDown, out v)) BellyMorphController.RegionRadiusDown = v;
-            if (PregnancyManager.TryParseFloat(_sThighGuardSpeed, out v)) BellyMorphController.ThighGuardSpeed = v;
-            if (PregnancyManager.TryParseFloat(_sInnerThighGuardStrength, out v)) BellyMorphController.InnerThighGuardStrength = v;
-            if (PregnancyManager.TryParseFloat(_sThighGuardSmoothStrength, out v)) BellyMorphController.ThighGuardSmoothStrength = v;
-            if (PregnancyManager.TryParseFloat(_sTopEdgeTaper, out v)) BellyMorphController.TopEdgeTaper = v;
-            if (PregnancyManager.TryParseFloat(_sBottomEdgeTaper, out v)) BellyMorphController.BottomEdgeTaper = v;
-            if (PregnancyManager.TryParseFloat(_sSideSmoothWidth, out v)) BellyMorphController.SideSmoothWidth = v;
-            if (PregnancyManager.TryParseFloat(_sSideSmoothStrength, out v)) BellyMorphController.SideSmoothStrength = v;
-            if (PregnancyManager.TryParseFloat(_sBreastGuardStrength, out v)) BellyMorphController.BreastGuardStrength = v;
-            if (PregnancyManager.TryParseFloat(_sOuterClothPregnancyScale, out v)) BellyMorphController.OuterClothPregnancyScale = v;
-            if (int.TryParse(_sSkirtBoundarySmoothPasses, NumberStyles.Integer, CultureInfo.InvariantCulture, out int passes)
-                || int.TryParse(_sSkirtBoundarySmoothPasses, NumberStyles.Integer, CultureInfo.CurrentCulture, out passes))
-                BellyMorphController.SkirtBoundarySmoothPasses = Mathf.Clamp(passes, 0, 16);
-            if (PregnancyManager.TryParseFloat(_sSkirtBoundarySmoothStrength, out v)) BellyMorphController.SkirtBoundarySmoothStrength = v;
-            if (PregnancyManager.TryParseFloat(_sSkirtBoundaryUpOffset, out v)) BellyMorphController.SkirtBoundaryUpOffset = v;
-            if (PregnancyManager.TryParseFloat(_sSkirtFrontPlaneFwdOffset, out v)) BellyMorphController.SkirtFrontPlaneFwdOffset = v;
-            if (PregnancyManager.TryParseFloat(_sSkirtTopRadiusSideScale, out v)) BellyMorphController.SkirtTopRadiusSideScale = v;
-            if (PregnancyManager.TryParseFloat(_sSkirtTopRadiusFwdScale, out v)) BellyMorphController.SkirtTopRadiusFwdScale = v;
-            if (PregnancyManager.TryParseFloat(_sSkirtHemFadeRangeScale, out v)) BellyMorphController.SkirtHemFadeRangeScale = v;
-            if (PregnancyManager.TryParseFloat(_sSkirtLowerTipSide, out v)) BellyMorphController.SkirtLowerTipSide = v;
-            if (PregnancyManager.TryParseFloat(_sSkirtLowerTipUp, out v)) BellyMorphController.SkirtLowerTipUp = v;
-            if (PregnancyManager.TryParseFloat(_sSkirtLowerTipFwd, out v)) BellyMorphController.SkirtLowerTipFwd = v;
-            if (PregnancyManager.TryParseFloat(_sSkirtLowerRadiusSide, out v)) BellyMorphController.SkirtLowerRadiusSide = v;
-            if (PregnancyManager.TryParseFloat(_sSkirtLowerRadiusUp, out v)) BellyMorphController.SkirtLowerRadiusUp = v;
-            if (PregnancyManager.TryParseFloat(_sSkirtLowerRadiusFwd, out v)) BellyMorphController.SkirtLowerRadiusFwd = v;
-        }
+        void ApplyShapeFieldsToController() { BellyMorphController.Shape = _shape.Copy(); }
 
         public static void TriggerApplyBelly(Maid maid, float progress)
         {

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType><ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable><NuGetAudit>false</NuGetAudit><NoWarn>$(NoWarn);CS0649</NoWarn></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/Growth/*.cs" />
+    <Compile Include="../../src/ALGrowthAdapter.cs" />
+    <Compile Include="../../src/ALVirtualSkinning.cs" />
+    <Compile Include="../../src/ALNavelAccessory.cs" />
+    <Compile Include="../../src/ALClothing.cs" />
+    <Compile Include="../../src/ALBreastClothing.cs" />
+    <Compile Include="../../src/ALClothingMotion.cs" />
+    <Compile Include="../../src/ALSkirtDrape.cs" />
+    <Compile Include="../../src/ALThighGuard.cs" />
+    <Compile Include="../../src/MatrixBridge.cs" />
+    <Compile Include="../../src/DeformationNormals.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+*.dll
+*.pdb
+*.model
+Pregnancy*Dumps/
+pregnancy_settings.json
