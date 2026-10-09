@@ -32,6 +32,13 @@ namespace COM3D2.Pregnancy.Plugin
         }
         public static void Main(string[] args)
         {
+            if(args.Length>0 && args[0]=="--leg-navel-tests") { RunLegNavelBindingTests(args); return; }
+            if(args.Length>0 && args[0]=="--refresh-tests") { RunRefreshTests(args); return; }
+            if(args.Length>0 && args[0]=="--refresh-benchmark") { RunRefreshBenchmark(args); return; }
+            if(args.Length>0 && args[0]=="--skirt-exception") { RunSkirtExceptionTests(args); return; }
+            if(args.Length>0 && args[0]=="--navel-timing") { RunNavelTimingTests(args); return; }
+            if(args.Contains("--enable-sag")){Shape.BellySag=2;args=args.Where(a=>a!="--enable-sag").ToArray();}
+            if(args.Length>0 && args[0]=="--sag-tests") { RunSagTests(args); return; }
             if(args.Length>0 && args[0]=="--clothing-pose-study") { RunClothingPoseStudy(args); return; }
             if(args.Length>0 && args[0]=="--breast-clothing-tests") { RunBreastClothingTests(); return; }
             if(args.Length>0 && args[0]=="--skirt-sparse") { RunSkirtSparseBoneTests(args); return; }

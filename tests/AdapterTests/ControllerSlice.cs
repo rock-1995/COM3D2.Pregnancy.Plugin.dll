@@ -13,10 +13,10 @@ namespace COM3D2.Pregnancy.Plugin
         static TestLog _log=new();
         class TestLog {public void LogInfo(string s){} public void LogWarning(string s)=>Console.WriteLine(s);}
         static bool IsDebugMeshLoggingEnabled()=>false;
-        static MeshMorphClass ClassifyMesh(SkinnedMeshRenderer r)=>r.sharedMesh.name.Contains("accheso")?MeshMorphClass.NavelAccessory:r.sharedMesh.name.Contains("body")?MeshMorphClass.Body:MeshMorphClass.OuterCloth;
+        static bool RuntimeClassification;
+        static MeshMorphClass ClassifyMesh(SkinnedMeshRenderer r)=>RuntimeClassification?RuntimeClassifyMesh(r):r.sharedMesh.name.Contains("accheso")?MeshMorphClass.NavelAccessory:r.sharedMesh.name.Contains("body")?MeshMorphClass.Body:r.sharedMesh.name.Contains("bra")?MeshMorphClass.InnerCloth:MeshMorphClass.OuterCloth;
         static MeshRecord FindRecord(Maid m,SkinnedMeshRenderer r)=>_records.TryGetValue(m.GetHashCode(),out var list)?list.Find(x=>x.SMR==r&&x.Mesh==r.sharedMesh):null;
         static bool IsBreastBoneName(string s)=>s.Contains("mune")||s.Contains("breast");
-        static void EnsureMonitor(Maid m){}
         static void ApplySmoothedNormals(Mesh m,MeshRecord r,Vector3[] v)
         {m.normals=DeformationNormals.Build(r.OrigVerts,r.Skirt==null?v:r.Skirt.VisualVertices,r.OrigNormals,m.triangles);}
         static void LogMorphSkip(Maid m,SkinnedMeshRenderer r,MeshMorphClass c,string s) {throw new Exception(s);}
@@ -41,6 +41,11 @@ namespace COM3D2.Pregnancy.Plugin
             public SkirtDrapePlan Skirt;
             public ClothingMotionPlan ClothingMotion;
             public int AppliedSignature;
+            public bool RefreshReady,HadBinding;
+            public ALContext AppliedContext;
+            public int RefreshShapeSignature,RefreshStructureSignature,AppliedExactSignature,AppliedNormalSignature;
+            public BodySurfaceHit[] RestHits;
+            public byte[] RestHitState;
         }
         class MorphBaseBakeState
         {
@@ -99,6 +104,11 @@ namespace COM3D2.Pregnancy.Plugin
             MeshRecord rec = records.Find(r => r.SMR == smr && r.Mesh == mesh);
             Vector3[] currentVerts = mesh.vertices;
             Vector3[] currentNormals = mesh.normals;
+            int structure=MeshStructureSignature(smr);
+            if(rec!=null && !refreshBase && CanReuseAppliedMesh(rec,currentVerts,currentNormals,progress,meshClass,structure))
+            {if(_refreshStats!=null)_refreshStats.Reused++;return;}
+            if(_refreshStats!=null)_refreshStats.Rebuilt++;
+            if(rec!=null && rec.RefreshStructureSignature!=structure)rec.Neighbors=null;
             if (rec == null)
             {
                 rec = new MeshRecord
@@ -146,6 +156,7 @@ namespace COM3D2.Pregnancy.Plugin
 
             Vector3[] newVerts;
             DeformStats stats;
+            long deformStarted=System.Diagnostics.Stopwatch.GetTimestamp();
             if (!TryDeformVertsInBindPoseWorld(
                 smr,
                 rec,
@@ -159,6 +170,7 @@ namespace COM3D2.Pregnancy.Plugin
                 return;
             }
 
+            if(_refreshStats!=null)_refreshStats.DeformTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-deformStarted;
             Vector3[] deltaVerts = BuildDeltaVerts(rec.OrigVerts, newVerts);
             // CleanVertices retains current game morphs and removes only our known
             // baked delta. Evaluate once from that base, even after TMorph rewrites it.
@@ -167,9 +179,14 @@ namespace COM3D2.Pregnancy.Plugin
             rec.LastDeltaVerts = deltaVerts;
             rec.AppliedSignature = ComputeVertexSignature(appliedVerts);
             mesh.vertices = appliedVerts;
+            long normalStarted=System.Diagnostics.Stopwatch.GetTimestamp();
             ApplySmoothedNormals(mesh, rec, appliedVerts);
+            if(_refreshStats!=null)_refreshStats.NormalTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-normalStarted;
             mesh.RecalculateBounds();
+            long bindingStarted=System.Diagnostics.Stopwatch.GetTimestamp();
             InstallALBinding(maid, rec, appliedVerts, progress);
+            if(_refreshStats!=null)_refreshStats.BindingTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-bindingStarted;
+            RememberAppliedMesh(rec,appliedVerts,progress,meshClass,structure);
 
             if (ShouldLogMorphDiagnostics(smr, meshClass))
             {
@@ -187,30 +204,7 @@ namespace COM3D2.Pregnancy.Plugin
             }
         }
         static int ComputeVertexSignature(Vector3[] verts)
-        {
-            if (verts == null) return 0;
-
-            unchecked
-            {
-                int count = verts.Length;
-                int hash = 17;
-                hash = hash * 31 + count;
-
-                if (count == 0) return hash;
-
-                int samples = Mathf.Min(12, count);
-                for (int i = 0; i < samples; i++)
-                {
-                    int idx = samples == 1 ? 0 : (int)((long)i * (count - 1) / (samples - 1));
-                    Vector3 v = verts[idx];
-                    hash = hash * 31 + Mathf.RoundToInt(v.x * 1000f);
-                    hash = hash * 31 + Mathf.RoundToInt(v.y * 1000f);
-                    hash = hash * 31 + Mathf.RoundToInt(v.z * 1000f);
-                }
-
-                return hash;
-            }
-        }
+        { return ExactVectors(verts); }
         static Vector3[] BuildDeltaVerts(Vector3[] baseVerts, Vector3[] newVerts)
         {
             if (baseVerts == null || newVerts == null || baseVerts.Length != newVerts.Length)
@@ -292,6 +286,7 @@ namespace COM3D2.Pregnancy.Plugin
                 AddBakeSignatureFloat(ref hash, Shape.VerticalRange);
                 AddBakeSignatureFloat(ref hash, Shape.WallSmoothing);
                 AddBakeSignatureFloat(ref hash, Shape.SagStrength);
+                AddBakeSignatureFloat(ref hash, Shape.BellySag);
                 AddBakeSignatureFloat(ref hash, Shape.MidVolume);
                 AddBakeSignatureFloat(ref hash, Shape.LowerPoleLift);
                 AddBakeSignatureFloat(ref hash, Shape.LateForwardShift);

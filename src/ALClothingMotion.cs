@@ -76,7 +76,7 @@ namespace COM3D2.Pregnancy.Plugin
                 var original=V.Transform(N(record.OrigVerts[i]),record.ToReference);
                 float blend=BellyShape.ClothingFootprint(V.Transform(original,context.InverseFrame),context.Frame.Profile,stage,Shape)*record.TorsoOwnership[i];
                 if(record.ThighGuardRestore!=null)blend*=1-record.ThighGuardRestore[i];
-                if(blend<=0 || !TryFindClothingRestSurface(context.Surface,U(original),context.Frame.Profile.Span*.2f,out var hit))continue;
+                if(blend<=0 || !TryFindRecordRestSurface(record,i,U(original),out var hit))continue;
                 var triangle=context.Surface.ClothingRest.Triangles[hit.TriangleIndex];
                 var body=context.Surface.Meshes[triangle.MeshIndex];
                 if(!body.Affected[triangle.A] && !body.Affected[triangle.B] && !body.Affected[triangle.C])continue;

@@ -1,0 +1,298 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using COM3D2.Pregnancy.Plugin.Growth.Numerics;
+
+namespace COM3D2.Pregnancy.Plugin.Growth;
+
+// Bind-space internal-volume contact with one fixed full-term membrane domain.
+// Only parameter/profile changes build the field; vertices only sample it.
+internal static class V9BellyShape
+{
+    internal readonly record struct Egg(float Bottom,float Top,float HalfWidth,float Depth,float AnteriorOffset,float UpperFullness=0,float AxisSlope=0)
+    {
+        internal float AnteriorAt(float y) => AnteriorOffset+AxisSlope*(y-(Bottom+Top)*.5f);
+    }
+    private readonly record struct Key(float Stage,float Fullness,float Width,float Reach,float Range,float Settle,float Smoothing,float Sag,float MidVolume,float Lift,float Clearance,bool UpperFade,float LateForward,float GrowthTilt,float LateHeight,float LateDepth,float LateWidth);
+    private sealed class Cache { internal Key Key; internal Field Value; }
+    internal static int FieldBuildCount { get; private set; }
+    internal static float Smooth(float t) { t=Scalar.Clamp(t,0,1);return t*t*t*(t*(t*6-15)+10); }
+    internal static float BoneInfluence(float bellyWeight,float legWeight)
+        => bellyWeight<=0 ? 0 : Smooth(bellyWeight/.15f)*Smooth((bellyWeight/Scalar.Max(bellyWeight+legWeight,1e-6f)-.35f)/.4f);
+    // Preserve the lower abdomen's native bone filter. The upper trial uses
+    // full shape influence; original height is measured in the shared torso frame.
+    internal static float DeformationInfluence(float native, float originalY, TorsoProfile torso, VtxSettings p)
+        => !p.UpperBoneFilterEnabled && originalY > torso.Navel ? 1f : native;
+    internal static float BreastRestore(float weight,float strength)=>Smooth(Scalar.Clamp(weight,0,1)*Scalar.Max(0,strength));
+
+    internal static Egg Growth(TorsoProfile torso,float stage,VtxSettings p)
+        => GrowthAtStage(torso,GrowthTimeline.Map(stage,p),p);
+
+    internal static Egg GrowthAtStage(TorsoProfile torso,float stage,VtxSettings p)
+    {
+        float s=Scalar.Clamp(stage,0,1),scale=torso.Span/2.7424295f;
+        // User-reviewed v3 controls, expressed relative to the original waist datum.
+        float[] keys={0,.33333334f,.44444445f,.5555556f,1};
+        float[] cy={-.7411765f,-.7411765f,-.545f,-.125f,.04f};
+        float[] cz={.15882353f,.15882353f,.34f,.40f,.58f};
+        float mid=p.MidVolume;
+        float[] rx={.02f,.24705882f,.45f*mid,.71f,1.06f};
+        float[] ry={.02f,.24117647f,.59f*mid,1.013f,1.256f};
+        float[] rz={.02f,.24705882f,.47f*mid,.72f,1.06f};
+        cy[4]=-.05f+.09f*p.LowerPoleLift;
+        ry[4]-=.09f*p.LowerPoleLift;
+        float Interpolate(float[] a)
+        {
+            int i=0;while(i<3 && s>keys[i+1])i++;
+            float t=Scalar.Clamp((s-keys[i])/(keys[i+1]-keys[i]),0,1);
+            return a[i]+(a[i+1]-a[i])*t;
+        }
+        float y=torso.Navel+Interpolate(cy)*scale,h=Interpolate(ry)*scale;
+        float top=y+h,bottom=y-h;
+        float late=Smooth((s-keys[3])/(1-keys[3]));
+        top+=(p.UpperReach-1)*torso.Span*.45f*late;
+        float settle=p.LateSettle*.12f*torso.Span*Smooth((s-.85f)/.15f);
+        float range=p.VerticalRange;
+        bottom=torso.Navel+(bottom-torso.Navel)*range-settle;
+        top=torso.Navel+(top-torso.Navel)*range-settle;
+        float fullness=p.GrowthFullness;
+        if(torso.HasCervix)
+        {
+            // Grow upright from the opening at every stage by default. Tilt
+            // is an explicit all-stage control about the lower pole; late
+            // translation moves the entire volume without changing its axis.
+            float height=top-bottom;
+            bottom=torso.Cervix.Y+.18f*scale*p.LowerPoleLift*late;
+            top=bottom+height-settle;
+            float travel=(Interpolate(cz)-cz[1])*scale*fullness;
+            top=bottom+(top-bottom)*(1+(p.LateHeightScale-1)*late);
+            float tilt=travel*p.GrowthAxisTilt;
+            float center=torso.Cervix.Z+tilt+(travel+p.LateForwardShift*torso.Span)*late;
+            return new Egg(bottom,top,Interpolate(rx)*scale*p.GrowthWidth*(1+(p.LateWidthScale-1)*late),
+                Interpolate(rz)*scale*fullness*(1+(p.LateDepthScale-1)*late),center,0,
+                2*tilt/Scalar.Max(top-bottom,1e-6f));
+        }
+        return new Egg(bottom,top,Interpolate(rx)*scale*p.GrowthWidth,
+            Interpolate(rz)*scale*fullness,
+            torso.AxisAt(torso.Navel)+(Interpolate(cz)+.08822574f)*scale*fullness);
+    }
+    private static Field Get(TorsoProfile t,float stage,VtxSettings p)
+    {
+        stage=GrowthTimeline.Map(stage,p);
+        var key=new Key(stage,p.GrowthFullness,p.GrowthWidth,p.UpperReach,p.VerticalRange,p.LateSettle,p.WallSmoothing,p.SagStrength,p.MidVolume,p.LowerPoleLift,p.SkinClearance,p.UpperFieldFadeEnabled,p.LateForwardShift,p.GrowthAxisTilt,p.LateHeightScale,p.LateDepthScale,p.LateWidthScale);
+        var cache=t.ShapeCache as Cache;
+        if(cache==null) {cache=new Cache();t.ShapeCache=cache;}
+        if(cache.Value==null || cache.Key!=key) {cache.Key=key;cache.Value=new Field(t,stage,p);FieldBuildCount++;}
+        return cache.Value;
+    }
+    internal static Vector3 Deform(Vector3 original,TorsoProfile torso,float stage,VtxSettings p)
+    {
+        if(stage<=0)return original;
+        var f=Get(torso,stage,p);
+        float support=f.Support(original);
+        if(support<=0)return original;
+        var deformed=DeformBase(original,torso,f);
+        return original+(NavelPatch(original,deformed,torso,stage,p,f)-original)*support;
+    }
+    internal static Vector3 DeformOuterCloth(Vector3 original,TorsoProfile torso,float stage,VtxSettings p)
+    {
+        if(stage<=0)return original;
+        var field=Get(torso,stage,p);
+        // Extend the abdominal field continuously into loose fabric rather than
+        // turning its displacement off outside the original skin's narrow band.
+        // Preserve the existing result at full support and keep remote fabric
+        // out of the skin's local navel correction.
+        return Deform(original,torso,stage,p)+(DeformBase(original,torso,field)-original)*(1-field.Support(original));
+    }
+    private static Vector3 DeformBase(Vector3 original,TorsoProfile torso,Field f)
+    {
+        f.Sample(original,out float push,out float drop,out float angle);
+        if(push<torso.Span*.0001f && drop<torso.Span*.0001f)return original;
+        // Advect skin down the smooth envelope instead of translating the old
+        // radial profile, which would flatten its lower cap. Preserve radial
+        // surface detail (including the navel depression) during this transport.
+        float y=original.Y-drop;
+        f.SampleAtHeight(y,angle,out float surfacePush,out _);
+        float oldAxis=torso.AxisAt(original.Y),newAxis=torso.AxisAt(y);
+        float radius=Scalar.Sqrt(original.X*original.X+(original.Z-oldAxis)*(original.Z-oldAxis));
+        radius+=f.WallRadius(y,angle)-f.WallRadius(original.Y,angle)+surfacePush;
+        return new Vector3(radius*Scalar.Sin(angle),y,Scalar.Max(original.Z,newAxis+radius*Scalar.Cos(angle)));
+    }
+    internal static float NavelStageResponse(float stage,VtxSettings p)
+        => stage<=0 ? 0 : p.NavelPreviewFull ? 1 : Smooth((stage-p.NavelStart)/VirtualAxisMath.NonZero(1-p.NavelStart));
+
+    private static Vector3 NavelPatch(Vector3 original,Vector3 deformed,TorsoProfile torso,float stage,VtxSettings p,Field f)
+    {
+        // A reliable depression must exist in the ORIGINAL mesh. No fallback
+        // waist landmark is allowed to manufacture a new navel.
+        if(!Scalar.IsFinite(torso.SkinNavelZ) || (p.NavelEversion<=0 && p.NavelProportion<=0))return deformed;
+        float radius=p.NavelRadius*torso.Span;
+        float centerY=torso.SkinNavelY+p.NavelVerticalOffset*torso.Span;
+        float u=original.X,v=original.Y-centerY;
+        float r=Scalar.Sqrt(u*u/(radius*radius)+v*v/(radius*radius*1.69f));
+        if(r>=1 || original.Z<=torso.AxisAt(original.Y))return deformed;
+        float late=NavelStageResponse(stage,p);
+        float expansion=Smooth(Vector3.Distance(original,deformed)/(torso.Span*.12f));
+        float mask=Smooth(1-r)*late*expansion;
+        if(mask<=0)return deformed;
+        float y=centerY,eps=torso.Span*.003f;
+        Vector3 Wall(float x,float yy)=>new(x,yy,torso.WallAt(x,yy));
+        var dx=(DeformBase(Wall(eps,y),torso,f)-DeformBase(Wall(-eps,y),torso,f))/(2*eps);
+        var dy=(DeformBase(Wall(0,y+eps),torso,f)-DeformBase(Wall(0,y-eps),torso,f))/(2*eps);
+        float sx=dx.X,sy=dy.Y;
+        // Preserve local material spacing instead of widening a compressed pit
+        // into a transverse slit. The compact mask leaves the surrounding wall.
+        var correction=new Vector3(u*(Scalar.Clamp(sx,.85f,1.5f)-sx),v*(Scalar.Clamp(sy,.85f,1.5f)-sy),0)
+            *(mask*p.NavelProportion);
+        float depression=Scalar.Min(0,original.Z-torso.WallAt(original.X,original.Y));
+        float height=p.NavelHeight*torso.Span*Smooth(1-r);
+        // Eversion changes depth only. Tilting this local push down the belly
+        // normal would fold already-compressed rows underneath the navel.
+        correction+=Vector3.UnitZ*(mask*p.NavelEversion*(height-depression));
+        return deformed+correction;
+    }
+    internal static float ClothingFootprint(Vector3 original,TorsoProfile torso,float stage,VtxSettings p,bool radialSupport=true)
+    {
+        if(stage<=0)return 0;
+        var field=Get(torso,stage,p);
+        field.Sample(original,out float push,out float drop,out _);
+        return Smooth(Scalar.Max(push,drop)/(torso.Span*.025f))*(radialSupport?field.Support(original):1f);
+    }
+    private sealed class Field
+    {
+        private const int Ny=97,Nt=65;
+        private readonly float[] _push=new float[Ny*Nt],_drop=new float[Ny*Nt];
+        private readonly TorsoProfile _torso;
+        private readonly float _min,_max,_dy;
+        private const float Dt=Scalar.PI/(Nt-1);
+        internal Field(TorsoProfile torso,float stage,VtxSettings p)
+        {
+            _torso=torso;float span=torso.Span,scale=span/2.7424295f;
+            var egg=GrowthAtStage(torso,stage,p);var first=GrowthAtStage(torso,1f/3,p);var final=GrowthAtStage(torso,1,p);
+            // The smoothing domain always includes the anticipated full-term area,
+            // even when the current small volume contacts only the lower abdomen.
+            _min=Scalar.Max(torso.PelvicFloor+.02f*span,Scalar.Min(first.Bottom,final.Bottom)-.20f*span);
+            _max=Scalar.Max(first.Top,final.Top)+.24f*span;
+            _dy=(_max-_min)/(Ny-1);
+            var load=new float[Ny*Nt];var future=new float[Ny*Nt];var sine=new float[Nt];var cosine=new float[Nt];
+            for(int j=0;j<Nt;j++){float a=-Scalar.PI*.5f+j*Dt;sine[j]=Scalar.Sin(a);cosine[j]=Scalar.Cos(a);}
+            float Radius(Egg e,float y,float axis,float sn,float cs)
+            {
+                float h=(e.Top-e.Bottom)*.5f,u=(y-(e.Top+e.Bottom)*.5f)/h;
+                if(Scalar.Abs(u)>=1)return -1;
+                float a=sn*sn/(e.HalfWidth*e.HalfWidth)+cs*cs/(e.Depth*e.Depth);
+                float offset=e.AnteriorAt(y);
+                float b=2*cs*(axis-offset)/(e.Depth*e.Depth);
+                float c=(axis-offset)*(axis-offset)/(e.Depth*e.Depth)-(1-u*u);
+                float disc=b*b-4*a*c;
+                return disc<0 ? -1 : (-b+Scalar.Sqrt(disc))/(2*a);
+            }
+            float peak=0,futurePeak=0;
+            for(int i=1;i<Ny-1;i++)
+            {
+                float y=_min+i*_dy,axis=torso.AxisAt(y),depth=Scalar.Max(.01f*span,(torso.FrontAt(y)-torso.BackAt(y))*.5f),width=torso.WidthAt(y);
+                for(int j=1;j<Nt-1;j++)
+                {
+                    float wall=1/Scalar.Sqrt(sine[j]*sine[j]/(width*width)+cosine[j]*cosine[j]/(depth*depth));
+                    float radius=Radius(egg,y,axis,sine[j],cosine[j]);
+                    if(stage>=1f/3)radius=Scalar.Max(radius,Radius(first,y,axis,sine[j],cosine[j]));
+                    float value=radius>0 ? Scalar.Max(0,radius+p.SkinClearance*scale-wall):0;
+                    load[i*Nt+j]=_push[i*Nt+j]=value;peak=Scalar.Max(peak,value);
+                    float finalRadius=Radius(final,y,axis,sine[j],cosine[j]);
+                    float finalLoad=finalRadius>0 ? Scalar.Max(0,finalRadius+p.SkinClearance*scale-wall):0;
+                    future[i*Nt+j]=finalLoad;futurePeak=Scalar.Max(futurePeak,finalLoad);
+                }
+            }
+            if(peak==0)return;
+            float smoothing=p.WallSmoothing;
+            float late=Smooth((stage-.5555556f)/(1-.5555556f));
+            // Engage the future abdominal footprint in early/mid smoothing,
+            // rather than merely diffusing a small isolated lower-belly bump.
+            // A gain curve keeps values above 1 responsive without exceeding
+            // a unit blend. The former clamp made most of that range plateau.
+            float sharedGain=smoothing>0 ? 1-1/(1+smoothing) : 0;
+            float shared=sharedGain*.90f*(1-late)*Smooth((stage-1f/3)/(1f/9));
+            if(futurePeak>0 && shared>0)
+                for(int k=0;k<load.Length;k++)
+                    load[k]=_push[k]=Scalar.Max(load[k],future[k]*(peak/futurePeak)*shared);
+            float ly=(.25f+smoothing*(.50f*(1-late)+.06f*late))*scale;
+            float lt=.24f+.08f*smoothing;
+            float ay=ly*ly/(_dy*_dy),at=lt*lt/(Dt*Dt),denom=1+2*ay+2*at;
+            // Projected SOR for the contact obstacle. It runs only on shape rebuild.
+            for(int iteration=0;iteration<900;iteration++)
+            {
+                float change=0;
+                for(int color=0;color<2;color++)
+                for(int i=1;i<Ny-1;i++)
+                for(int j=1+((i+color)&1);j<Nt-1;j+=2)
+                {
+                    int k=i*Nt+j;
+                    float target=(ay*(_push[k-Nt]+_push[k+Nt])+at*(_push[k-1]+_push[k+1]))/denom;
+                    float next=Scalar.Max(load[k],_push[k]+1.65f*(target-_push[k]));
+                    change=Scalar.Max(change,Scalar.Abs(next-_push[k]));_push[k]=next;
+                }
+                if(change<span*1e-6f)break;
+            }
+            for(int i=0;i<Ny;i++)
+            for(int j=0;j<Nt;j++)
+            {
+                int k=i*Nt+j;
+                float edge=Smooth(i*_dy/(.16f*span))*(p.UpperFieldFadeEnabled ? Smooth((Ny-1-i)*_dy/(.12f*span)) : 1f)*Smooth(Scalar.Min(j,Nt-1-j)*Dt/.30f);
+                _push[k]*=edge;
+                _drop[k]=p.SagStrength*.50f*_push[k]*cosine[j]*cosine[j];
+            }
+            // Gravity extends the lower surface while retaining internal contact.
+            // The same SagStrength drives both the envelope and skin advection.
+            if(p.SagStrength>0)
+            {
+                var basePush=(float[])_push.Clone();
+                float shift=.22f*scale*p.SagStrength/_dy;
+                for(int i=1;i<Ny-1;i++)
+                for(int j=1;j<Nt-1;j++)
+                {
+                    float u=Scalar.Min(Ny-1,i+shift);int lo=Math.Min(Ny-2,(int)u);float f=u-lo;
+                    float spread=.85f*((1-f)*basePush[lo*Nt+j]+f*basePush[(lo+1)*Nt+j]);
+                    float extra=Scalar.Max(0,spread-basePush[i*Nt+j]);
+                    _push[i*Nt+j]+=extra*Smooth(extra/(.035f*span))*Smooth(i*_dy/(.16f*span));
+                }
+            }
+            // Bound the vertical gradient so sag cannot reverse the row ordering.
+            for(int j=0;j<Nt;j++)
+            {
+                for(int i=1;i<Ny;i++)_drop[i*Nt+j]=Scalar.Min(_drop[i*Nt+j],_drop[(i-1)*Nt+j]+.60f*_dy);
+                for(int i=Ny-2;i>=0;i--)_drop[i*Nt+j]=Scalar.Min(_drop[i*Nt+j],_drop[(i+1)*Nt+j]+.60f*_dy);
+            }
+        }
+        internal float WallRadius(float y,float angle)
+        {
+            float sn=Scalar.Sin(angle),cs=Scalar.Cos(angle),w=_torso.WidthAt(y);
+            float d=Scalar.Max(.01f*_torso.Span,(_torso.FrontAt(y)-_torso.BackAt(y))*.5f);
+            return 1/Scalar.Sqrt(sn*sn/(w*w)+cs*cs/(d*d));
+        }
+        internal void Sample(Vector3 v,out float push,out float drop,out float angle)
+        {
+            angle=Scalar.Atan2(v.X,v.Z-_torso.AxisAt(v.Y));
+            SampleAtHeight(v.Y,angle,out push,out drop);
+        }
+        internal float Support(Vector3 v)
+        {
+            // The solved membrane lives on the rest abdominal wall. Its
+            // meridians are not infinite rays through detached hands/thighs.
+            float radius=Scalar.Sqrt(v.X*v.X+Scalar.Pow(v.Z-_torso.AxisAt(v.Y),2));
+            float angle=Scalar.Atan2(v.X,v.Z-_torso.AxisAt(v.Y));
+            float outside=radius-WallRadius(v.Y,angle);
+            return 1-Smooth((outside/_torso.Span-.03f)/.07f);
+        }
+        internal void SampleAtHeight(float y,float angle,out float push,out float drop)
+        {
+            push=drop=0;
+            if(y<=_min || y>=_max || Scalar.Abs(angle)>=Scalar.PI*.5f)return;
+            float yy=(y-_min)/_dy,tt=(angle+Scalar.PI*.5f)/Dt;
+            int i=Math.Min(Ny-2,(int)yy),j=Math.Min(Nt-2,(int)tt);float fy=yy-i,ft=tt-j;
+            float SampleArray(float[] a) => (1-fy)*((1-ft)*a[i*Nt+j]+ft*a[i*Nt+j+1])+fy*((1-ft)*a[(i+1)*Nt+j]+ft*a[(i+1)*Nt+j+1]);
+            push=SampleArray(_push);drop=SampleArray(_drop);
+        }
+    }
+}
+
+

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
 
@@ -180,7 +180,8 @@ namespace COM3D2.Pregnancy.Plugin
             p.UpperReach = ShapeSlider("Upper abdomen reach (after 5 months)", p.UpperReach, 0.75f, 1.2f, x, w, ref y);
             p.VerticalRange = ShapeSlider("Vertical influence range", p.VerticalRange, .6f, 1.2f, x, w, ref y);
             p.WallSmoothing = ShapeSlider("Whole-abdomen smoothing", p.WallSmoothing, 0, 2, x, w, ref y);
-            p.SagStrength = ShapeSlider("Belly sag (0 = off)", p.SagStrength, 0, 2, x, w, ref y);
+            p.SagStrength = ShapeSlider("Skin slide / density (legacy sag)", p.SagStrength, 0, 2, x, w, ref y);
+            p.BellySag = ShapeSlider("Belly sag (downward shift, 0 = off)", p.BellySag, 0, 2, x, w, ref y);
             p.MidVolume = ShapeSlider("Second-stage volume (near 4 months)", p.MidVolume, .75f, 1.5f, x, w, ref y);
             p.LowerPoleLift = ShapeSlider("Late lower-pole lift (0 = cervix)", p.LowerPoleLift, 0, 2, x, w, ref y);
             p.LateForwardShift = ShapeSlider("Late whole-volume forward / torso span", p.LateForwardShift, -.1f, .2f, x, w, ref y);
@@ -212,9 +213,9 @@ namespace COM3D2.Pregnancy.Plugin
             p.AxisPullAngle = ShapeSlider("Full-pull angle (degrees)", p.AxisPullAngle, 10, 120, x, w, ref y);
             p.AxisAnchorY = ShapeSlider("Anchor height / torso span", p.AxisAnchorY, -.2f, .2f, x, w, ref y);
             p.AxisAnchorZ = ShapeSlider("Anchor forward / torso span", p.AxisAnchorZ, -.2f, .2f, x, w, ref y);
-            GUI.Label(new Rect(x,y,w,22),"Navel start only applies with full navel preview OFF.");y+=24;
+            GUI.Label(new Rect(x,y,w,22),"Navel grows from start to 100%; keep full preview OFF.");y+=24;
             p.NavelEversion = ShapeSlider("Navel eversion (0 = off)", p.NavelEversion, 0, 2, x, w, ref y);
-            p.NavelStart = ShapeSlider("Navel change starts at stage", p.NavelStart, .3f, .95f, x, w, ref y);
+            p.NavelStart = ShapeSlider("Navel change starts at pregnancy progress", p.NavelStart, .3f, .95f, x, w, ref y);
             p.NavelHeight = ShapeSlider("Navel protrusion depth / torso span", p.NavelHeight, 0, .03f, x, w, ref y);
             p.NavelVerticalOffset = ShapeSlider("Navel vertical offset / torso span (- = down)", p.NavelVerticalOffset, -.03f, .03f, x, w, ref y);
             p.NavelRadius = ShapeSlider("Navel patch radius / torso span", p.NavelRadius, .015f, .08f, x, w, ref y);
@@ -300,6 +301,18 @@ namespace COM3D2.Pregnancy.Plugin
             y += 24f;
         }
 
+        void SelectMaid(int i)
+        {
+            _sel = i;
+            _curMaid = _maids[i];
+            _shape = BellyMorphController.GetAppliedShape(_curMaid);
+            _shapeText.Clear(); _shapeLastValue.Clear();
+            _curPreg = PregnancyManager.GetPregnant(_curMaid);
+            _curProg = PregnancyManager.GetProgress(_curMaid);
+            _curCycle = PregnancyManager.EnsureCycleProgress(_curMaid);
+            _dropOpen = false;
+        }
+
         void DrawDrop()
         {
             GUI.Box(_dropRect, "");
@@ -311,13 +324,7 @@ namespace COM3D2.Pregnancy.Plugin
                 Rect r = new Rect(_dropRect.x + 4f, iy, _dropRect.width - 8f, h - 2f);
                 if (GUI.Button(r, _names[i]))
                 {
-                    if (i != _sel) BellyMorphController.Reset(_curMaid);
-                    _sel = i;
-                    _curMaid = _maids[i];
-                    _curPreg = PregnancyManager.GetPregnant(_curMaid);
-                    _curProg = PregnancyManager.GetProgress(_curMaid);
-                    _curCycle = PregnancyManager.EnsureCycleProgress(_curMaid);
-                    _dropOpen = false;
+                    SelectMaid(i);
                 }
             }
         }
@@ -342,11 +349,7 @@ namespace COM3D2.Pregnancy.Plugin
             }
             if (_maids.Count > 0)
             {
-                _sel = 0;
-                _curMaid = _maids[0];
-                _curPreg = PregnancyManager.GetPregnant(_curMaid);
-                _curProg = PregnancyManager.GetProgress(_curMaid);
-                _curCycle = PregnancyManager.EnsureCycleProgress(_curMaid);
+                SelectMaid(0);
             }
         }
 
@@ -359,7 +362,6 @@ namespace COM3D2.Pregnancy.Plugin
             if (maid == null) return;
 
             PregnancyManager.CaptureCurrentBellySettings();
-            BellyMorphController.Reset(maid);
             BellyMorphController.ApplyProgress(maid, progress);
         }
 

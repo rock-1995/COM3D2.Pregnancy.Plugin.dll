@@ -1,24 +1,28 @@
 # COM3D2 Pregnancy Plugin
 
-## Clothing preview — 2026-10-10
+## V13 — 2026-10-10
 
-[Download the preview DLL](https://github.com/rock-1995/COM3D2.Pregnancy.Plugin.dll-on-going-/releases/tag/clothing-preview-20261010) · [Changes and validation](CHANGELOG.md) · [Build and tests](BUILDING.md)
+[Download V13](https://github.com/rock-1995/COM3D2.Pregnancy.Plugin.dll/releases/tag/v13-20261010) · [Changes and validation](CHANGELOG.md) · [Build and tests](BUILDING.md)
 
-This snapshot contains the current AL-based body and clothing implementation. Tight clothing now follows the actual animated body surface at the abdomen/chest boundary. Breast guarding is selected from the body's breast-physics region instead of freezing abdominal fabric just because the garment has a breast-bone influence. Skirt drape and pose caching from the preceding local versions are retained.
+V13 includes a downward belly-sag control, gradual navel protrusion from the configured start (default 40%) to full pregnancy, faster repeated clothing refreshes, and independent deformation state for each maid.
 
-**Preview limitation:** a small edge-interior intersection remains in one simulated upper-abdomen pose (about 0.4 mm in front-depth projection). Offline mesh and pose tests passed; this specific build has not received an in-game visual pass. It is published as a prerelease, without replacing the existing stable release.
+- Clothing vertices influenced by lower-leg bones without skirt-bone ownership keep their original geometry and skin weights, preventing the front lower portion of leg-bound garments from lifting with the belly.
+- Navel accessories follow the final bones, weights and matrices of the navel support vertices while preserving the accessory's rigid shape.
+- The **背中 / accSenaka** category now participates in outer-clothing deformation.
+
+The tested DLL is published as a prerelease. Production compilation and offline geometry, pose, refresh and multi-maid checks passed; this exact build has not yet had an in-game visual pass. The previous clothing preview's small edge-interior clipping limitation remains documented in [CHANGELOG.md](CHANGELOG.md).
 
 ### Installation
 
-Back up your current plugin, close the game, and replace `COM3D2.Pregnancy.Plugin.dll` in `BepInEx/plugins/`. Keep only one copy of the plugin DLL in the plugin search path. Existing settings are retained. The release does not contain game assemblies, model assets, private dumps, or user saves.
+Back up your current plugin, close the game, and replace `COM3D2.Pregnancy.Plugin.dll` in `BepInEx/plugins/`. Keep only one copy of the plugin DLL in the plugin search path. Existing settings are retained; new defaults do not overwrite saved values. Game assemblies, models, private dumps and user saves are not included.
 
-The plugin identifier and embedded version are retained from the tested build. Use the release tag and SHA-256 file to identify this preview.
+The plugin identifier and embedded version remain those of the tested local build. Identify this release by its tag and SHA-256 file.
 
 ---
 
 ## Earlier feature overview
 
-The original project description is preserved below. See the preview notes above for the current deformation status.
+The original project description is preserved below. See the V13 notes above for the current deformation status.
 
 The pregnancy mod is basically complete. Here is a breakdown of the features:
 

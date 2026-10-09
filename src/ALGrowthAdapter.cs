@@ -14,6 +14,9 @@ namespace COM3D2.Pregnancy.Plugin
         {
             public Maid Maid;
             public int Signature;
+            public VtxSettings Settings;
+            public NMatrix BodyToReference;
+            public readonly Dictionary<SkinnedMeshRenderer,int> MapSignatures=new Dictionary<SkinnedMeshRenderer,int>();
             public SkinnedMeshRenderer Body;
             public LocalFrame Frame;
             public NMatrix FrameMatrix, InverseFrame;
@@ -70,25 +73,37 @@ namespace COM3D2.Pregnancy.Plugin
         static void PrepareALContext(Maid maid,List<SkinnedMeshRenderer> renderers,float stage)
         {
             _alWorking=null;
+            long contextStarted=System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
                 if(maid==null)return;
+                PruneDetachedBindings(maid,renderers);
                 var bodies=renderers.Where(r=>r!=null && r.sharedMesh!=null && ClassifyMesh(r)==MeshMorphClass.Body && r.sharedMesh.vertexCount>=50)
                     .OrderByDescending(r=>r.sharedMesh.vertexCount).ToArray();
                 if(bodies.Length==0)throw new InvalidOperationException("No readable body mesh for growth calibration.");
                 var body=bodies[0];
                 var originals=new Dictionary<SkinnedMeshRenderer,Vector3[]>();
                 int signature=ComputeMorphBakeSignature(stage,MeshMorphClass.Body);
+                bool hasNavelAccessory=renderers.Any(r=>r!=null && ClassifyMesh(r)==MeshMorphClass.NavelAccessory);
+                var topologies=new Dictionary<SkinnedMeshRenderer,int[]>();
                 foreach(var r in bodies)
                 {
                     var v=CleanVertices(maid,r);originals[r]=v;
-                    unchecked {signature=signature*31+r.sharedMesh.GetInstanceID();signature=signature*31+ComputeVertexSignature(v);}
+                    var topology=ClothingBodyTopology(maid,r);topologies[r]=topology;
+                    unchecked
+                    {
+                        signature=signature*31+r.GetHashCode();signature=signature*31+r.sharedMesh.GetInstanceID();
+                        signature=signature*31+ComputeVertexSignature(v);signature=signature*31+MeshStructureSignature(r);
+                        signature=signature*31+ExactIndices(topology);signature=signature*31+(r.enabled&&r.gameObject.activeInHierarchy?1:0);
+                    }
                 }
-                foreach(var r in renderers)
-                    if(r!=null && r.sharedMesh!=null)
-                        unchecked {signature=signature*31+r.sharedMesh.GetInstanceID();signature=signature*31+(r.enabled&&r.gameObject.activeInHierarchy?1:0);}
+                unchecked{signature=signature*31+(hasNavelAccessory?1:0);}
                 if(_alContexts.TryGetValue(maid.GetHashCode(),out var cached) && cached.Signature==signature && cached.Body==body)
-                { _alWorking=cached;return; }
+                {
+                    SyncContextMaps(cached,renderers);_alWorking=cached;
+                    if(_refreshStats!=null)_refreshStats.ContextHits++;return;
+                }
+                if(_refreshStats!=null)_refreshStats.ContextBuilds++;
 
                 var bones=NativeBones(body);var binds=NativeBinds(body);
                 int pelvis=FindBoneIndex(bones,"Bip01 Pelvis_SCL_","Bip01 Pelvis");
@@ -115,9 +130,8 @@ namespace COM3D2.Pregnancy.Plugin
                 var frame=new LocalFrame {Center=U(floor),Up=U(up),Right=U(side),Fwd=U(forward),BoneLen=NVector.Distance(floor,navel)};
                 var fm=FrameMatrix(frame);
                 if(!NMatrix.Invert(fm,out var inv))throw new InvalidOperationException("Degenerate COM3D2 torso frame.");
-                var context=new ALContext {Maid=maid,Body=body,Signature=signature,Frame=frame,FrameMatrix=fm,InverseFrame=inv,Stage=stage};
-                foreach(var r in renderers)
-                    if(r!=null && r.sharedMesh!=null && ClassifyMesh(r)!=MeshMorphClass.Ignore && RestMap(r,body,out var map))context.Maps[r]=map*bodyToReference;
+                var context=new ALContext {Maid=maid,Body=body,Signature=signature,Settings=Shape.Copy(),BodyToReference=bodyToReference,Frame=frame,FrameMatrix=fm,InverseFrame=inv,Stage=stage};
+                SyncContextMaps(context,renderers);
 
                 int chest=-1;float chestY=float.MinValue;
                 for(int i=0;i<bones.Length && i<binds.Length;i++)
@@ -152,7 +166,6 @@ namespace COM3D2.Pregnancy.Plugin
                 context.Surface=CreateBodyAnchorContext(frame);context.Material=new MaterialBlendField(frame.Profile.Span);
                 _alWorking=context;
                 // Build body correspondences before any clothing, independently of slot enumeration order.
-                bool hasNavelAccessory=renderers.Any(r=>r!=null && ClassifyMesh(r)==MeshMorphClass.NavelAccessory);
                 foreach(var r in bodies)
                 {
                     bool visible=r.enabled && r.gameObject.activeInHierarchy;
@@ -162,7 +175,7 @@ namespace COM3D2.Pregnancy.Plugin
                     if(hasNavelAccessory)context.NavelBodies.Add(record);
                     // Hidden-body support is scoped to the accessory; clothing behavior stays unchanged.
                     if(!visible)continue;
-                    AddBodyAnchorMesh(context.Surface,r,record,null,morphed,frame,ClothingBodyTopology(maid,r));
+                    AddBodyAnchorMesh(context.Surface,r,record,null,morphed,frame,topologies[r]);
                     for(int i=0;i<record.OrigVerts.Length;i++)
                     {
                         var o=NVector.Transform(N(record.OrigVerts[i]),record.ToReference);
@@ -174,6 +187,7 @@ namespace COM3D2.Pregnancy.Plugin
                 _log.LogInfo(string.Format("[ALGrowth] calibrated mesh={0} floor={1} waist={2} upper={3}; span={4:F6}; stage={5:F4}; navel={6}",body.sharedMesh.name,bones[pelvis].name,bones[waist].name,bones[chest].name,frame.Profile.Span,stage,Scalar.IsFinite(frame.Profile.SkinNavelZ)));
             }
             catch(Exception e){_alWorking=null;_log.LogWarning("[ALGrowth] Calibration failed: "+e.Message);}
+            finally{if(_refreshStats!=null)_refreshStats.ContextTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-contextStarted;}
         }
 
         static float BoneSum(BoneWeight w,Transform[] bones,Func<string,bool> predicate)
@@ -267,8 +281,10 @@ namespace COM3D2.Pregnancy.Plugin
             var weights=NativeWeights(smr);var bones=NativeBones(smr);
             rec.Skirt=null;
             rec.ClothingMotion=null;
+            rec.RestHits=null;rec.RestHitState=null;
             bool cloth=kind!=MeshMorphClass.Body;
             int count=rec.OrigVerts.Length;
+            var lowerLegExcluded=cloth?BuildLowerLegClothExclusion(weights,bones,count):null;
             rec.GrowthContext=context;rec.ToReference=map;
             rec.ThighGuardRestore=BuildThighGuard(rec,weights,bones,context);
             rec.BellyInfluence=cloth?null:new float[count];
@@ -279,6 +295,9 @@ namespace COM3D2.Pregnancy.Plugin
             {
                 breast[i]=BoneSum(weights[i],bones,IsBreastBoneName);
                 rec.TorsoOwnership[i]=TorsoOwnership(weights[i],bones);
+                // Exclusion persists through surface matching, repair, virtual
+                // attachment and motion binding, not just the first shape pass.
+                if(cloth && lowerLegExcluded[i])rec.TorsoOwnership[i]=0;
                 armExcluded[i]=HasArmWeight(weights[i],armBones);
                 if(!cloth)rec.BellyInfluence[i]=BellyShape.BoneInfluence(BoneSum(weights[i],bones,IsALBellyBone),BoneSum(weights[i],bones,IsALLegBone));
             }
@@ -297,7 +316,7 @@ namespace COM3D2.Pregnancy.Plugin
                 original[i]=changed[i]=U(reference);
                 bool hangingBreastCloth=false;
                 if(kind==MeshMorphClass.InnerCloth && Shape.BreastExclusionEnabled &&
-                    TryFindClothingRestSurface(context.Surface,U(reference),profile.Span*.2f,out var innerHit))
+                    TryFindRecordRestSurface(rec,i,U(reference),out var innerHit))
                 {
                     var triangle=context.Surface.ClothingRest.Triangles[innerHit.TriangleIndex];
                     var body=context.Surface.Meshes[triangle.MeshIndex];
@@ -385,8 +404,8 @@ namespace COM3D2.Pregnancy.Plugin
             var original=NVector.Transform(N(record.OrigVerts[i]),record.ToReference);
             var changed=NVector.Transform(N(record.Skirt==null?record.LastNewV[i]:record.Skirt.VisualVertices[i]),record.ToReference);
             var material=NVector.Transform(original,c.InverseFrame);
-            float attachment=VirtualAxisMath.MaterialSurfaceWeight(NVector.Distance(original,changed),material,c.Frame.Profile,stage,Shape,
-                BellyShape.DeformationInfluence(record.BellyInfluence==null?1:record.BellyInfluence[i],material.Y,c.Frame.Profile,Shape)*record.TorsoOwnership[i]);
+            float attachment=VirtualAxisMath.MaterialSurfaceWeight(NVector.Distance(original,changed),material,c.Frame.Profile,stage,c.Settings,
+                BellyShape.DeformationInfluence(record.BellyInfluence==null?1:record.BellyInfluence[i],material.Y,c.Frame.Profile,c.Settings)*record.TorsoOwnership[i]);
             return record.ThighGuardRestore==null ? attachment : attachment*(1f-record.ThighGuardRestore[i]);
         }
         public static string GetALNavelStatus(Maid maid)
