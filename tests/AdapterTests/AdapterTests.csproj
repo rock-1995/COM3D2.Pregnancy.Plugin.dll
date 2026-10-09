@@ -3,6 +3,8 @@
   <ItemGroup>
     <Compile Include="../../src/Growth/*.cs" />
     <Compile Include="../../src/ALGrowthAdapter.cs" />
+    <Compile Include="../../src/ALRefresh.cs" />
+    <Compile Include="../../src/ALClothingLegFilter.cs" />
     <Compile Include="../../src/ALVirtualSkinning.cs" />
     <Compile Include="../../src/ALNavelAccessory.cs" />
     <Compile Include="../../src/ALClothing.cs" />
