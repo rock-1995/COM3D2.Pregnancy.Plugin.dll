@@ -17,9 +17,10 @@ The root project explicitly compiles `src/**/*.cs`, so the test stubs are not in
 ```powershell
 dotnet run --project .\tests\AdapterTests -c Release
 dotnet run --project .\tests\AdapterTests -c Release --no-build -- --breast-clothing-tests
+dotnet run --project .\tests\AdapterTests -c Release --no-build -- --refresh-tests refresh-results.json
 ```
 
-These checks use Unity stubs and exercise the actual production math and adapter files. They do not launch the game or measure game FPS. `ControllerSlice.cs` is a harness-only adapter for the surrounding game code.
+These checks use Unity stubs and exercise the actual production math and adapter files. They do not launch the game or measure game FPS. `ControllerSlice.cs`, `LifecycleSlice.cs` and `SelectionSlice.cs` supply the surrounding game-code harness. The back-category checks use `ClassificationSlice.cs`, extracted from the production classifier with method-name prefixes to isolate older fixtures.
 
 ## Optional model and dump replays
 
@@ -30,3 +31,11 @@ dotnet run --project .\tests\AdapterTests -c Release --no-build -- --clothing-po
 ```
 
 The pose replay verifies sampled body positions against rendered body skinning, all three support-face corners, the four-weight skin equation, culling bounds, no per-frame clothing vertex uploads, and reuse of unchanged support poses.
+
+### V13 focused replay
+
+```powershell
+dotnet run --project .\tests\AdapterTests -c Release --no-build -- --leg-navel-tests results.json BODY_MODEL DRESS652_MODEL SKIRT_DUMP_DIRECTORY BODY_ORIGINAL_CSV
+```
+
+Use the 5,502-vertex `dress652_onep.model` matching the skirt diagnostic export. `SKIRT_DUMP_DIRECTORY` contains the plugin's `vertices.csv` and `parameters.txt`; `BODY_ORIGINAL_CSV` contains the matching body's original vertices (one header line, then three comma-separated coordinates per vertex). This replay checks unchanged lower-leg coordinates/weights and native poses, minority calf weights, skirt ownership, source skin rebinding, accessory update order, and the back-category Apply/cache/visibility flow. It requires the matching local dataset; the self-contained tests above do not.
