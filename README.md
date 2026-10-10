@@ -24,6 +24,28 @@ Requires a working **BepInEx** installation and **ExSaveData / ExternalSaveData*
 
 Only the DLL is required for normal use. The PDB is optional and used for debugging. Upgrading preserves saved settings.
 
+## Controls
+
+### F1 — Gameplay settings
+
+With **BepInEx ConfigurationManager** installed, press **F1** and find `COM3D2 Pregnancy`. Set the conception chance, choose fixed or cycle-based probability, set pregnancy duration, and control automatic updates after clothing changes. You can also change the F8 and F9 shortcuts and toggle troubleshooting logs.
+
+These settings apply to every maid. If you do not have ConfigurationManager, close the game and edit the plugin configuration file directly.
+
+### F8 — Adjust the selected maid
+
+Press **F8** to open `COM3D2 Pregnancy`. Use the top selector to choose a maid in the scene, then set her pregnancy state, growth stage, and cycle position. The lower controls adjust the belly, clothing, and pose response.
+
+Click **Apply Belly** to apply and save the shape. **Reset Belly** clears the active deformation, and **Reset Defaults** restores the built-in shape values. Scroll to the bottom for logging and data exports. After swapping maids, click `R` to rescan the scene. This reloads the values and replaces any unapplied edits.
+
+### F9 — View maid status
+
+Press **F9** to open `Pregnancy - Maid Status`. It lists maids in the save, including those outside the active scene. Pregnant maids are highlighted and show elapsed and total pregnancy days. Other maids show their cycle day.
+
+To edit a maid, bring her into the scene and use F8. Reopen the status window to refresh the list, or click `X` to close it. In `Simple` mode the list still shows cycle days, while conception uses a fixed chance.
+
+Press F8 or F9 again to close its window. These are the default shortcuts. Your saved shortcuts take precedence.
+
 ## Quick start
 
 Press **F8** to open the panel and select a maid from the `Maid` dropdown.
@@ -34,8 +56,6 @@ Press **F8** to open the panel and select a maid from the `Maid` dropdown.
 4. Adjust the shape controls below and click **Apply Belly** again.
 
 For photos or a preview, set a stage and click Apply with `Pregnant` cleared. Daily progression applies to maids marked as pregnant.
-
-The main panel lists maids in the current scene. Click `R` after swapping maids. **F9** shows pregnancy or cycle days for all maids in the save. Reopen that window to refresh it.
 
 ## Conception and pregnancy
 
