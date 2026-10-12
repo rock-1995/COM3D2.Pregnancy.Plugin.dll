@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable><NuGetAudit>false</NuGetAudit>
+    <GameDir Condition="'$(GameDir)' == ''">E:\com3d2</GameDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/BodyChangeProfile.cs" />
+    <Reference Include="Assembly-CSharp"><HintPath>$(GameDir)\COM3D2x64_Data\Managed\Assembly-CSharp.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(GameDir)\COM3D2x64_Data\Managed\UnityEngine.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

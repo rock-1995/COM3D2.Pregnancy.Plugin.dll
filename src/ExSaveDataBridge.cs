@@ -19,9 +19,9 @@ namespace COM3D2.Pregnancy.Plugin
             if (_initialized) return _available;
             _initialized = true;
 
-            // 確認済みの正しいクラス名を先頭に
+            // Try the verified class name first
             string[] candidates = {
-                "CM3D2.ExternalSaveData.Managed.ExSaveData",   // ← 確認済み
+                "CM3D2.ExternalSaveData.Managed.ExSaveData",   // Verified
                 "CM3D2.ExSaveData.Managed.ExSaveData",
                 "COM3D2.ExSaveData.Managed.ExSaveData",
                 "CM3D2.ExSaveData.ExSaveData",
