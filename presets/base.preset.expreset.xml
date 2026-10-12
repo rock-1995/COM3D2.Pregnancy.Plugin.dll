@@ -1,0 +1,41 @@
+<plugins>
+  <plugin name="CM3D2.MaidVoicePitch">
+    <prop name="SLIDER_TEMPLATE" value="Sybaris/UnityInjector/Config/MaidVoicePitchSlider.xml" />
+  </plugin>
+  <plugin name="COM3D2.AutoConverter">
+    <prop name="boAddFaceShape" value="True" />
+    <prop name="boAddMayuposWeight" value="True" />
+    <prop name="vMayuPriority" value="990" />
+    <prop name="vSkinPriority" value="970" />
+    <prop name="vAdjMayuPos.x" value="0" />
+    <prop name="vAdjMayuPos.y" value="0" />
+    <prop name="vAutoFixKubiScl" value="50" />
+    <prop name="vFaceShapePosZ" value="0" />
+    <prop name="boForcePriority" value="False" />
+    <prop name="boAddHairlength" value="True" />
+    <prop name="hairF.Min.x" value="0.3" />
+    <prop name="hairF.Min.y" value="1" />
+    <prop name="hairF.Min.z" value="1" />
+    <prop name="hairF.Max.x" value="2" />
+    <prop name="hairF.Max.y" value="1" />
+    <prop name="hairF.Max.z" value="1" />
+    <prop name="hairR.Min.x" value="0.3" />
+    <prop name="hairR.Min.y" value="1" />
+    <prop name="hairR.Min.z" value="1" />
+    <prop name="hairR.Max.x" value="2" />
+    <prop name="hairR.Max.y" value="1" />
+    <prop name="hairR.Max.z" value="1" />
+    <prop name="hairS.Min.x" value="0.3" />
+    <prop name="hairS.Min.y" value="1" />
+    <prop name="hairS.Min.z" value="1" />
+    <prop name="hairS.Max.x" value="2" />
+    <prop name="hairS.Max.y" value="1" />
+    <prop name="hairS.Max.z" value="1" />
+    <prop name="hairT.Min.x" value="0.3" />
+    <prop name="hairT.Min.y" value="1" />
+    <prop name="hairT.Min.z" value="1" />
+    <prop name="hairT.Max.x" value="2" />
+    <prop name="hairT.Max.y" value="1" />
+    <prop name="hairT.Max.z" value="1" />
+  </plugin>
+</plugins>

@@ -32,6 +32,7 @@ namespace COM3D2.Pregnancy.Plugin
         }
         public static void Main(string[] args)
         {
+            if(args.Length>0 && args[0]=="--body-change-routing") { RunBodyRoutingTests(); return; }
             if(args.Length>0 && args[0]=="--leg-navel-tests") { RunLegNavelBindingTests(args); return; }
             if(args.Length>0 && args[0]=="--refresh-tests") { RunRefreshTests(args); return; }
             if(args.Length>0 && args[0]=="--refresh-benchmark") { RunRefreshBenchmark(args); return; }

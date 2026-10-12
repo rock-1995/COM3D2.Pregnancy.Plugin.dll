@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType><ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable><NuGetAudit>false</NuGetAudit><GameDir Condition="'$(GameDir)' == ''">E:\com3d2</GameDir></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/ConfigKeyMigration.cs" /><Compile Include="../../src/Growth/VtxSettings.cs" />
+    <Reference Include="BepInEx"><HintPath>$(GameDir)\BepInEx\core\BepInEx.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(GameDir)\COM3D2x64_Data\Managed\UnityEngine.dll</HintPath></Reference>
+    <None Include="expected-defaults.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

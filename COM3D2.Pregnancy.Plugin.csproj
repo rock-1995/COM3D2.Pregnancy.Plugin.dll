@@ -10,14 +10,14 @@
     <Nullable>disable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <!-- Build directly into BepInEx\plugins. -->
+    <!-- Default output goes directly to BepInEx/plugins; override OutputPath for staging. -->
     <OutputPath>$(GameDir)/BepInEx/plugins/</OutputPath>
-    <!-- Keep referenced game DLLs out of the build output. -->
+    <!-- Do not copy referenced game assemblies to the output. -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <!-- ================================================================
-       Set the COM3D2 installation root that contains the BepInEx folder.
+       Set this to the COM3D2 installation root containing BepInEx.
        ================================================================ -->
   <PropertyGroup>
     <GameDir>E:\com3d2</GameDir>
@@ -52,6 +52,10 @@
     </Reference>
 
     <!-- Game assemblies -->
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>$(GameDir)\COM3D2x64_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Assembly-CSharp">
       <HintPath>$(GameDir)\COM3D2x64_Data\Managed\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>

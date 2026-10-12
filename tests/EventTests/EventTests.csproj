@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NuGetAudit>false</NuGetAudit>
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/EffectEventGate.cs" />
+    <Compile Include="../../src/ConceptionEffects.cs" />
+    <Compile Include="../../src/PregnancyManager.cs" />
+    <Compile Include="../../src/FertilityCycleMode.cs" />
+  </ItemGroup>
+</Project>
