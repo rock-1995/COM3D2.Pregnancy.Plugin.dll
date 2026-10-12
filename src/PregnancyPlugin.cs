@@ -10,7 +10,7 @@ namespace COM3D2.Pregnancy.Plugin
     {
         public const string PluginGuid = "com.pregnancymod.com3d2";
         public const string PluginName = "COM3D2 Pregnancy";
-        public const string PluginVersion = "0.2.0";
+        public const string PluginVersion = "0.2.3";
 
         internal static PregnancyPlugin Instance;
         internal static ConfigEntry<KeyCode> CfgToggleKey;
@@ -21,6 +21,9 @@ namespace COM3D2.Pregnancy.Plugin
         internal static ConfigEntry<MorphTriggerMode> CfgMorphTriggerMode;
         internal static ConfigEntry<bool> CfgMorphSpyLogging;
         internal static ConfigEntry<bool> CfgDebugMeshLogging;
+        internal static ConfigEntry<int> CfgBodyChangeBirths;
+        internal static ConfigEntry<int> CfgBodyChangeLower;
+        internal static ConfigEntry<int> CfgBodyChangeUpper;
         Harmony _harmony;
         int _aysHookAttempts;
         bool _aysHookReady;
@@ -59,12 +62,22 @@ namespace COM3D2.Pregnancy.Plugin
                 "Debug", "Mesh Logging", false,
                 "Log mesh load spy and belly morph diagnostics.");
 
+            CfgBodyChangeBirths = ConfigKeyMigration.BindInt(Config,
+                "Body Changes", "Births for Full Change", "\u8fbe\u5230\u5b8c\u6574\u53d8\u5316\u7684\u751f\u4ea7\u6b21\u6570 x", 5,
+                "Number of births needed for the full body/color change. Before that: (pregnancy progress + births) / x. At or above x: full change. Integer; default 5. Zero or negative x uses the full change.");
+            CfgBodyChangeLower = ConfigKeyMigration.BindInt(Config,
+                "Body Changes", "Body Value Minimum", "\u4f53\u578b\u6570\u503c\u4e0b\u9650", 0,
+                "Minimum final body-slider value, in the game's slider units. Integer input; negative values and values above 100 are allowed. Does not limit colors or change saved character data. Reversed bounds are sorted for calculation.");
+            CfgBodyChangeUpper = ConfigKeyMigration.BindInt(Config,
+                "Body Changes", "Body Value Maximum", "\u4f53\u578b\u6570\u503c\u4e0a\u9650", 100,
+                "Maximum final body-slider value, in the game's slider units. Integer input; negative values and values above 100 are allowed. New settings take effect on the next deformation.");
+
             try
             {
                 _harmony = new Harmony(PluginGuid);
                 _harmony.PatchAll();
                 BellyMorphController.PatchAysHooks(_harmony);
-                Logger.LogInfo("Harmony patches applied.");
+                Logger.LogInfo("Harmony patches applied. Conception uses vaginal script effects (story/private/yotogi).");
             }
             catch (System.Exception e)
             {
