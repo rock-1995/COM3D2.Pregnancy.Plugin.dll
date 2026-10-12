@@ -22,6 +22,28 @@ dotnet run --project .\tests\AdapterTests -c Release --no-build -- --refresh-tes
 
 These checks use Unity stubs and exercise the actual production math and adapter files. They do not launch the game or measure game FPS. `ControllerSlice.cs`, `LifecycleSlice.cs` and `SelectionSlice.cs` supply the surrounding game-code harness. The back-category checks use `ClassificationSlice.cs`, extracted from the production classifier with method-name prefixes to isolate older fixtures.
 
+## V14 body, defaults and event checks
+
+Run these from the repository root. The profile reader uses your local game assemblies; the defaults/migration test uses your local BepInEx and Unity assemblies. Override `GameDir` with `-p:GameDir="YOUR_GAME_DIRECTORY"` when needed. Patch validation scripts accept `-GameDir` too.
+
+```powershell
+dotnet run --project .\tests\BodyProfileTests -c Release -- .\presets\base.preset .\presets\reference.preset
+dotnet run --project .\tests\BodyRuntimeTests -c Release
+dotnet run --project .\tests\ConfigDefaultsTests -c Release
+dotnet run --project .\tests\EventTests -c Release
+dotnet run --project .\tests\AdapterTests -c Release -- --body-change-routing
+dotnet run --project .\tests\AdapterTests -c Release --no-build -- --refresh-tests refresh-results.json
+dotnet run --project .\tests\AdapterTests -c Release --no-build
+pwsh -File .\tests\Validate-BodyChangePatches.ps1 -PluginDll .\bin\Release\COM3D2.Pregnancy.Plugin.dll
+pwsh -File .\tests\Validate-EventPatches.ps1 -PluginDll .\bin\Release\COM3D2.Pregnancy.Plugin.dll
+```
+
+These checks cover native preset differences, slider/color calculations and restoration, repeated application, childbirth counting, per-maid isolation, legacy configuration migration, unrestricted integer settings and all 51 logged shape defaults. `expected-defaults.json` contains only the expected parameter values; personal logs are not distributed.
+
+The patch scripts inspect signatures against the installed game and check that the body-change runtime does not call persistent appearance mutation APIs. They do not prove that Harmony is installed successfully in a running game. `sync_body_lifecycle.py` refreshes the extracted body-change lifecycle methods used by the adapter harness when those production methods change.
+
+Build/test results for this update are recorded in `VERIFICATION.md`. The preceding body-change build was loaded and used locally; the exact English/defaults build has not had a separate in-game visual pass.
+
 ## Optional model and dump replays
 
 The other study commands in `tests/AdapterTests/Program.cs` require locally owned model files and prepared vertex data. Game models and private dumps are deliberately excluded. For `--clothing-pose-study`, the input directory contains `inputs.json` entries with `model` and `stage`, plus `<model>-body.csv` and `<model>-original.csv` (three comma-separated coordinates per vertex). The model directory contains the corresponding `<model>.model` and `LOmobchara_extra_v1_beta.model`.
