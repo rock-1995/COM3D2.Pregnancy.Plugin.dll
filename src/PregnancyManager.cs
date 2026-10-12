@@ -73,6 +73,13 @@ namespace COM3D2.Pregnancy.Plugin
             return Mathf.Clamp01(p);
         }
 
+        public static int GetBirthCount(Maid maid)
+        {
+            int count;
+            return int.TryParse(ExSaveDataBridge.Get(maid, "birthCount", "0"), out count)
+                && count > 0 ? count : 0;
+        }
+
         public static void SetProgress(Maid maid, float value)
             => ExSaveDataBridge.Set(maid, "progress",
                 value.ToString("F3", CultureInfo.InvariantCulture));
@@ -126,6 +133,21 @@ namespace COM3D2.Pregnancy.Plugin
             => ExSaveDataBridge.Set(maid, "fertilityCoefficient",
                 Mathf.Clamp01(value).ToString("F3", CultureInfo.InvariantCulture));
 
+        // Shared by story, private-mode interaction and yotogi script effects.
+        internal static void RegisterConceptionEvent(Maid maid)
+        {
+            if (maid == null || maid.boMAN || GetPregnant(maid)) return;
+            if (IsCyclicMode(GetCycleMode()))
+            {
+                EnsureCycleProgress(maid);
+                SetFertilityCoefficient(maid, 1f);
+            }
+            else if (Random.value < PregnancyPlugin.CfgFertilityRate.Value)
+            {
+                SetPregnant(maid, true);
+            }
+        }
+
         public static void AdvanceDay()
         {
             int weeks = PregnancyPlugin.CfgPregnancyWeeks.Value;
@@ -155,6 +177,9 @@ namespace COM3D2.Pregnancy.Plugin
                     float newProgress = GetProgress(m) + inc;
                     if (newProgress >= 1f)
                     {
+                        int births = GetBirthCount(m);
+                        if (births < int.MaxValue)
+                            ExSaveDataBridge.Set(m, "birthCount", (births + 1).ToString(CultureInfo.InvariantCulture));
                         SetProgress(m, newProgress - 1f);
                         SetPregnant(m, false);
                     }

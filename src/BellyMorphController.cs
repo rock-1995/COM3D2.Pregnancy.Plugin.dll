@@ -161,6 +161,7 @@ namespace COM3D2.Pregnancy.Plugin
             using(new RefreshTrace(maid,"apply"))
             {
                 if (!IsValid(maid)) return;
+                ApplyBodyChanges(maid, progress);
                 _bpWorldCached = false;
                 _activeProgress[maid.GetHashCode()] = Mathf.Clamp01(progress);
                 if(progress<=0){ResetInternal(maid);return;}
@@ -182,6 +183,13 @@ namespace COM3D2.Pregnancy.Plugin
             if (maid == null) return;
 
             ResetInternal(maid);
+            bool suppress = _suppressMorphBaseBake;
+            try
+            {
+                _suppressMorphBaseBake = true;
+                BodyChanges.Reset(maid);
+            }
+            finally { _suppressMorphBaseBake = suppress; }
             _bpWorldCached = false;
 
             var mon = maid.gameObject.GetComponent<BellyMonitor>();
@@ -1160,8 +1168,8 @@ namespace COM3D2.Pregnancy.Plugin
         {
             if (!IsValid(maid)) return;
             if (CurrentTriggerMode != MorphTriggerMode.VisibilityChange) return;
-            if (!PregnancyManager.GetPregnant(maid)) return;
-            if (PregnancyManager.GetProgress(maid) <= 0f) return;
+            if ((!PregnancyManager.GetPregnant(maid) || PregnancyManager.GetProgress(maid) <= 0f)
+                && !BodyChanges.HasHistory(maid)) return;
 
             foreach (SkinnedMeshRenderer smr in CollectRelevantRenderers(maid))
                 AttachNotifier(smr.gameObject, maid);
@@ -2188,10 +2196,10 @@ namespace COM3D2.Pregnancy.Plugin
 
                 ClearVisibilityApply();
                 if (CurrentTriggerMode != MorphTriggerMode.VisibilityChange) return;
-                if (!PregnancyManager.GetPregnant(_maid)) return;
+                if (!PregnancyManager.GetPregnant(_maid) && !BodyChanges.HasHistory(_maid)) return;
 
-                float progress = PregnancyManager.GetProgress(_maid);
-                if (progress <= 0f) return;
+                float progress = PregnancyManager.GetPregnant(_maid) ? PregnancyManager.GetProgress(_maid) : 0f;
+                if (progress <= 0f && !BodyChanges.HasHistory(_maid)) return;
 
                 RefreshProgress(_maid, progress);
             }
