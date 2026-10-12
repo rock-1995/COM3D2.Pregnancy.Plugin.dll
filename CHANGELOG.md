@@ -1,5 +1,19 @@
 # Changes
 
+## V14 — Body and color changes across pregnancies
+
+Plugin version: **0.2.3**. See the [user guide](README.md) for installation and controls.
+
+- Add gradual body-slider and color changes using the difference between `base.preset` and `reference.preset`, placed beside the DLL. The included pair affects 11 sliders, including the character editor's abdomen slider, and three color groups. Type and menu selections are ignored.
+- Completed births contribute lasting changes. Before `x` births, the factor is `(pregnancy progress + completed births) / x`; at `x` births or more, it is `1`. Existing saves start at zero recorded births.
+- Add F1 integer inputs for `Births for Full Change` (default `5`), `Body Value Minimum` (`0`) and `Body Value Maximum` (`100`). Negative limits and limits above 100 are allowed. Colors retain their native channel units and do not use the slider limits.
+- Apply these effects with the existing deformation triggers. Reapplying does not accumulate the same offset, and resetting restores the runtime appearance. Saved character appearance and preset files are not rewritten.
+- Include the local conception-event update for Yotogi, story scenes and private-mode interactions. Supported vaginal script effects target the correct maid; repeated pulses in one action segment count once. See [event compatibility](EVENT_COMPATIBILITY.md).
+- Use English body-change controls and help. Existing values under the earlier Chinese setting names migrate automatically.
+- Set the 51 built-in shape parameters to the latest logged tuning, including upper transition width `0.4667925`. Existing saved shape settings remain in effect until **Reset Defaults**, then **Apply Belly**, is used.
+
+Build and verification details are in [BUILDING.md](BUILDING.md). The preceding body-change build was loaded and used locally; this English/defaults update still needs a separate in-game visual pass.
+
 ## v13-20261010
 
 ### Changes since the clothing preview
@@ -10,7 +24,7 @@
 - Keep the exact `_SM_dress652_onep` model outside the skirt-bone solver. Other skirt rigs retain their normal solver.
 - Exclude clothing vertices with positive lower-leg/knee/foot/toe bone influence and no skirt-bone ownership from both geometry deformation and abdominal virtual skinning. This includes minority calf weights and bone descendants; eligibility is independent of the current pose. Inner and outer clothing both retain native leg animation at these vertices.
 - Navel accessories consume the body's actual final support vertices, bone weights and skinning matrices. Rebinding the body refreshes the support data, and accessory-first update order synchronizes the source palette. The existing rigid attachment shape and hidden-body fallback are retained.
-- Include the **背中 / accSenaka** category in outer-clothing deformation and visibility refreshes.
+- Include the **Back / accSenaka** category in outer-clothing deformation and visibility refreshes.
 
 ### Validation
 

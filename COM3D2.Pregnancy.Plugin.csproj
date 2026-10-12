@@ -10,14 +10,14 @@
     <Nullable>disable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <!-- 编译完直接放进 BepInEx\plugins，不用手动复制 -->
+    <!-- Default output goes directly to BepInEx/plugins; override OutputPath for staging. -->
     <OutputPath>$(GameDir)/BepInEx/plugins/</OutputPath>
-    <!-- 不把引用的游戏 dll 一起复制过去 -->
+    <!-- Do not copy referenced game assemblies to the output. -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <!-- ================================================================
-       修改这里：你的 COM3D2 安装根目录（含 BepInEx 文件夹的那层）
+       Set this to the COM3D2 installation root containing BepInEx.
        ================================================================ -->
   <PropertyGroup>
     <GameDir>E:\com3d2</GameDir>
@@ -35,7 +35,7 @@
       <HintPath>$(FrameworkPathOverride)\System.Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <!-- BepInEx 核心 -->
+    <!-- BepInEx core -->
     <Reference Include="BepInEx">
       <HintPath>$(GameDir)\BepInEx\core\BepInEx.dll</HintPath>
       <Private>False</Private>
@@ -51,7 +51,11 @@
       <Private>False</Private>
     </Reference>
 
-    <!-- 游戏本体 -->
+    <!-- Game assemblies -->
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>$(GameDir)\COM3D2x64_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Assembly-CSharp">
       <HintPath>$(GameDir)\COM3D2x64_Data\Managed\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>

@@ -1,170 +1,138 @@
 # COM3D2 Pregnancy Plugin
 
-Adds pregnancy progression and an adjustable pregnant belly to COM3D2. Maids can conceive during Yotogi and gradually show as the days pass. You can also open the in-game controls at any time, choose a maid and a pregnancy stage, and shape the belly to your liking.
+Adds pregnancy progression, an adjustable pregnant belly, clothing deformation, and gradual body/color changes across pregnancies to COM3D2.
 
-[Download the latest release](https://github.com/rock-1995/COM3D2.Pregnancy.Plugin.dll/releases/latest) · [Changelog](CHANGELOG.md) · [Building from source](BUILDING.md)
+[Download the latest release](https://github.com/rock-1995/COM3D2.Pregnancy.Plugin.dll/releases/latest) · [Changelog](CHANGELOG.md) · [Build and tests](BUILDING.md)
 
-## What you can do
+## Features
 
-**Let pregnancy develop as you play.** The plugin detects conception events during Yotogi and checks for pregnancy using your chosen probability. Use a simple fixed chance, or a 7-day or 28-day menstrual cycle that makes timing matter. You can choose how long pregnancy lasts; once a maid is pregnant, her progress advances each day and her belly develops with it.
-
-**Create the look you want.** Choose anything from a slight bump to a full-term belly. Adjust its size, width, height and projection, as well as when each growth stage appears. You can also refine the upper and lower contours, sag, surface transitions and navel details. The same pregnancy stage can look different with different shape settings.
-
-**Use it with clothing and poses.** Underwear, swimwear, outerwear, skirts, trousers and items in the Back (背中) category adjust with the body. Skirts have draping support, and navel accessories follow the body as it changes. The belly and clothing also follow poses such as bending, with controls for movement and transitions. The plugin supports use alongside AddYotogiSlider (AYS) body morphs.
-
-**Adjust several maids separately.** Each maid has her own pregnancy status and progress. In a scene with multiple maids, you can select, adjust and apply a shape to each one while keeping the others' applied shapes. A separate status window lets you check pregnancy or cycle days for the maids in your save.
+- **Pregnancy as you play.** Supported vaginal ejaculation events in Yotogi, story scenes and private-mode interactions can cause pregnancy. Choose a fixed conception chance or a 7-day/28-day menstrual cycle. Pregnancy advances with in-game days.
+- **Shape the pregnant belly.** Adjust fullness, width, height, growth timing, sag, upper/lower contours, movement and navel appearance. Preview any pregnancy stage from the in-game menu.
+- **Body changes across pregnancies.** Gradually change sliders such as bust size, waist, hips, arms, legs and the character editor's abdomen slider. Completed births contribute lasting changes, up to your chosen number of births.
+- **Gradual color changes.** Differences between two presets also drive color changes. Color channels are interpolated; body-part types and menu selections are not replaced.
+- **Clothing and pose support.** Underwear, outerwear, skirts, trousers and Back-category items follow the deformation. Skirts have draping support, and navel accessories follow the changing body. Supports use alongside AddYotogiSlider (AYS) morphs.
+- **Separate control for each maid.** Apply a shape to one maid without replacing another maid's applied shape. A separate status window lists the maids in your save.
 
 ## Installation
 
-Download `COM3D2.Pregnancy.Plugin.dll` from [Releases](https://github.com/rock-1995/COM3D2.Pregnancy.Plugin.dll/releases/latest) and put it in your game's `BepInEx/plugins/` folder.
+1. Close the game and back up your existing pregnancy plugin and settings.
+2. Download the release ZIP and extract its `BepInEx` folder into the game directory.
+3. Keep one `COM3D2.Pregnancy.Plugin.dll` in the plugin search path. Keep these preset files beside it:
+
+```text
+BepInEx/plugins/
+  COM3D2.Pregnancy.Plugin.dll
+  base.preset
+  base.preset.expreset.xml
+  reference.preset
+  reference.preset.expreset.xml
+```
+
+The PDB is optional. The preset pair is required for the additional body/color changes. If the pair is missing or cannot be read, the plugin logs a warning and keeps the original belly feature available.
+
+The plugin runs through BepInEx. **BepInEx ConfigurationManager** provides F1, and **ExSaveData** stores pregnancy and childbirth history with the game save. Existing user settings are retained. The three Chinese body-change setting names from the local build are migrated to English without resetting their values.
+
+## Quick start
+
+1. Press **F8** and choose a maid from the `Maid` list. Click `R` to rescan if needed.
+2. Enable `Pregnant` for daily pregnancy progression, or leave it unchecked for a manual preview.
+3. Set `Growth stage`: `0` is the start and `1` is full term.
+4. Click **Apply Belly** to apply the belly, clothing, body-slider and color changes for that stage.
+5. Adjust the shape controls and apply again. Select another maid to adjust her separately.
+
+The additional body/color changes use the existing deformation triggers. Repeatedly applying the same stage does not accumulate the change.
 
 ## The three menus
 
-### F1: Configure the rules
-
-With **BepInEx ConfigurationManager** installed, press **F1** and find `COM3D2 Pregnancy`. This is where you change the conception chance, choose a cycle mode, shorten or extend pregnancy, and decide whether clothing visibility changes should refresh the morph automatically. You can also change the F8 and F9 shortcuts and turn diagnostic logging on or off.
-
-These settings apply to the plugin as a whole and affect all maids. ConfigurationManager provides this menu; without it, you can edit the plugin's configuration file while the game is closed.
-
-### F8: Adjust the selected maid
-
-Press **F8** to open the `COM3D2 Pregnancy` window. Select a maid from the current scene at the top, then set whether she is pregnant, her pregnancy stage and her cycle position. Below that are the shape, clothing and movement controls, so you can adjust them while looking at the character.
-
-Click **Apply Belly** to apply and save your shape edits. Use **Reset Belly** to remove the current deformation, or **Reset Defaults** to start again from the built-in shape settings. Scroll down for more controls and the parameter logging and data export buttons. After changing characters, click `R` to rescan the list. This reloads the values and replaces any shape edits you have not applied.
-
-### F9: Check all maids
-
-Press **F9** to open `Pregnancy - Maid Status`. It lists the maids in your save, including those outside the current scene. Pregnant maids are highlighted and show their current day and total pregnancy length; other maids show their cycle day.
-
-This window is an overview. To edit a maid, bring her into the scene and use F8. The list refreshes when opened, so close and reopen it to update the information. You can also close it with the `X` in the upper-right corner. Cycle days are displayed in `Simple` mode too, but conception still uses the fixed probability in that mode.
-
-Press F8 or F9 again to close its window. These are the default shortcuts; if you have changed them, use your saved bindings.
-
-## Try it out
-
-Press **F8**, choose a maid from the `Maid` dropdown, then:
-
-1. Enable **Pregnant** to mark her as pregnant.
-2. Move **Growth stage** to choose her progress. `0` is the beginning and `1` is full term; the corresponding day count appears beside it.
-3. Click **Apply Belly** to see the body and clothing change.
-4. Adjust the shape controls below and click **Apply Belly** again until you are happy with the result.
-
-For screenshots or a quick preview, you can leave `Pregnant` unchecked and apply a shape at any stage. Only maids marked as pregnant take part in daily pregnancy progression.
-
-## Conception and pregnancy
-
-A new configuration starts with **Simple mode, a 30% base conception chance and a 40-week pregnancy**. All three are adjustable. Existing configurations keep your previously saved values.
-
-| Mode | How conception works |
+| Shortcut | What it does |
 | --- | --- |
-| `Simple` | A detected vaginal creampie event during Yotogi triggers a pregnancy check using the base probability. |
-| `SevenDay` | Uses a 7-day cycle, with day 3 as the fertile window. An event leaves a fertility factor that decays each day. Pregnancy is checked at the end of the day using that factor, cycle timing and the base probability. |
-| `TwentyEightDay` | Uses a 28-day cycle, with day 14 as the main fertile window and half the cycle factor on day 15. Pregnancy is also checked at day end using the decaying fertility factor. |
+| **F1** | Open ConfigurationManager, then find `COM3D2 Pregnancy`. Set conception rules, pregnancy duration, automatic refresh, body-change limits and shortcuts. |
+| **F8** | Select a maid; edit pregnancy status, progress and cycle position; adjust and apply the shape. |
+| **F9** | Open `Pregnancy - Maid Status` to check pregnancy/cycle days for the maids in your save, including those outside the current scene. |
 
-Pregnancy advances at the end of each in-game day. The default 40 weeks equals 280 days, and you can make it shorter or longer. In cycle modes, the menstrual cycle pauses during pregnancy. When pregnancy reaches its end, the pregnant status clears and the cycle resumes.
+F8 and F9 are configurable defaults. Press the shortcut again to close its window. Reopen F9 to refresh its list; use F8 to edit a maid who is present in the scene.
 
-You can override pregnancy status, progress and cycle position at any time using `Pregnant`, `Growth stage` and `Cycle Coefficient` in the F8 window. After changing the stage, click `Apply Belly` to see the new appearance immediately.
+## Body and color changes across pregnancies
 
-Change the general options in BepInEx ConfigurationManager, or close the game and edit `BepInEx/config/com.pregnancymod.com3d2.cfg`.
+The plugin compares **base.preset** with **reference.preset**:
 
-<details>
-<summary>General settings reference</summary>
+```text
+change = reference value - base value
+before x completed births: factor = (pregnancy progress + completed births) / x
+at x or more completed births: factor = 1
+final value = the maid's own value + change * factor
+```
 
-| Setting | Purpose | Default |
-| --- | --- | --- |
-| `Toggle UI Key` | Main window shortcut | `F8` |
-| `Maid List UI Key` | Maid status window shortcut | `F9` |
-| `Pregnancy Weeks` | Total pregnancy length in weeks | `40` |
-| `Fertility Rate` | Base conception probability; `0.3` means 30%. Cycle modes also multiply it by the cycle and decaying fertility factors. | `0.3` |
-| `Fertility Cycle Mode` | One of the three conception modes above | `Simple` |
-| `Morph Trigger Mode` | When deformation is refreshed | `VisibilityChange` |
+Pregnancy progress is between `0` and `1`. Final body-slider values are rounded to integers and limited by your minimum/maximum settings. The pair defines the **difference**; it does not replace each maid with the reference character.
 
-`VisibilityChange` refreshes a pregnant maid's deformation when her body or clothing visibility changes, such as when dressing or undressing. `ManualOnly` disables those automatic triggers; use `Apply Belly` to apply the deformation yourself.
+For example, a slider changing from `70` to `95` defines `+25`. With `x = 5`, full term in the first pregnancy adds `+5`. After two births and halfway through the next pregnancy, it adds about `+13` after rounding. At five completed births, it adds the full `+25`.
 
-</details>
+After childbirth, the pregnancy contribution becomes zero and the completed-birth contribution remains. Saves without a recorded birth count start at zero. The count increases on an actual end-of-pregnancy day transition; toggling `Pregnant` is not counted as childbirth.
 
-## Shaping the belly
+### F1 body-change settings
 
-Start at a stage where the shape is easy to see, adjust the overall size and outline, then try a few other stages to check the growth progression. You can drag sliders, type values directly, or use `− / +` for small adjustments. Click **Apply Belly** after editing.
+Under **Body Changes**:
 
-- **Size and outline:** Adjust forward projection, width, vertical range and upper-abdomen reach. Late-pregnancy height, depth and width can also be adjusted separately.
-- **Growth timing:** Choose when the slight bump, visibly pregnant belly and mid-pregnancy shape appear. You can make the bump show earlier or put more growth later in the pregnancy. This does not change the total pregnancy length.
-- **Local shape:** Refine the lower belly, upper settling, tilt, sag and surface smoothing. Navel position, adjustment radius and eversion can be changed too.
-- **Clothing and movement:** Adjust clothing displacement, how the belly follows bending poses, and its transitions into the pelvis and upper torso. Check these controls in the pose you intend to use.
+| Setting | Default | What it controls |
+| --- | ---: | --- |
+| `Births for Full Change` | `5` | The value of `x` in the formula. |
+| `Body Value Minimum` | `0` | The lowest final value for an affected body slider. |
+| `Body Value Maximum` | `100` | The highest final value for an affected body slider. |
 
-Slider ranges are suggestions; the input boxes accept values outside them. Use `.` for decimal numbers. To start over, click **Reset Defaults**, then **Apply Belly**.
+All three are integer inputs with no additional input-range restriction. You may use negative limits or limits above `100` with slider-unlock mods. Zero or negative `x` uses the full difference. Reversed minimum/maximum values are sorted for calculation. Settings take effect on the next deformation.
 
-<details>
-<summary>Shape settings reference</summary>
+**Colors use their own channel units**, which can exceed `100`. They follow the same pregnancy/birth factor but are not clamped by the body-slider limits. The supplied pair changes 11 sliders, including the character editor's `Hara` abdomen slider, and three color groups: nipple color and small differences in both eye colors. The existing pregnancy-belly deformation remains separate.
 
-| Control | What it adjusts |
+### Use your own preset pair
+
+1. Save the starting appearance as a body preset named **base.preset**.
+2. Adjust sliders and colors to the desired full-change appearance and save it as **reference.preset**.
+3. Put both beside the DLL. Keep any companion XML files with matching names as shown above.
+4. Click **Apply Belly** again. Modified preset files are reloaded at the next application.
+
+Only differing native numeric sliders and color channels are used. Menu-file selections, body-part types, clothing selections and extension-only slider values are not applied. Companion XML files stay with the pair; this feature reads the native `.preset` data.
+
+These are runtime appearance effects. The plugin does not rewrite character presets or saved character-editor slider/color data. Birth history is stored separately through ExSaveData.
+
+## Pregnancy rules
+
+New configurations use **Simple**, a **30%** base conception chance and **40 weeks** of pregnancy. Change them in F1.
+
+| Mode | How it works |
 | --- | --- |
-| `Subtle belly at progress` / `Visible belly at progress` / `Mid belly at progress` | The three growth-stage positions. They must satisfy `0 < Subtle < Visible < Mid < 1`. |
-| `Forward fullness` / `Belly width` | Forward fullness and left-to-right width. |
-| `Upper abdomen reach` / `Vertical influence range` | Upper-abdomen reach and the vertical area affected. |
-| `Second-stage volume` | Volume during the earlier visibly pregnant stage. |
-| `Late volume height / front-back depth / left-right width multiplier` | Height, depth and width in late pregnancy. |
-| `Late lower-pole lift` / `Late upper settling` | How far the bottom lifts and the upper portion settles in late pregnancy. |
-| `Late whole-volume forward` / `All-stage axis tilt` | Late-pregnancy forward shift and growth tilt across all stages. |
-| `Belly sag` | Downward sag, with more forward growth producing more downward movement while preserving local navel orientation. `0` disables it. |
-| `Skin slide / density (legacy sag)` | Surface sliding and density distribution across the abdomen. |
-| `Whole-abdomen smoothing` / `Skin clearance` | Overall surface smoothing and clearance. |
-| `Navel eversion` / `Navel protrusion depth` | Navel eversion strength and protrusion depth. Setting eversion strength to `0` disables eversion. |
-| `Navel change starts at pregnancy progress` | When the navel starts changing, default `0.4`. It progresses from there and reaches the full configured effect at stage `1`. |
-| `Navel vertical offset` / `Navel patch radius` / `Navel proportion retention` | Navel height offset, local adjustment radius and proportion retention. A negative offset moves it down. |
-| `Clothing displacement` | How much clothing moves with the belly. |
-| `Thigh Guard Speed` / `Inner Thigh Guard` | Protection around the lower-abdomen-to-thigh transition and inner thighs. Set either control to `0` to disable that protection. |
-| `Thigh Guard Smooth` | Smoothing within the protected thigh regions. At least one thigh protection control must be above `0`. |
+| `Simple` | A supported vaginal ejaculation event triggers a check using the base chance. |
+| `SevenDay` | A 7-day cycle with day 3 as the fertile day. An event leaves a fertility factor that decays daily; pregnancy is checked at day end. |
+| `TwentyEightDay` | A 28-day cycle, with the main fertile day on day 14 and half the egg factor on day 15. Pregnancy is checked at day end using the decaying fertility factor. |
 
-`Navel visible preset` selects a pronounced navel effect and enables `Preview full navel response at current belly size`. This preview bypasses gradual pregnancy-based change. To return to gradual change, turn the preview off and apply again. `Navel off` sets eversion strength and proportion retention to `0`; click Apply for it to take effect.
+In cycle modes, timing and the fertility factor multiply the base chance. The cycle pauses during pregnancy and resumes after childbirth. The default 40 weeks equals 280 in-game days. Override status, stage or cycle position in F8; apply after changing the stage to update the appearance.
 
-Distances marked `/ torso span` are relative to the character's torso size, not centimetres.
+Supported event detection covers Yotogi, story scenes and private-mode interactions. Anal, oral and external effects are excluded; repeated particle pulses for one event count once. Only the target maid is affected. Custom scripts must use a supported event; see [compatibility details](EVENT_COMPATIBILITY.md) for technical limits.
 
-</details>
+## Shape controls and automatic refresh
 
-<details>
-<summary>Movement and deformation range</summary>
+F8 controls cover growth-stage timing, fullness, width, vertical range, upper reach, late-pregnancy volume, smoothing, skin slide, belly sag, upper/lower transitions, clothing displacement, thigh protection and movement in bending poses.
 
-| Control | What it adjusts |
-| --- | --- |
-| `Virtual axis strength` | Additional belly following in bending poses. `0` uses the original bone following. |
-| `Blend start` / `Full blend` | The transition range from original movement to belly following. |
-| `Lower start / transition width / curve bias` | Start, width and curve of the transition between the lower belly and pelvis. |
-| `Upper start / transition width / curve bias / join / activation` | The transition and join between the upper belly and torso. |
-| `Pull at small angles` / `Pull at large angles` / `Full-pull angle` | Pull strength at different bend angles, and the angle at which full pull is reached. |
-| `Anchor height` / `Anchor forward` | Vertical and forward position of the belly's movement anchor. |
-| `Exclude breast-weighted vertices` | Excludes body regions controlled by breast bones. Enabled by default. |
-| `Upper abdomen bone-weight filter` | Limits upper-abdomen deformation according to bone influence. Disabled by default. |
-| `Extra shape-field top fade` | Adds fading at the top of the deformation. Disabled by default. |
+Navel controls adjust strength, depth, start stage, position and radius. The default start is `0.4`; the effect reaches full strength at stage `1`. `Navel visible preset` enables a full-response preview; turn that preview off to return to gradual change.
 
-Clothing fit depends on the garment's cut and model. If you see local clipping, check the belly size, clothing displacement and pose transitions together.
+Drag sliders, type values, or use the small step buttons. Distances marked `/ torso span` are relative to torso size. Check several stages and the poses/clothing you use.
 
-</details>
+In F1, `Morph Trigger Mode = VisibilityChange` refreshes eligible maids when body/clothing visibility changes, including remaining body/color changes after childbirth. `ManualOnly` disables automatic triggers; use **Apply Belly** yourself.
 
 ## Applying, resetting and saving
 
-**Apply Belly** applies the current settings and saves the shape parameters to `BepInEx/plugins/pregnancy_settings.json`, which is read on the next launch. Editing a value alone does not save it. `Log to BepInEx` only records the parameters in the log.
+- **Apply Belly:** apply the selected stage and shape; save global belly-shape settings for the next launch.
+- **Reset Belly:** remove the selected maid's current runtime belly, body-slider and color changes. Status and birth history remain; a later application or automatic refresh can restore the effects.
+- **Reset Defaults:** load the built-in belly-shape defaults into the editor. Apply to use and save them. This release uses the latest tuned settings, including upper transition width `0.4667925`.
+- **Log to BepInEx:** record the editor's current shape parameters; this button does not change defaults.
 
-**Reset Belly** removes the selected maid's current belly deformation but keeps her pregnancy status and progress, so an automatic refresh may bring it back. To clear both pregnancy and its appearance, uncheck `Pregnant`, set `Growth stage` to `0`, then click `Apply Belly`. **Reset Defaults** restores the shape-editing values; click Apply again to use and save them.
+Global belly settings are stored in `BepInEx/plugins/pregnancy_settings.json`. Per-maid pregnancy, progress, cycle and birth data use ExSaveData; save the game normally to retain them. The body-change rules use `BepInEx/config/com.pregnancymod.com3d2.cfg`.
 
-Pregnancy status, progress and cycle data are stored per maid through ExSaveData. Save the game normally after changing them. Applied shapes are kept separately for maids during the current session, while the JSON file stores the global shape parameters from the last Apply. Updating the plugin keeps your existing settings.
+To remove the current pregnancy contribution, clear `Pregnant`, set `Growth stage` to `0`, and apply. Recorded births still contribute body/color changes. Use **Reset Belly** to remove the appearance temporarily.
 
-<details>
-<summary>Recording settings and reporting problems</summary>
+## Reporting a problem
 
-Click `Log to BepInEx` to write the shape parameters currently shown in the editor to the log. For clothing or accessory problems, these export buttons are also available:
+Include the plugin version, body/clothing model, pregnancy stage, relevant settings and a screenshot. F8 also offers vertex, skirt, upper-clothing and navel-accessory exports; their paths are written to the log.
 
-| Button | Export |
-| --- | --- |
-| `Dump All Verts` | All vertex diagnostic data |
-| `Dump Skirt Verts` | Skirt-related data |
-| `Dump Upper Verts` | Upper-clothing data |
-| `Dump Navel Accessory` | Navel accessory following data |
-
-Files are saved in the relevant `Pregnancy*Dumps` folders under `BepInEx/plugins/`. The exact path is written to the log. Exports capture the current state without changing the deformation. For comparisons, export once without deformation and once with it applied.
-
-When reporting a problem, include the plugin version, clothing or body model name, pregnancy stage, relevant settings and a screenshot. Attach the corresponding exports if available.
-
-</details>
+Clothing fit depends on model, shape and pose. The existing small garment edge-interior clipping limitation is documented in the [changelog](CHANGELOG.md). Automated checks and build instructions are in [BUILDING.md](BUILDING.md).
 
 Thanks to the developers of AddYotogiSlider (AYS) and KK PregnancyPlus; this project draws on their work.
