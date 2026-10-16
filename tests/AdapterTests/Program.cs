@@ -32,6 +32,12 @@ namespace COM3D2.Pregnancy.Plugin
         }
         public static void Main(string[] args)
         {
+            if(args.Length>0 && args[0]=="--bake-normal-tests") { RunBakeNormalTests(args); return; }
+            if(args.Length>0 && args[0]=="--bake-normal-study") { RunBakeNormalStudy(args); return; }
+            if(args.Length>0 && args[0]=="--normal-model-lifecycle-tests") { RunNormalModelLifecycleTests(args); return; }
+            if(args.Length>0 && args[0]=="--normal-lifecycle-tests") { RunNormalLifecycleTests(); return; }
+            if(args.Length>0 && args[0]=="--normal-tests") { TestNormalTransport(); Console.WriteLine($"PASS: {tests} normal transport assertions."); return; }
+            if(args.Length>0 && args[0]=="--curved-binding-tests") { RunCurvedBindingTests(args); return; }
             if(args.Length>0 && args[0]=="--body-change-routing") { RunBodyRoutingTests(); return; }
             if(args.Length>0 && args[0]=="--leg-navel-tests") { RunLegNavelBindingTests(args); return; }
             if(args.Length>0 && args[0]=="--refresh-tests") { RunRefreshTests(args); return; }

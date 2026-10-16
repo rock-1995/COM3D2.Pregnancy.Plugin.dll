@@ -203,9 +203,12 @@ namespace COM3D2.Pregnancy.Plugin
             p.LowerTransitionStart = ShapeSlider("Lower start above pelvic floor / span", p.LowerTransitionStart, -.50f, .75f, x, w, ref y);
             p.LowerTransitionWidth = ShapeSlider("Lower transition width / span", p.LowerTransitionWidth, .02f, 1.50f, x, w, ref y);
             p.LowerTransitionBias = ShapeSlider("Lower curve bias (- earlier / + later)", p.LowerTransitionBias, -2, 2, x, w, ref y);
+            p.LowerBoundaryArc = ShapeSlider("Lower boundary arc / span (+ down)", p.LowerBoundaryArc, 0, .30f, x, w, ref y);
             p.UpperTransitionStart = ShapeSlider("Upper start above waist datum / span", p.UpperTransitionStart, -.50f, 1f, x, w, ref y);
             p.UpperTransitionWidth = ShapeSlider("Upper transition width / span", p.UpperTransitionWidth, .02f, 1.50f, x, w, ref y);
             p.UpperTransitionBias = ShapeSlider("Upper curve bias (- hold / + release)", p.UpperTransitionBias, -2, 2, x, w, ref y);
+            p.UpperBoundaryArc = ShapeSlider("Upper boundary arc / span (+ up)", p.UpperBoundaryArc, 0, .30f, x, w, ref y);
+            GUI.Label(new Rect(x,y,w,22),"Boundary arc: 0 = flat; 0.1 = 10% of torso span.");y+=24;
             p.UpperTransitionJoin = ShapeSlider("Upper join / transition width", p.UpperTransitionJoin, .02f, 1f, x, w, ref y);
             p.UpperTransitionActivation = ShapeSlider("Upper activation displacement / span", p.UpperTransitionActivation, .001f, .15f, x, w, ref y);
             p.AxisPullLow = ShapeSlider("Pull at small angles", p.AxisPullLow, 0, 1, x, w, ref y);

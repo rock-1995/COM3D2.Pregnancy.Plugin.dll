@@ -58,9 +58,9 @@ internal static class VirtualAxisMath
     // across a continuous anatomical length, reaching full virtual support near
     // the navel. This is a rest/material coordinate, shared with clothing, and
     // does not depend on pose angle, mesh density, or world orientation.
-    internal static float SurfaceWeight(float displacement, float materialY, TorsoProfile torso, VtxSettings p)
+    internal static float SurfaceWeight(float displacement, float materialY, TorsoProfile torso, VtxSettings p, float arcRise = 0)
     {
-        float start = torso.PelvicFloor + Parameter(p.LowerTransitionStart, .02f, -.50f, .75f) * torso.Span;
+        float start = torso.PelvicFloor + Parameter(p.LowerTransitionStart, .02f, -.50f, .75f) * torso.Span - arcRise;
         float u = Scalar.Clamp((materialY - start) / Scalar.Max(torso.Span * Parameter(p.LowerTransitionWidth, .60f, .02f, 1.50f), 1e-5f), 0, 1);
         float attachment = LowerAttachment(u, p.LowerTransitionBias);
         return Weight(displacement, torso.Span, p) * attachment;
@@ -74,18 +74,33 @@ internal static class VirtualAxisMath
     internal static float UpperStart(TorsoProfile torso, VtxSettings p)
         => torso.Navel + Parameter(p.UpperTransitionStart, .15f, -.50f, 1f) * torso.Span;
 
+    // Rest-space meridians bend both ends of each attachment band together.
+    // The front centre opens up/down by the configured torso-span ratio; cos^2 fades
+    // smoothly to zero at the sides. Keeping the offset constant along the
+    // same meridian also keeps the upper transported anchor on its entrance.
+    internal static float TransitionArc(Vector3 original, TorsoProfile torso, float height = .10f)
+    {
+        float forward = original.Z - torso.AxisAt(original.Y);
+        if (forward <= 0) return 0;
+        float radialSquared = original.X * original.X + forward * forward;
+        return Parameter(height, .10f, 0, .30f) * torso.Span * forward * forward / Scalar.Max(radialSquared, 1e-12f);
+    }
+
     internal static float UpperRelease(float u, float bias) => 1 - LowerAttachment(u, -bias);
 
     // Built into skin weights on a shape rebuild, never evaluated per pose.
     // Carry the deformation at the upper band's entrance up the same material
-    // meridian, then release it by HEIGHT. Do not multiply a second fade into
+    // meridian, then release it by height above that meridian's curved entrance.
+    // Do not multiply a second fade into
     // the current vertex's already-falling displacement weight.
     internal static float MaterialSurfaceWeight(float displacement, Vector3 original,
         TorsoProfile torso, float stage, VtxSettings p, float influence = 1f)
     {
         if (stage <= 0 || !Scalar.IsFinite(displacement) || displacement <= 0 || influence <= 0) return 0;
-        float baseline = SurfaceWeight(displacement, original.Y, torso, p);
-        float start = UpperStart(torso, p);
+        float lowerArc = TransitionArc(original, torso, p.LowerBoundaryArc);
+        float upperArc = TransitionArc(original, torso, p.UpperBoundaryArc);
+        float baseline = SurfaceWeight(displacement, original.Y, torso, p, lowerArc);
+        float start = UpperStart(torso, p) + upperArc;
         if (original.Y <= start) return baseline;
         float width = Parameter(p.UpperTransitionWidth, .55f, .02f, 1.50f) * torso.Span;
         float u = (original.Y - start) / Scalar.Max(width, 1e-5f);
@@ -105,7 +120,7 @@ internal static class VirtualAxisMath
         float radius = Scalar.Max(0, Radius(start) + radial - Radius(original.Y));
         var anchor = new Vector3(radius * sn, start, torso.AxisAt(start) + radius * cs);
         float anchorDelta = Vector3.Distance(anchor, BellyShape.Deform(anchor, torso, stage, p)) * Parameter(influence, 1, 0, 1);
-        float entry = SurfaceWeight(anchorDelta, start, torso, p);
+        float entry = SurfaceWeight(anchorDelta, start, torso, p, lowerArc);
         float target = entry * UpperRelease(u, p.UpperTransitionBias);
         float activation = BellyShape.Smooth(displacement / Scalar.Max(torso.Span * Parameter(p.UpperTransitionActivation, .02f, .001f, .15f), 1e-5f));
         target *= activation;

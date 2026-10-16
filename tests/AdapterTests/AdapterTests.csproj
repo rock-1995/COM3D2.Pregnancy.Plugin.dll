@@ -15,5 +15,7 @@
     <Compile Include="../../src/ALThighGuard.cs" />
     <Compile Include="../../src/MatrixBridge.cs" />
     <Compile Include="../../src/DeformationNormals.cs" />
+    <Compile Include="../../src/BodyNormalRegions.cs" />
+    <Compile Include="../../src/MorphNormalRefresh.cs" />
   </ItemGroup>
 </Project>
