@@ -33,9 +33,11 @@ namespace COM3D2.Pregnancy.Plugin.Growth
         public float LowerTransitionStart = -0.3997642f;
         public float LowerTransitionWidth = 0.34f;
         public float LowerTransitionBias = 0f;
+        public float LowerBoundaryArc = 0.10f;
         public float UpperTransitionStart = 0.28f;
         public float UpperTransitionWidth = 0.4667925f;
         public float UpperTransitionBias = -0.8867925f;
+        public float UpperBoundaryArc = 0.10f;
         public float UpperTransitionJoin = 0.4221698f;
         public float UpperTransitionActivation = 0.02f;
         public bool BreastExclusionEnabled = true;
@@ -62,6 +64,8 @@ namespace COM3D2.Pregnancy.Plugin.Growth
             // Only absent fields receive defaults; an explicitly saved zero
             // remains a user choice, as do all pre-existing shape settings.
             var defaults=new VtxSettings();
+            if(!savedJson.Contains("\"LowerBoundaryArc\""))LowerBoundaryArc=defaults.LowerBoundaryArc;
+            if(!savedJson.Contains("\"UpperBoundaryArc\""))UpperBoundaryArc=defaults.UpperBoundaryArc;
             if(!savedJson.Contains("\"BellySag\""))BellySag=defaults.BellySag;
             if(!savedJson.Contains("\"SubtleStageProgress\""))SubtleStageProgress=defaults.SubtleStageProgress;
             if(!savedJson.Contains("\"VisibleStageProgress\""))VisibleStageProgress=defaults.VisibleStageProgress;
