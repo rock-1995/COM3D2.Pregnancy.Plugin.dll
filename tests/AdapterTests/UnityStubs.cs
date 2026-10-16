@@ -93,7 +93,9 @@ namespace UnityEngine
         Vector3[] v=Array.Empty<Vector3>();
         public int VertexWrites;
         public Vector3[] vertices{get=>(Vector3[])v.Clone();set{v=(Vector3[])value.Clone();VertexWrites++;}}
-        public Vector3[] normals=Array.Empty<Vector3>();
+        Vector3[] n=Array.Empty<Vector3>();
+        public int NormalWrites;
+        public Vector3[] normals{get=>(Vector3[])n.Clone();set{n=(Vector3[])value.Clone();NormalWrites++;}}
         public BoneWeight[] boneWeights=Array.Empty<BoneWeight>();
         public Matrix4x4[] bindposes=Array.Empty<Matrix4x4>();
         public int[] triangles=Array.Empty<int>();
@@ -124,7 +126,7 @@ namespace UnityEngine
 }
 public class Maid {public TBody body0;public UnityEngine.GameObject gameObject=new();public List<UnityEngine.SkinnedMeshRenderer> Renderers=new();public bool Pregnant=true;public float Progress=1;}
 public class TBodySkin {public TMorph morph;}
-public class TMorph {public UnityEngine.Vector3[] m_vOriVert,m_vOriNorm;public TBodySkin bodyskin;public UnityEngine.Vector3[] ExtraDelta;public int[][] m_nSubMeshOriTri;private UnityEngine.SkinnedMeshRenderer smr_src;public UnityEngine.SkinnedMeshRenderer Renderer=>smr_src;public void SetRenderer(UnityEngine.SkinnedMeshRenderer r)=>smr_src=r;public void FixBlendValues(){smr_src.sharedMesh.vertices=m_vOriVert.Select((v,i)=>ExtraDelta==null?v:v+ExtraDelta[i]).ToArray();smr_src.sharedMesh.normals=m_vOriNorm;}}
+public class TMorph {public UnityEngine.Vector3[] m_vOriVert,m_vOriNorm;public TBodySkin bodyskin;public UnityEngine.Vector3[] ExtraDelta,ExtraNormalDelta;public int[][] m_nSubMeshOriTri;private UnityEngine.SkinnedMeshRenderer smr_src;public UnityEngine.SkinnedMeshRenderer Renderer=>smr_src;public void SetRenderer(UnityEngine.SkinnedMeshRenderer r)=>smr_src=r;public void FixBlendValues(){smr_src.sharedMesh.vertices=m_vOriVert.Select((v,i)=>ExtraDelta==null?v:v+ExtraDelta[i]).ToArray();smr_src.sharedMesh.normals=m_vOriNorm.Select((v,i)=>ExtraNormalDelta==null?v:v+ExtraNormalDelta[i]).ToArray();}}
 public class TBody {public Maid maid;public List<TBodySkin> goSlot=new();public bool isLoadedBody=true;}
 namespace COM3D2.Pregnancy.Plugin
 {
