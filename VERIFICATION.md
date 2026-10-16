@@ -1,3 +1,20 @@
+# V15 verification
+
+Checked on 2026-10-17. The .NET 3.5 production Release build completed with zero warnings and zero errors. The release uses the same DLL subsequently confirmed in game by the user.
+
+| Check | Result |
+| --- | ---: |
+| Bake-time normals and protected boundaries | 290,974 passed |
+| Model-based normal lifecycle | 484,764 passed |
+| Self-contained normal lifecycle | 21,009 passed |
+| Refresh and multi-maid behavior | 31,531 passed |
+| General adapter behavior | 4,274 passed |
+| Curved boundary binding | 63,631 passed |
+
+Model replays covered four body exports at three pregnancy stages. Tests use production code with Unity/game stubs or extracted lifecycle methods. Pose-only updates made no normal uploads in the replay; no game frame-rate benchmark was performed. Public replay commands accept a directory of matching local exports; private model files and exports are not distributed.
+
+DLL SHA-256: `C159E1EBF084F03CD521429F3CCBADE3C1BC1A146F47CDF3CB0CFF3EB37FE1EE`.
+
 # V14 verification
 
 Plugin version: **0.2.3**. Checked on 2026-10-13 against a local COM3D2 installation.

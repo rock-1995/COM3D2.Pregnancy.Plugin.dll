@@ -22,6 +22,18 @@ dotnet run --project .\tests\AdapterTests -c Release --no-build -- --refresh-tes
 
 These checks use Unity stubs and exercise the actual production math and adapter files. They do not launch the game or measure game FPS. `ControllerSlice.cs`, `LifecycleSlice.cs` and `SelectionSlice.cs` supply the surrounding game-code harness. The back-category checks use `ClassificationSlice.cs`, extracted from the production classifier with method-name prefixes to isolate older fixtures.
 
+## Normal and boundary checks
+
+```powershell
+dotnet run --project .\tests\AdapterTests -c Release -- --normal-tests
+dotnet run --project .\tests\AdapterTests -c Release --no-build -- --normal-lifecycle-tests
+dotnet run --project .\tests\AdapterTests -c Release --no-build -- --curved-binding-tests curved-results.json
+dotnet run --project .\tests\AdapterTests -c Release --no-build -- --bake-normal-tests BODY_MODEL DUMP_DIRECTORY bake-results.json
+dotnet run --project .\tests\AdapterTests -c Release --no-build -- --normal-model-lifecycle-tests BODY_MODEL DUMP_DIRECTORY lifecycle-results.json
+```
+
+The last two commands require a locally owned body model and a directory containing matching ALGrowth body CSV exports. Every `.csv` file in that directory is replayed; use a separate directory containing only compatible exports. Checks cover protected boundaries, authored normal detail, UV seams, native morph changes, repeat Apply/reset and unchanged normal uploads during pose changes. Results are recorded in [VERIFICATION.md](VERIFICATION.md).
+
 ## V14 body, defaults and event checks
 
 Run these from the repository root. The profile reader uses your local game assemblies; the defaults/migration test uses your local BepInEx and Unity assemblies. Override `GameDir` with `-p:GameDir="YOUR_GAME_DIRECTORY"` when needed. Patch validation scripts accept `-GameDir` too.
