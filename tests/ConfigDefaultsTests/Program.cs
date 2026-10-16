@@ -42,4 +42,20 @@ foreach(var pair in expectedDefaults)
     object expected=field.FieldType==typeof(bool)?bool.Parse(pair.Value):float.Parse(pair.Value,CultureInfo.InvariantCulture);
     Check(field.GetValue(defaults).Equals(expected),"default matches logged value: "+pair.Key);
 }
-Console.WriteLine($"PASS: {checks} config migration and logged-default checks.");
+Check(defaults.LowerBoundaryArc==.10f&&defaults.UpperBoundaryArc==.10f,"arc defaults preserve previous curvature");
+var legacyArc=new VtxSettings{LowerBoundaryArc=0,UpperBoundaryArc=0};
+legacyArc.CompleteGrowthDefaults("{\"growth\":{}}");
+Check(legacyArc.LowerBoundaryArc==.10f&&legacyArc.UpperBoundaryArc==.10f,"missing arc fields migrate from legacy zero initialization");
+foreach(float lower in new[]{0f,-.12f,.24f,.7f})
+{
+    var options=new JsonSerializerOptions{IncludeFields=true};
+    var saved=new VtxSettings{LowerBoundaryArc=lower,UpperBoundaryArc=.23f};
+    string json=JsonSerializer.Serialize(saved,options);
+    var loaded=JsonSerializer.Deserialize<VtxSettings>(json,options);loaded.CompleteGrowthDefaults(json);
+    Check(loaded.LowerBoundaryArc==lower&&loaded.UpperBoundaryArc==.23f,"explicit zero, signed and large arcs survive save/reload");
+    Check(loaded.Copy().LowerBoundaryArc==lower&&loaded.Copy().UpperBoundaryArc==.23f,"per-maid copy preserves separate arc controls");
+}
+var partialArc=new VtxSettings{LowerBoundaryArc=0,UpperBoundaryArc=0};
+partialArc.CompleteGrowthDefaults("{\"LowerBoundaryArc\":0}");
+Check(partialArc.LowerBoundaryArc==0&&partialArc.UpperBoundaryArc==.10f,"migration preserves explicit zero independently");
+Console.WriteLine($"PASS: {checks} config migration, logged-default and arc persistence checks.");

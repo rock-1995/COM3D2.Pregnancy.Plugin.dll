@@ -305,6 +305,7 @@ namespace COM3D2.Pregnancy.Plugin
             rec.BreastExcluded=BreastExclusion.Build(breast,count,weldGroups,Shape.BreastExclusionEnabled);
             BreastExclusion.ShareWelds(armExcluded,weldGroups);
             for(int i=0;i<count;i++)if(armExcluded[i])rec.TorsoOwnership[i]=0;
+            rec.NormalRegions=cloth?null:BuildBodyNormalRegions(rec,weights,bones);
             result=(Vector3[])rec.OrigVerts.Clone();
             var original=new Vector3[count];var changed=new Vector3[count];var moved=new bool[count];
             var breastSurface=cloth && Shape.BreastExclusionEnabled?new bool[count]:null;

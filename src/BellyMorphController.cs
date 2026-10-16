@@ -51,6 +51,8 @@ namespace COM3D2.Pregnancy.Plugin
             public Mesh Mesh;
             public Vector3[] OrigVerts;
             public Vector3[] OrigNormals;
+            public int[] NormalTriangles;
+            public int[] NormalRegions;
             public Vector3[] LastDeltaVerts;
             public Vector3[] LastNewV;
             public NMatrix ToReference;
@@ -81,6 +83,8 @@ namespace COM3D2.Pregnancy.Plugin
             public Vector3[] OriginalNormals;
             public Vector3[] BakedVerts;
             public Vector3[] BakedNormals;
+            public MorphNormalCache NormalCache;
+            public int[] NormalRegions;
             public int OriginalSignature;
             public int AppliedSignature;
             public int ShapeSignature;
@@ -632,7 +636,10 @@ namespace COM3D2.Pregnancy.Plugin
                     && currentSignature == state.AppliedSignature;
 
                 if (currentIsKnownBaked && state.ShapeSignature == shapeSignature)
+                {
+                    RefreshBakedMorphNormals(maid,morph,state);
                     return false;
+                }
 
                 Vector3[] baseVerts;
                 Vector3[] baseNormals;
@@ -658,6 +665,7 @@ namespace COM3D2.Pregnancy.Plugin
                     Mesh = mesh,
                     OrigVerts = baseVerts,
                     OrigNormals = baseNormals,
+                    NormalTriangles = MorphNormalTopology(morph,mesh),
                 };
 
                 bool[] mask = BuildVertexMask(smr, rec, meshClass);
@@ -705,6 +713,7 @@ namespace COM3D2.Pregnancy.Plugin
                     OriginalNormals = baseNormals,
                     BakedVerts = bakedVerts,
                     BakedNormals = bakedNormals,
+                    NormalRegions = rec.NormalRegions,
                     OriginalSignature = originalSignature,
                     AppliedSignature = appliedSignature,
                     ShapeSignature = shapeSignature,
@@ -716,6 +725,7 @@ namespace COM3D2.Pregnancy.Plugin
                 _maidShapes[maid.GetHashCode()]=Shape.Copy();
 
                 ForceFixBlendValues(morph);
+                RefreshBakedMorphNormals(maid,morph,newState);
                 long bindingStarted=System.Diagnostics.Stopwatch.GetTimestamp();
                 InstallALBinding(maid, rec, bakedVerts, progress);
                 if(_refreshStats!=null)_refreshStats.BindingTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-bindingStarted;
@@ -985,9 +995,11 @@ namespace COM3D2.Pregnancy.Plugin
                 AddBakeSignatureFloat(ref hash, Shape.LowerTransitionStart);
                 AddBakeSignatureFloat(ref hash, Shape.LowerTransitionWidth);
                 AddBakeSignatureFloat(ref hash, Shape.LowerTransitionBias);
+                AddBakeSignatureFloat(ref hash, Shape.LowerBoundaryArc);
                 AddBakeSignatureFloat(ref hash, Shape.UpperTransitionStart);
                 AddBakeSignatureFloat(ref hash, Shape.UpperTransitionWidth);
                 AddBakeSignatureFloat(ref hash, Shape.UpperTransitionBias);
+                AddBakeSignatureFloat(ref hash, Shape.UpperBoundaryArc);
                 AddBakeSignatureFloat(ref hash, Shape.UpperTransitionJoin);
                 AddBakeSignatureFloat(ref hash, Shape.UpperTransitionActivation);
                 hash = hash * 31 + (Shape.BreastExclusionEnabled ? 1 : 0);
@@ -1657,8 +1669,9 @@ namespace COM3D2.Pregnancy.Plugin
             if (!alreadyApplied)
             {
                 rec.OrigVerts = (Vector3[])CleanVertices(maid, smr).Clone();
-                rec.OrigNormals = (Vector3[])currentNormals.Clone();
             }
+            rec.OrigNormals = CleanNormals(maid,smr,currentVerts,currentNormals);
+            rec.NormalTriangles = RendererNormalTopology(maid,smr);
             if (refreshBase)
             {
                 rec.LastDeltaVerts = null;
@@ -1915,7 +1928,7 @@ namespace COM3D2.Pregnancy.Plugin
                 return;
             }
 
-            mesh.normals = DeformationNormals.Build(rec.OrigVerts,newVerts,rec.OrigNormals,mesh.triangles);
+            mesh.normals = DeformationNormals.Build(rec.OrigVerts,newVerts,rec.OrigNormals,rec.NormalTriangles??mesh.triangles,rec.NormalRegions);
         }
 
         static float Smooth01(float value)

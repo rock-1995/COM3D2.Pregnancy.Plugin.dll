@@ -427,7 +427,10 @@ static bool TryBakeRuntimeMorphBase(Maid maid, TMorph morph, float progress)
                     && currentSignature == state.AppliedSignature;
 
                 if (currentIsKnownBaked && state.ShapeSignature == shapeSignature)
+                {
+                    RefreshBakedMorphNormals(maid,morph,state);
                     return false;
+                }
 
                 Vector3[] baseVerts;
                 Vector3[] baseNormals;
@@ -453,6 +456,7 @@ static bool TryBakeRuntimeMorphBase(Maid maid, TMorph morph, float progress)
                     Mesh = mesh,
                     OrigVerts = baseVerts,
                     OrigNormals = baseNormals,
+                    NormalTriangles = MorphNormalTopology(morph,mesh),
                 };
 
                 bool[] mask = BuildVertexMask(smr, rec, meshClass);
@@ -500,6 +504,7 @@ static bool TryBakeRuntimeMorphBase(Maid maid, TMorph morph, float progress)
                     OriginalNormals = baseNormals,
                     BakedVerts = bakedVerts,
                     BakedNormals = bakedNormals,
+                    NormalRegions = rec.NormalRegions,
                     OriginalSignature = originalSignature,
                     AppliedSignature = appliedSignature,
                     ShapeSignature = shapeSignature,
@@ -511,6 +516,7 @@ static bool TryBakeRuntimeMorphBase(Maid maid, TMorph morph, float progress)
                 _maidShapes[maid.GetHashCode()]=Shape.Copy();
 
                 ForceFixBlendValues(morph);
+                RefreshBakedMorphNormals(maid,morph,newState);
                 long bindingStarted=System.Diagnostics.Stopwatch.GetTimestamp();
                 InstallALBinding(maid, rec, bakedVerts, progress);
                 if(_refreshStats!=null)_refreshStats.BindingTicks+=System.Diagnostics.Stopwatch.GetTimestamp()-bindingStarted;
@@ -526,7 +532,8 @@ static bool TryBakeRuntimeMorphBase(Maid maid, TMorph morph, float progress)
                 return true;
             }
         }
-static bool HasAnyMaskedVertex(bool[] mask)
+
+        static bool HasAnyMaskedVertex(bool[] mask)
         {
             if (mask == null) return false;
             for (int i = 0; i < mask.Length; i++)

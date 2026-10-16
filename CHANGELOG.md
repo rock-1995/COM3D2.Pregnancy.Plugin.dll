@@ -1,5 +1,12 @@
 # Changes
 
+## V15 — 2026-10-17
+
+- Add adjustable upper/lower binding boundary arcs in F8.
+- Correct body shading near breast and inner-thigh boundaries when applying deformation, including native morph refreshes.
+
+Plugin version: **0.2.3**. Existing settings are retained. See [verification](VERIFICATION.md).
+
 ## V14 — Body and color changes across pregnancies
 
 Plugin version: **0.2.3**. See the [user guide](README.md) for installation and controls.
