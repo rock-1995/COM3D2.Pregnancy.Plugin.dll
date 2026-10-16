@@ -10,6 +10,14 @@ public static partial class BellyMorphController
         var output=Path.GetFullPath(args[1]);Directory.CreateDirectory(output);
         var body=ReadModel(args[2],"body-real");var maid=new Maid();
         var original=body.sharedMesh.vertices;var normals=body.sharedMesh.normals;
+        if(args.Length>3)
+        {
+            var rows=File.ReadAllLines(args[3]).Skip(1).Where(s=>!string.IsNullOrWhiteSpace(s)).Select(s=>s.Split('\t')).ToArray();
+            int end=Array.FindIndex(rows,1,a=>a[1]=="0");if(end<0)end=rows.Length;
+            original=rows.Take(end).Select(a=>new Vector3(float.Parse(a[2],System.Globalization.CultureInfo.InvariantCulture),float.Parse(a[3],System.Globalization.CultureInfo.InvariantCulture),float.Parse(a[4],System.Globalization.CultureInfo.InvariantCulture))).ToArray();
+            Check(original.Length==body.sharedMesh.vertexCount,"dump matches model vertex count");
+            body.sharedMesh.vertices=original;
+        }
         float[] Flatten(Vector3[] values)=>values.SelectMany(v=>new[]{v.x,v.y,v.z}).ToArray();
         Shape=new VtxSettings();
         foreach(float stage in new[]{0f,.44444445f,.739f,1f})
@@ -19,7 +27,7 @@ public static partial class BellyMorphController
             Check(TryDeformAL(body,rec,MeshMorphClass.Body,stage,out var result,out _),"normal study deformation");
             var fixedNormals=DeformationNormals.Build(original,result,normals,body.sharedMesh.triangles);
             File.WriteAllText(Path.Combine(output,$"model-{stage:F3}.json"),JsonSerializer.Serialize(new{
-                stage,original=Flatten(original),deformed=Flatten(result),normals=Flatten(normals),fixedNormals=Flatten(fixedNormals),triangles=body.sharedMesh.triangles,skin=body.sharedMesh.GetTriangles(0),
+                stage,original=Flatten(original),deformed=Flatten(result),normals=Flatten(normals),fixedNormals=Flatten(fixedNormals),triangles=body.sharedMesh.triangles,skin=body.sharedMesh.GetTriangles(0),excluded=rec.BreastExcluded,
                 local=Flatten(original.Select(v=>U(Growth.Numerics.Vector3.Transform(N(v),rec.ToReference*rec.GrowthContext.InverseFrame))).ToArray())
             }));
         }
@@ -27,6 +35,22 @@ public static partial class BellyMorphController
     }
     static void TestNormalTransport()
     {
+        // A triangle can grow beside a stationary, curved part of the mesh
+        // without changing either face's direction. Its area must not drag
+        // the authored shading toward itself (the under-breast regression).
+        var corner=new[]{Vector3.zero,Vector3.right,Vector3.up,Vector3.forward};
+        var cornerNormals=Enumerable.Repeat(new Vector3(1,0,1).normalized,4).ToArray();
+        var cornerTriangles=new[]{0,1,2,0,2,3};
+        foreach(float stretch in new[]{.02f,.2f,1f,7f,50f})
+        {
+            var stretched=(Vector3[])corner.Clone();stretched[1]*=stretch;
+            var transported=DeformationNormals.Build(corner,stretched,cornerNormals,cornerTriangles);
+            Check(transported.SequenceEqual(cornerNormals),"area-only stretch must preserve authored normals exactly");
+        }
+        // A collapsed face has no reliable new direction and must not rotate
+        // the other, surviving face's shading by disappearing from its fan.
+        var collapsed=(Vector3[])corner.Clone();collapsed[1]=Vector3.zero;
+        Check(DeformationNormals.Build(corner,collapsed,cornerNormals,cornerTriangles).SequenceEqual(cornerNormals),"collapsed face does not invent a shading rotation");
         var v=new[]{new Vector3(0,0,0),new Vector3(1,0,0),new Vector3(0,1,0),new Vector3(1,0,0),new Vector3(1,1,0),new Vector3(0,1,0)};
         var n=Enumerable.Repeat(Vector3.forward,v.Length).ToArray();var t=new[]{0,1,2,3,4,5};
         var same=DeformationNormals.Build(v,v,n,t);Check(same.SequenceEqual(n),"no deformation preserves every authored normal bit");
