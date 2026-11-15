@@ -49,11 +49,12 @@ Check(Near(first.body0.Values["Hara"], 1f) && Near(first.body0.Values["west"], 0
 PregnancyPlugin.CfgBodyChangeUpper.Value = 500; PregnancyPlugin.CfgBodyChangeLower.Value = -200; Apply(first, 0f);
 Check(Near(first.body0.Values["Hara"], 2.15f), "expanding clamp restores baseline rather than losing prior overflow");
 first.Parts.Color.m_nMainBrightness = 280; Apply(first, 0f);
-Check(first.body0.LastColor.Color.m_nMainBrightness == 140 && first.Parts.Color.m_nMainBrightness == 280, "live color edit rebases runtime palette only");
+Check(first.body0.LastColor.Color.m_nMainBrightness == 163 && first.Parts.Color.m_nMainBrightness == 280, "live color edit still reaches the absolute target without changing saved color");
 BodyChanges.Forget(first);
 Check(first.Parts.GetPartsColorTableTex(MaidParts.PARTS_COLOR.NIPPLE) == first.Parts.Original, "unload removes runtime palette");
 Apply(second, 0f);
 Check(Near(second.body0.Values["Hara"], .64f), "postpartum history works at zero pregnancy progress");
+NippleColorTests.Run(Check);
 File.Delete(Path.Combine(folder, "reference.preset")); Apply(second, .8f);
 Check(Near(second.body0.Values["Hara"], .5f) && second.body0.LastColor == second.Parts.Original, "missing profile removes prior overlay safely");
 Console.WriteLine($"PASS: {checks} runtime lifecycle checks.");

@@ -1,5 +1,12 @@
 # Changes
 
+## V16 — 2026-11-16
+
+- Blend nipple color from each character's original color toward the reference preset's target color.
+- Add **Nipple Color Change Limit (%)** in F1, from 0 to 100; repeated application does not accumulate the change.
+
+Plugin version: **0.2.3**. See [verification](VERIFICATION.md).
+
 ## V15 — 2026-10-17
 
 - Add adjustable upper/lower binding boundary arcs in F8.

@@ -9,7 +9,7 @@ Adds pregnancy progression, an adjustable pregnant belly, clothing deformation, 
 - **Pregnancy as you play.** Supported vaginal ejaculation events in Yotogi, story scenes and private-mode interactions can cause pregnancy. Choose a fixed conception chance or a 7-day/28-day menstrual cycle. Pregnancy advances with in-game days.
 - **Shape the pregnant belly.** Adjust fullness, width, height, growth timing, sag, upper/lower contours, movement and navel appearance. Preview any pregnancy stage from the in-game menu.
 - **Body changes across pregnancies.** Gradually change sliders such as bust size, waist, hips, arms, legs and the character editor's abdomen slider. Completed births contribute lasting changes, up to your chosen number of births.
-- **Gradual color changes.** Differences between two presets also drive color changes. Color channels are interpolated; body-part types and menu selections are not replaced.
+- **Gradual color changes.** Nipple color moves from each maid's own original color toward the reference preset, with an adjustable progress limit. Other colors use the difference between the two presets. Body-part types and menu selections are not replaced.
 - **Clothing and pose support.** Underwear, outerwear, skirts, trousers and Back-category items follow the deformation. Skirts have draping support, and navel accessories follow the changing body. Supports use alongside AddYotogiSlider (AYS) morphs.
 - **Separate control for each maid.** Apply a shape to one maid without replacing another maid's applied shape. A separate status window lists the maids in your save.
 
@@ -78,10 +78,13 @@ Under **Body Changes**:
 | `Births for Full Change` | `5` | The value of `x` in the formula. |
 | `Body Value Minimum` | `0` | The lowest final value for an affected body slider. |
 | `Body Value Maximum` | `100` | The highest final value for an affected body slider. |
+| `Nipple Color Change Limit (%)` | `100` | Maximum progress from the maid's own nipple color to the reference color, from `0` to `100`. |
 
-All three are integer inputs with no additional input-range restriction. You may use negative limits or limits above `100` with slider-unlock mods. Zero or negative `x` uses the full difference. Reversed minimum/maximum values are sorted for calculation. Settings take effect on the next deformation.
+The first three are integer inputs with no additional input-range restriction. You may use negative body-slider limits or limits above `100` with slider-unlock mods. Zero or negative `x` uses the full change. Reversed body-slider bounds are sorted for calculation. Settings take effect on the next deformation.
 
 **Colors use their own channel units**, which can exceed `100`. They follow the same pregnancy/birth factor but are not clamped by the body-slider limits. The supplied pair changes 11 sliders, including the character editor's `Hara` abdomen slider, and three color groups: nipple color and small differences in both eye colors. The existing pregnancy-belly deformation remains separate.
+
+Nipple color starts from each maid's native color setting and approaches the color in `reference.preset`; `base.preset` is not its starting color. The blend is the smaller of the pregnancy/birth factor and the nipple limit divided by `100`. A `0%` limit keeps her original color, `50%` stops halfway, and `100%` permits reaching the target. Repeated application never uses the previous tint as a new starting point. Other color groups retain their preset-difference behavior.
 
 ### Use your own preset pair
 
@@ -90,7 +93,7 @@ All three are integer inputs with no additional input-range restriction. You may
 3. Put both beside the DLL. Keep any companion XML files with matching names as shown above.
 4. Click **Apply Belly** again. Modified preset files are reloaded at the next application.
 
-Only differing native numeric sliders and color channels are used. Menu-file selections, body-part types, clothing selections and extension-only slider values are not applied. Companion XML files stay with the pair; this feature reads the native `.preset` data.
+Native numeric slider and other-color differences are used; the reference nipple color is an absolute target even when it matches the base preset. Menu-file selections, body-part types, clothing selections and extension-only slider values are not applied. Companion XML files stay with the pair; this feature reads the native `.preset` data.
 
 These are runtime appearance effects. The plugin does not rewrite character presets or saved character-editor slider/color data. Birth history is stored separately through ExSaveData.
 
