@@ -16,6 +16,7 @@ namespace COM3D2.Pregnancy.Plugin
             internal BodyChangeProfile Profile;
             internal double Factor;
             internal int Lower, Upper;
+            internal int NippleColorLimit;
             internal readonly Dictionary<string, int> Applied = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             internal readonly Dictionary<MaidParts.PARTS_COLOR, Texture2D> Textures = new Dictionary<MaidParts.PARTS_COLOR, Texture2D>();
             internal readonly Dictionary<MaidParts.PARTS_COLOR, MaidParts.PartsColor> TextureColors = new Dictionary<MaidParts.PARTS_COLOR, MaidParts.PartsColor>();
@@ -65,12 +66,14 @@ namespace COM3D2.Pregnancy.Plugin
             double factor = BodyChangeMath.Factor(PregnancyManager.GetBirthCount(maid), progress, x);
             var next = new State {
                 Maid = maid, Body = maid.body0, Parts = maid.Parts, Profile = _profile,
-                Factor = factor, Lower = PregnancyPlugin.CfgBodyChangeLower.Value, Upper = PregnancyPlugin.CfgBodyChangeUpper.Value
+                Factor = factor, Lower = PregnancyPlugin.CfgBodyChangeLower.Value, Upper = PregnancyPlugin.CfgBodyChangeUpper.Value,
+                NippleColorLimit = PregnancyPlugin.CfgNippleColorLimit.Value
             };
             if (_profile == null || factor == 0d)
                 return previous == null ? null : next;
             bool same = previous != null && previous.Profile == _profile && previous.Body == maid.body0
-                && previous.Parts == maid.Parts && previous.Factor == factor && previous.Lower == next.Lower && previous.Upper == next.Upper;
+                && previous.Parts == maid.Parts && previous.Factor == factor && previous.Lower == next.Lower && previous.Upper == next.Upper
+                && previous.NippleColorLimit == next.NippleColorLimit;
             foreach (var entry in _profile.Sliders)
             {
                 MaidProp prop = maid.GetProp(entry.Value.Id);
@@ -159,7 +162,7 @@ namespace COM3D2.Pregnancy.Plugin
         {
             foreach (var entry in state.Profile.Colors)
             {
-                MaidParts.PartsColor effective = BodyChangeProfile.AddColor(state.Parts.GetPartsColor(entry.Key), entry.Value, state.Factor);
+                MaidParts.PartsColor effective = EffectiveColor(state, entry.Key, entry.Value);
                 MaidParts.PartsColor previous;
                 if (!state.TextureColors.TryGetValue(entry.Key, out previous) || !previous.Equals(effective))
                     state.Body.UpdateInfinityColor(entry.Key);
@@ -171,7 +174,7 @@ namespace COM3D2.Pregnancy.Plugin
             State state;
             long[] delta;
             if (!PartStates.TryGetValue(parts, out state) || !state.Profile.Colors.TryGetValue(kind, out delta)) return;
-            MaidParts.PartsColor effective = BodyChangeProfile.AddColor(parts.GetPartsColor(kind), delta, state.Factor);
+            MaidParts.PartsColor effective = EffectiveColor(state, kind, delta);
             Texture2D result;
             MaidParts.PartsColor previous;
             state.Textures.TryGetValue(kind, out result);
@@ -188,6 +191,16 @@ namespace COM3D2.Pregnancy.Plugin
                 state.TextureColors[kind] = effective;
             }
             texture = result;
+        }
+
+        static MaidParts.PartsColor EffectiveColor(State state, MaidParts.PARTS_COLOR kind, long[] delta)
+        {
+            // GetPartsColor returns the maid's native setting; our replacement
+            // texture never writes back to it, so repeat Apply cannot accumulate.
+            var original = state.Parts.GetPartsColor(kind);
+            return kind == MaidParts.PARTS_COLOR.NIPPLE && state.Profile.NippleTarget.HasValue
+                ? BodyChangeProfile.BlendColor(original, state.Profile.NippleTarget.Value, state.Factor, state.NippleColorLimit)
+                : BodyChangeProfile.AddColor(original, delta, state.Factor);
         }
 
         internal static void Reset(Maid maid)

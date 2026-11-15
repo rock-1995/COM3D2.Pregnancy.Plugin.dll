@@ -35,6 +35,7 @@ namespace COM3D2.Pregnancy.Plugin
             new Dictionary<string, Slider>(StringComparer.OrdinalIgnoreCase);
         internal readonly Dictionary<MaidParts.PARTS_COLOR, long[]> Colors =
             new Dictionary<MaidParts.PARTS_COLOR, long[]>();
+        internal MaidParts.PartsColor? NippleTarget;
 
         internal static BodyChangeProfile Load(string basePath, string referencePath)
         {
@@ -63,7 +64,15 @@ namespace COM3D2.Pregnancy.Plugin
                 var delta = new long[b.Length];
                 bool changed = false;
                 for (int j = 0; j < delta.Length; j++) { delta[j] = (long)r[j] - b[j]; changed |= delta[j] != 0; }
-                if (changed) profile.Colors[(MaidParts.PARTS_COLOR)i] = delta;
+                var kind = (MaidParts.PARTS_COLOR)i;
+                if (kind == MaidParts.PARTS_COLOR.NIPPLE)
+                {
+                    // Nipple color has an absolute destination. The baseline is
+                    // each maid's own saved color, never the base preset's color.
+                    profile.NippleTarget = referenceColors[i];
+                    profile.Colors[kind] = delta;
+                }
+                else if (changed) profile.Colors[kind] = delta;
             }
             return profile;
         }
@@ -105,6 +114,15 @@ namespace COM3D2.Pregnancy.Plugin
             original.m_nShadowRate = v[4]; original.m_nShadowHue = v[5];
             original.m_nShadowChroma = v[6]; original.m_nShadowBrightness = v[7]; original.m_nShadowContrast = v[8];
             return original;
+        }
+
+        internal static MaidParts.PartsColor BlendColor(MaidParts.PartsColor original, MaidParts.PartsColor target, double factor, int limitPercent)
+        {
+            double blend = Math.Min(Math.Max(0d, factor), Math.Max(0, Math.Min(100, limitPercent)) / 100d);
+            int[] start = ColorValues(original), end = ColorValues(target);
+            var delta = new long[start.Length];
+            for (int i = 0; i < delta.Length; i++) delta[i] = (long)end[i] - start[i];
+            return AddColor(original, delta, blend);
         }
     }
 }

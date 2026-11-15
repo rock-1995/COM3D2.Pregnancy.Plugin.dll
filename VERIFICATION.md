@@ -1,3 +1,11 @@
+# V16 verification
+
+Checked on 2026-11-16. The production rebuild completed with zero warnings and zero errors. Runtime lifecycle checks: **652 passed**. Profile/math/native API checks: **37 passed**. All **4** body-change Harmony targets were verified against the installed game.
+
+The release DLL is byte-identical to the installed color-target build from 2026-10-17. Production source matches its archived source. No game was launched or visual scene tested for this publication.
+
+DLL SHA-256: `C10C1B2483A658E2DF788DE6F9CE806C977F2FE930F04511BBDD6F0D4523F095`.
+
 # V15 verification
 
 Checked on 2026-10-17. The .NET 3.5 production Release build completed with zero warnings and zero errors. The release uses the same DLL subsequently confirmed in game by the user.

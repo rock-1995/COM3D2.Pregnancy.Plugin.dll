@@ -28,6 +28,7 @@ namespace COM3D2.Pregnancy.Plugin
     public class PregnancyPlugin
     {
         public static Config<int> CfgBodyChangeBirths = new(5), CfgBodyChangeLower = new(0), CfgBodyChangeUpper = new(100);
+        public static Config<int> CfgNippleColorLimit = new(100);
     }
     public static class PregnancyManager { public static int GetBirthCount(Maid maid) => maid.Births; }
 }
@@ -40,6 +41,7 @@ public class MaidProp
 }
 public class Maid
 {
+    public static int PresetBaseBrightness = 303, PresetReferenceBrightness = 163;
     public int Births;
     public TBody body0;
     public MaidParts Parts = new();
@@ -67,7 +69,10 @@ public class Maid
     public static MaidParts.PartsColor[] DeserializeMultiColorPre(BinaryReader r)
     {
         bool reference = Path.GetFileName(((FileStream)r.BaseStream).Name) == "reference.preset";
-        return new[] { new MaidParts.PartsColor { m_nMainBrightness = reference ? 163 : 303, m_nMainChroma = reference ? 94 : 198 } };
+        return new[] {
+            new MaidParts.PartsColor { m_nMainBrightness = reference ? PresetReferenceBrightness : PresetBaseBrightness, m_nMainChroma = reference ? 94 : 198 },
+            new MaidParts.PartsColor { m_nMainBrightness = reference ? 98 : 100 }
+        };
     }
     public string SaveShape() => string.Join("|", Props.Values.Select(p => $"{p.name},{p.value},{p.temp_value},{p.boDut},{p.boTempDut},{p.boTempExecuted},{p.min},{p.max}"))
         + string.Join(",", BodyChangeProfile.ColorValues(Parts.Color));
@@ -78,22 +83,29 @@ public class TBody
     public Dictionary<string, float> Values = new(StringComparer.OrdinalIgnoreCase);
     public int Updates;
     public Texture2D LastColor;
+    public Dictionary<MaidParts.PARTS_COLOR,Texture2D> LastColors = new();
+    public int ColorUpdates;
     public void VertexMorph_FromProcItem(string tag, float f) { BodyChanges.Transform(this, tag, ref f); Values[tag] = f; Updates++; }
     public void BoneMorph_FromProcItem(string tag, float f) { BodyChanges.Transform(this, tag, ref f); Values[tag] = f; Updates++; }
     public void ItemScaleReset() { }
-    public void UpdateInfinityColor(MaidParts.PARTS_COLOR kind) => LastColor = maid.Parts.GetPartsColorTableTex(kind);
+    public void UpdateInfinityColor(MaidParts.PARTS_COLOR kind)
+    {
+        var texture=maid.Parts.GetPartsColorTableTex(kind);LastColors[kind]=texture;ColorUpdates++;
+        if(kind==MaidParts.PARTS_COLOR.NIPPLE)LastColor=texture;
+    }
 }
 public class MaidParts
 {
-    public enum PARTS_COLOR { NIPPLE }
+    public enum PARTS_COLOR { NIPPLE, EYE_L }
     public struct PartsColor
     {
         public bool m_bUse;
         public int m_nMainHue, m_nMainChroma, m_nMainBrightness, m_nMainContrast, m_nShadowRate, m_nShadowHue, m_nShadowChroma, m_nShadowBrightness, m_nShadowContrast;
     }
     public PartsColor Color;
+    public PartsColor EyeColor = new() { m_nMainBrightness=73 };
     public Texture2D Original = new(256, 1, TextureFormat.RGBA32, false);
-    public PartsColor GetPartsColor(PARTS_COLOR kind) => Color;
+    public PartsColor GetPartsColor(PARTS_COLOR kind) => kind==PARTS_COLOR.NIPPLE ? Color : EyeColor;
     public Texture2D GetPartsColorTableTex(PARTS_COLOR kind)
     {
         var result = Original; BodyChanges.ColorTexture(this, kind, ref result); return result;

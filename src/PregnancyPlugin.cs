@@ -24,6 +24,7 @@ namespace COM3D2.Pregnancy.Plugin
         internal static ConfigEntry<int> CfgBodyChangeBirths;
         internal static ConfigEntry<int> CfgBodyChangeLower;
         internal static ConfigEntry<int> CfgBodyChangeUpper;
+        internal static ConfigEntry<int> CfgNippleColorLimit;
         Harmony _harmony;
         int _aysHookAttempts;
         bool _aysHookReady;
@@ -71,6 +72,10 @@ namespace COM3D2.Pregnancy.Plugin
             CfgBodyChangeUpper = ConfigKeyMigration.BindInt(Config,
                 "Body Changes", "Body Value Maximum", "\u4f53\u578b\u6570\u503c\u4e0a\u9650", 100,
                 "Maximum final body-slider value, in the game's slider units. Integer input; negative values and values above 100 are allowed. New settings take effect on the next deformation.");
+            CfgNippleColorLimit = Config.Bind(
+                "Body Changes", "Nipple Color Change Limit (%)", 100,
+                new ConfigDescription("Maximum progress from each maid's own original nipple color toward reference.preset. 0 keeps her original color; 50 stops halfway; 100 can reach the target. Caps the existing pregnancy/birth progress. Takes effect on the next deformation.",
+                    new AcceptableValueRange<int>(0, 100)));
 
             try
             {
