@@ -5,20 +5,23 @@ namespace COM3D2.Pregnancy.Plugin
     [HarmonyPatch(typeof(GameMain), "OnEndDay")]
     class Patch_OnEndDay
     {
-        static void Postfix() => PregnancyManager.AdvanceDay();
+        static void Postfix()
+        {
+            PregnancyManager.AdvanceDay();
+            NativeAppearanceRuntime.RefreshLoadedAppearances();
+        }
     }
 
     [HarmonyPatch(typeof(TMorph), "FixBlendValues")]
     class Patch_TMorphFixBlendValues
     {
-        static void Postfix(TMorph __instance)
+        static void Prefix(TMorph __instance, out bool __state)
         {
-            try { BellyMorphController.NotifyFixBlendValues(__instance); }
-            catch (System.Exception e)
-            {
-                BepInEx.Logging.Logger.CreateLogSource("Pregnancy")
-                    .LogInfo("[Pregnancy] FixBlendValues hook: " + e.Message);
-            }
+            __state = BellyMorphController.NativeMorphWillChange(__instance);
+        }
+        static void Postfix(TMorph __instance, bool __state)
+        {
+            if (__state) NativeAppearanceRuntime.MorphChanged(__instance);
         }
     }
 

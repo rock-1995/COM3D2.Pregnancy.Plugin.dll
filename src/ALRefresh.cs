@@ -95,7 +95,7 @@ namespace COM3D2.Pregnancy.Plugin
         }
         static int MeshStructureSignature(SkinnedMeshRenderer renderer)
         {
-            unchecked{return (RigSignature(renderer,true)*31+ExactIndices(renderer.sharedMesh.triangles))*31+(UseOrdinaryClothing(renderer)?1:0);}
+            unchecked{return (RigSignature(renderer,true)*31+ExactIndices(NativeOriginalTopology(renderer)))*31+(UseOrdinaryClothing(renderer)?1:0);}
         }
 
         static void PruneDetachedBindings(Maid maid,List<SkinnedMeshRenderer> renderers)

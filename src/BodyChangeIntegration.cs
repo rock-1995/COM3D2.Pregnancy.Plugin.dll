@@ -5,7 +5,7 @@ namespace COM3D2.Pregnancy.Plugin
         static void ApplyBodyChanges(Maid maid, float progress)
         {
             BodyChanges.State next;
-            try { next = BodyChanges.Prepare(maid, progress); }
+            try { next = BodyChanges.PrepareFactor(maid, PregnancyAppearance.Get(maid).Body); }
             catch (System.Exception e)
             {
                 _log.LogWarning("Body change preparation: " + e.Message);
@@ -14,7 +14,7 @@ namespace COM3D2.Pregnancy.Plugin
             if (next == null) return;
             // Rebuild from the unmodified mesh when shape inputs change. This also
             // prevents the old belly deformation from becoming the new body baseline.
-            ResetInternal(maid);
+            if (BodyChanges.NeedsGeometryApply(next)) ResetInternal(maid);
             bool suppress = _suppressMorphBaseBake;
             try
             {
