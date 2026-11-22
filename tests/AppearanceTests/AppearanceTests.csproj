@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType><ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <PropertyGroup>
+    <GameDir Condition="'$(GameDir)' == ''">$(COM3D2_GAME_DIR)</GameDir>
+    <ExternalSaveAssembly Condition="'$(ExternalSaveAssembly)' == ''">$(GameDir)/Sybaris/COM3D2.ExternalSaveData.Managed.dll</ExternalSaveAssembly>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="ProfileStubs.cs;GameApiStubs/**/*.cs;UnityApiStubs/**/*.cs" />
+    <Compile Include="../../src/PregnancyAppearance.cs" />
+    <Compile Include="../../src/BodyChangeProfile.cs" />
+    <Compile Include="../../src/ExSaveDataBridge.cs" />
+    <ProjectReference Include="GameApiStubs/Assembly-CSharp.csproj" />
+    <Reference Include="COM3D2.ExternalSaveData.Managed">
+      <HintPath>$(ExternalSaveAssembly)</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="CheckExternalSaveAssembly" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(ExternalSaveAssembly)')"
+           Text="AppearanceTests requires your local ExternalSaveData DLL. Pass -p:GameDir=YOUR_COM3D2_DIRECTORY or -p:ExternalSaveAssembly=PATH_TO_COM3D2.ExternalSaveData.Managed.dll. No game files are supplied by this repository." />
+  </Target>
+</Project>
