@@ -172,6 +172,26 @@ class Program
         PregnancyManager.SetPregnant(mother, true); PregnancyManager.SetProgress(mother, .999f);
         PregnancyManager.AdvanceDay();
         Check(PregnancyManager.GetBirthCount(mother) == int.MaxValue, "birth count cannot wrap negative");
+        var appearanceMaid = new Maid("appearance-simulation-events");
+        GameMain.Instance.CharacterMgr.Maids.Clear();
+        GameMain.Instance.CharacterMgr.Maids.Add(appearanceMaid);
+        PregnancyManager.SetPregnant(appearanceMaid, true);
+        PregnancyManager.SetProgress(appearanceMaid, .5f);
+        PregnancyAppearance.Set(appearanceMaid, .9f, .7f);
+        PregnancyManager.SetPregnant(appearanceMaid, true);
+        PregnancyManager.SetProgress(appearanceMaid, .5f);
+        Check(PregnancyAppearance.Get(appearanceMaid).Belly == .9f && PregnancyAppearance.Get(appearanceMaid).Body == .7f,
+            "unchanged simulation setters preserve independent appearance edits");
+        PregnancyManager.AdvanceDay();
+        float simulationProgress = PregnancyManager.GetProgress(appearanceMaid);
+        var advancedAppearance = PregnancyAppearance.Get(appearanceMaid);
+        Check(advancedAppearance.Belly == simulationProgress && Math.Abs(advancedAppearance.Body - simulationProgress / 5f) < 0.000001f,
+            "day advance publishes final belly and body values once simulation changes");
+        PregnancyManager.SetProgress(appearanceMaid, .999f);
+        PregnancyManager.AdvanceDay();
+        var birthAppearance = PregnancyAppearance.Get(appearanceMaid);
+        Check(birthAppearance.Belly == 0f && birthAppearance.Body == .2f,
+            "birth clears belly while retaining first-birth body progress");
         Console.WriteLine("PASS: " + checks + " event/target/probability/cycle/context/birth checks.");
     }
 

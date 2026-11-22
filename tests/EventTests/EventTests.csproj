@@ -11,6 +11,9 @@
     <Compile Include="../../src/EffectEventGate.cs" />
     <Compile Include="../../src/ConceptionEffects.cs" />
     <Compile Include="../../src/PregnancyManager.cs" />
+    <Compile Include="../../src/PregnancyAppearance.cs" />
+    <Compile Include="../../src/BodyChangeProfile.cs" />
+    <Compile Include="../AppearanceTests/ProfileStubs.cs" />
     <Compile Include="../../src/FertilityCycleMode.cs" />
   </ItemGroup>
 </Project>
