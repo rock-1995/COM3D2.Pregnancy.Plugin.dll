@@ -10,10 +10,11 @@ void Check(bool condition, string description)
 var profile = BodyChangeProfile.Load(args[0], args[1]);
 var expected = new Dictionary<string, long> {
     ["MuneL"] = 25, ["MuneTare"] = 29, ["RegFat"] = 26, ["ArmL"] = 3,
-    ["Hara"] = 35, ["RegMeet"] = 13, ["koshi"] = 44, ["kata"] = 1,
+    ["RegMeet"] = 13, ["koshi"] = 44, ["kata"] = 1,
     ["west"] = 24, ["MuneUpDown"] = -7, ["MuneYawaraka"] = 5
 };
-Check(profile.Sliders.Count == 11, "exactly 11 slider changes");
+Check(profile.Sliders.Count == 10, "ten body slider changes; native Hara is excluded");
+Check(!profile.Sliders.ContainsKey("Hara"), "pregnancy does not use the native Hara parameter");
 foreach (var pair in expected) Check(profile.Sliders[pair.Key].Delta == pair.Value, pair.Key);
 Check(!profile.Sliders.ContainsKey("chikubi") && !profile.Sliders.ContainsKey("chikubicolor"), "menu selections excluded");
 Check(profile.Colors.Count == 3, "three color groups");
@@ -23,7 +24,7 @@ var identical = BodyChangeProfile.Load(args[0], args[0]);
 Check(identical.Sliders.Count == 0 && identical.Colors.Count == 1 && identical.NippleTarget.HasValue, "identical presets still define the nipple destination independently of base");
 Check(profile.NippleTarget.HasValue && profile.NippleTarget.Value.m_nMainBrightness == 163, "native reference nipple color retained as absolute target");
 var reverse = BodyChangeProfile.Load(args[1], args[0]);
-Check(reverse.Sliders["Hara"].Delta == -35, "negative custom delta");
+Check(reverse.Sliders["RegMeet"].Delta == -13 && !reverse.Sliders.ContainsKey("Hara"), "negative custom delta also excludes Hara");
 Check(BodyChangeMath.Factor(0, 0f, 5) == 0, "initial no change");
 Check(BodyChangeMath.Factor(0, .5f, 5) == .1, "first pregnancy halfway");
 Check(BodyChangeMath.Factor(2, .5f, 5) == .5, "pregnancy plus birth history");
