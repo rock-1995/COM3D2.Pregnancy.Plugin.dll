@@ -31,8 +31,13 @@ namespace COM3D2.Pregnancy.Plugin
         public static Config<int> CfgNippleColorLimit = new(100);
     }
     public static class PregnancyManager { public static int GetBirthCount(Maid maid) => maid.Births; }
+    internal static class NativeAppearanceRuntime
+    {
+        internal static int Forgotten;
+        internal static void Forget(Maid maid) { Forgotten++; BodyChanges.Forget(maid); }
+    }
 }
-public enum MPN { Hara, west, chikubi }
+public enum MPN { RegMeet, west, chikubi, Hara }
 public class MaidProp
 {
     public int idx, type, value, temp_value, min = 0, max = 100;
@@ -46,11 +51,12 @@ public class Maid
     public TBody body0;
     public MaidParts Parts = new();
     public Dictionary<MPN, MaidProp> Props = new();
-    public Maid(int hara, int waist)
+    public Maid(int regmeet, int waist)
     {
         body0 = new TBody { maid = this };
-        Props[MPN.Hara] = new() { idx = 0, name = "Hara", type = 1, value = hara };
+        Props[MPN.RegMeet] = new() { idx = 0, name = "RegMeet", type = 1, value = regmeet };
         Props[MPN.west] = new() { idx = 1, name = "west", type = 2, value = waist };
+        Props[MPN.Hara] = new() { idx = 3, name = "Hara", type = 1, value = 17 };
         Parts.Color = new() { m_nMainBrightness = 303, m_nMainChroma = 198 };
     }
     public MaidProp GetProp(MPN id) => Props.TryGetValue(id, out var prop) ? prop : null;
@@ -61,9 +67,10 @@ public class Maid
     {
         bool reference = Path.GetFileName(((FileStream)r.BaseStream).Name) == "reference.preset";
         return new() {
-            new() { idx=0, name="Hara", type=1, value=reference ? 48 : 13 },
+            new() { idx=0, name="RegMeet", type=1, value=reference ? 48 : 13 },
             new() { idx=1, name="west", type=2, value=reference ? 59 : 35 },
-            new() { idx=2, name="chikubi", type=3, value=reference ? 1 : 0 }
+            new() { idx=2, name="chikubi", type=3, value=reference ? 1 : 0 },
+            new() { idx=3, name="Hara", type=1, value=reference ? 98 : 3 }
         };
     }
     public static MaidParts.PartsColor[] DeserializeMultiColorPre(BinaryReader r)

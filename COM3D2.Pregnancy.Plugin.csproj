@@ -10,8 +10,8 @@
     <Nullable>disable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <!-- Default output goes directly to BepInEx/plugins; override OutputPath for staging. -->
-    <OutputPath>$(GameDir)/BepInEx/plugins/</OutputPath>
+    <!-- Keep builds local; deployment copies the verified DLL explicitly. -->
+    <OutputPath>bin/$(Configuration)/</OutputPath>
     <!-- Do not copy referenced game assemblies to the output. -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>

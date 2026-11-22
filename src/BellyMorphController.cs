@@ -162,19 +162,11 @@ namespace COM3D2.Pregnancy.Plugin
 
         public static void ApplyProgress(Maid maid, float progress)
         {
-            using(new RefreshTrace(maid,"apply"))
-            {
-                if (!IsValid(maid)) return;
-                ApplyBodyChanges(maid, progress);
-                _bpWorldCached = false;
-                _activeProgress[maid.GetHashCode()] = Mathf.Clamp01(progress);
-                if(progress<=0){ResetInternal(maid);return;}
-                _maidShapes[maid.GetHashCode()]=Shape.Copy();
-                EnsureMonitor(maid);
-                PruneRecords(maid);
-
-                ApplyToSlots(maid, Mathf.Clamp01(progress), false);
-            }
+            if (!IsValid(maid)) return;
+            var appearance = PregnancyAppearance.Get(maid);
+            PregnancyAppearance.Set(maid, progress, appearance.Body);
+            CaptureShapeForMaid(maid);
+            NativeAppearanceRuntime.RequestApply(maid);
         }
 
         public static void SetBelly(Maid maid, float sliderValue)
@@ -194,6 +186,7 @@ namespace COM3D2.Pregnancy.Plugin
                 BodyChanges.Reset(maid);
             }
             finally { _suppressMorphBaseBake = suppress; }
+            SyncNativeOutput(maid);
             _bpWorldCached = false;
 
             var mon = maid.gameObject.GetComponent<BellyMonitor>();
@@ -269,8 +262,6 @@ namespace COM3D2.Pregnancy.Plugin
                             + $" verts={smr.sharedMesh.vertexCount}");
                     continue;
                 }
-
-                AttachNotifier(smr.gameObject, maid);
 
                 bool willApply = includeInactive || (smr.enabled && smr.gameObject.activeInHierarchy);
                 if (IsDebugMeshLoggingEnabled())
@@ -1871,7 +1862,7 @@ namespace COM3D2.Pregnancy.Plugin
         const int SkirtDrapeSmoothPasses = 4;
         const float SkirtDrapeSmoothStrength = 0.35f;
 
-        static List<int>[] BuildMeshNeighbors(Mesh mesh, int count)
+        static List<int>[] BuildMeshNeighbors(Mesh mesh, int count, int[] originalTopology = null)
         {
             List<int>[] neighbors = new List<int>[count];
             for (int i = 0; i < count; i++)
@@ -1880,7 +1871,7 @@ namespace COM3D2.Pregnancy.Plugin
             int[] triangles = null;
             try
             {
-                triangles = mesh.triangles;
+                triangles = originalTopology ?? mesh.triangles;
             }
             catch
             {
@@ -2223,9 +2214,6 @@ namespace COM3D2.Pregnancy.Plugin
                 if (IsDebugMeshLoggingEnabled())
                     MaybeLogMeshInventory(_maid, CollectTargetRenderers(_maid), "monitor");
                 else _meshInventorySignatures.Remove(_maid.GetHashCode());
-                BellyMorphController.FlushMorphDirty(_maid);
-                ProcessFullRefresh();
-                ProcessVisibilityApply();
                 UpdateALBindings(_maid);
             }
 

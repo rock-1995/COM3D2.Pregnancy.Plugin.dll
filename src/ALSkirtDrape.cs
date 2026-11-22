@@ -161,7 +161,7 @@ namespace COM3D2.Pregnancy.Plugin
             // mixed material points between the unchanged torso and full-skirt
             // boundaries; retain the native animation weights and free rotations.
             SkirtTransition.Solve(Array.ConvertAll(record.OrigVerts,v=>NVector.Transform(N(v),record.ToReference)),
-                deltas,visualDeltas,mixed,record.Mesh.triangles,torso.Span);
+                deltas,visualDeltas,mixed,record.NormalTriangles??record.Mesh.triangles,torso.Span);
             for(int i=0;i<deformed.Length;i++)
             {
                 if(record.BreastExcluded[i] || record.TorsoOwnership[i]<=0)continue;

@@ -10,7 +10,7 @@ namespace COM3D2.Pregnancy.Plugin
     {
         public const string PluginGuid = "com.pregnancymod.com3d2";
         public const string PluginName = "COM3D2 Pregnancy";
-        public const string PluginVersion = "0.2.3";
+        public const string PluginVersion = "0.3.0";
 
         internal static PregnancyPlugin Instance;
         internal static ConfigEntry<KeyCode> CfgToggleKey;
@@ -18,7 +18,7 @@ namespace COM3D2.Pregnancy.Plugin
         internal static ConfigEntry<int> CfgPregnancyWeeks;
         internal static ConfigEntry<float> CfgFertilityRate;
         internal static ConfigEntry<FertilityCycleMode> CfgCycleMode;
-        internal static ConfigEntry<MorphTriggerMode> CfgMorphTriggerMode;
+        internal static ConfigEntry<MorphTriggerMode> CfgMorphTriggerMode = null;
         internal static ConfigEntry<bool> CfgMorphSpyLogging;
         internal static ConfigEntry<bool> CfgDebugMeshLogging;
         internal static ConfigEntry<int> CfgBodyChangeBirths;
@@ -26,8 +26,7 @@ namespace COM3D2.Pregnancy.Plugin
         internal static ConfigEntry<int> CfgBodyChangeUpper;
         internal static ConfigEntry<int> CfgNippleColorLimit;
         Harmony _harmony;
-        int _aysHookAttempts;
-        bool _aysHookReady;
+        internal BepInEx.Logging.ManualLogSource LoggerForNative => Logger;
 
         void Awake()
         {
@@ -50,10 +49,6 @@ namespace COM3D2.Pregnancy.Plugin
             CfgCycleMode = Config.Bind(
                 "General", "Fertility Cycle Mode", FertilityCycleMode.Simple,
                 "Simple uses the fixed fertility rate on creampie. SevenDay and TwentyEightDay use cycle timing at day end.");
-
-            CfgMorphTriggerMode = Config.Bind(
-                "General", "Morph Trigger Mode", MorphTriggerMode.VisibilityChange,
-                "When belly morphs are refreshed: ManualOnly or VisibilityChange.");
 
             CfgMorphSpyLogging = Config.Bind(
                 "Debug", "Morph Spy Logging", true,
@@ -81,8 +76,7 @@ namespace COM3D2.Pregnancy.Plugin
             {
                 _harmony = new Harmony(PluginGuid);
                 _harmony.PatchAll();
-                BellyMorphController.PatchAysHooks(_harmony);
-                Logger.LogInfo("Harmony patches applied. Conception uses vaginal script effects (story/private/yotogi).");
+                Logger.LogInfo("Harmony patches applied. Appearance is composed in native customization; pregnancy does not use hara.");
             }
             catch (System.Exception e)
             {
@@ -100,23 +94,7 @@ namespace COM3D2.Pregnancy.Plugin
 
             gameObject.AddComponent<PregnancyUI>();
             gameObject.AddComponent<MaidListUI>();
-            gameObject.AddComponent<SceneAutoApply>();
             Logger.LogInfo($"{PluginName} {PluginVersion} loaded.");
-        }
-
-        void Start()
-        {
-            _aysHookAttempts = 0;
-            _aysHookReady = BellyMorphController.PatchAysHooks(_harmony);
-        }
-
-        void Update()
-        {
-            if (_aysHookReady || _aysHookAttempts >= 600)
-                return;
-
-            _aysHookAttempts++;
-            _aysHookReady = BellyMorphController.PatchAysHooks(_harmony);
         }
 
     }

@@ -24,7 +24,7 @@ public static partial class BellyMorphController
         Check(NV.Distance(offsets[2],new NV(0,0,.2f))==0&&NV.Distance(offsets[5],new NV(0,0,.5f))==0,"independent chain offsets are preserved");
 
         foreach(string path in args.Skip(2))TestRealSkirt(args[1],path);
-        Console.WriteLine($"PASS: {tests} skirt/contact assertions; real game models, production deformation and skinning, managed Unity stubs.");
+        Console.WriteLine($"PASS: {tests} skirt/contact assertions; {Math.Max(0,args.Length-2)} supplied real garment models, production deformation and skinning, managed Unity stubs.");
     }
     static void TestRealSkirt(string bodyPath,string garmentPath)
     {

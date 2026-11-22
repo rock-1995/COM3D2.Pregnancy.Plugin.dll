@@ -365,7 +365,10 @@ namespace COM3D2.Pregnancy.Plugin
             if (maid == null) return;
 
             PregnancyManager.CaptureCurrentBellySettings();
-            BellyMorphController.ApplyProgress(maid, progress);
+            BellyMorphController.CaptureShapeForMaid(maid);
+            // The legacy entry point keeps its signature; appearance progress
+            // now comes from the maid's independent saved/preview values.
+            NativeAppearanceRuntime.RequestApply(maid);
         }
 
         static string FormatShape(float value)
