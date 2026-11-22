@@ -20,7 +20,7 @@ static class NippleColorTests
         Apply(dark,.5f);Apply(light,.5f);
         check(Brightness(dark)==73 && Brightness(light)==343,"changed F1 limit is applied with otherwise identical pregnancy state");
         check(light.body0.LastColors[MaidParts.PARTS_COLOR.EYE_L].Color.m_nMainBrightness==72,"nipple cap does not cap eye color");
-        check(Math.Abs(light.body0.Values["Hara"]-.31f)<.00001,"nipple cap does not cap body sliders");
+        check(Math.Abs(light.body0.Values["RegMeet"]-.31f)<.00001,"nipple cap does not cap body sliders");
         light.Births=0;Apply(light,.5f);
         check(Brightness(light)==379,"a 25% ceiling does not rescale existing 10% progress");
         light.Births=5;Apply(light,0);
