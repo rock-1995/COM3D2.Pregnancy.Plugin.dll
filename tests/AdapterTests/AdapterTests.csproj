@@ -17,5 +17,6 @@
     <Compile Include="../../src/DeformationNormals.cs" />
     <Compile Include="../../src/BodyNormalRegions.cs" />
     <Compile Include="../../src/MorphNormalRefresh.cs" />
+    <Compile Include="../../src/NativeMorphIntegration.cs" />
   </ItemGroup>
 </Project>

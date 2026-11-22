@@ -124,9 +124,29 @@ namespace UnityEngine
     }
     public class Material {public string name;}
 }
-public class Maid {public TBody body0;public UnityEngine.GameObject gameObject=new();public List<UnityEngine.SkinnedMeshRenderer> Renderers=new();public bool Pregnant=true;public float Progress=1;}
-public class TBodySkin {public TMorph morph;}
-public class TMorph {public UnityEngine.Vector3[] m_vOriVert,m_vOriNorm;public TBodySkin bodyskin;public UnityEngine.Vector3[] ExtraDelta,ExtraNormalDelta;public int[][] m_nSubMeshOriTri;private UnityEngine.SkinnedMeshRenderer smr_src;public UnityEngine.SkinnedMeshRenderer Renderer=>smr_src;public void SetRenderer(UnityEngine.SkinnedMeshRenderer r)=>smr_src=r;public void FixBlendValues(){smr_src.sharedMesh.vertices=m_vOriVert.Select((v,i)=>ExtraDelta==null?v:v+ExtraDelta[i]).ToArray();smr_src.sharedMesh.normals=m_vOriNorm.Select((v,i)=>ExtraNormalDelta==null?v:v+ExtraNormalDelta[i]).ToArray();}}
+public class Maid {public TBody body0;public UnityEngine.GameObject gameObject=new();public List<UnityEngine.SkinnedMeshRenderer> Renderers=new();public bool Pregnant=true,boMAN;public float Progress=1;}
+public class TBodySkin {public TMorph morph;public TBody body;public bool boVisible=true;}
+public class TMorph
+{
+    public UnityEngine.Vector3[] m_vOriVert,m_vOriNorm;
+    public TBodySkin bodyskin;
+    public UnityEngine.Vector3[] ExtraDelta,ExtraNormalDelta;
+    public int[][] m_nSubMeshOriTri;
+    private UnityEngine.SkinnedMeshRenderer smr_src;
+    // Native reflection slots used by the directly linked integration source.
+    private UnityEngine.Vector3[] m_vTmpVert,m_vTmpNorm;
+    private bool m_bMorph;
+    private float[] BlendValuesChk=Array.Empty<float>();
+    public float[] BlendValues=Array.Empty<float>();
+    public int MorphCount=>BlendValues.Length;
+    public UnityEngine.SkinnedMeshRenderer Renderer=>smr_src;
+    public void SetRenderer(UnityEngine.SkinnedMeshRenderer r)
+    {smr_src=r;m_vTmpVert=r.sharedMesh.vertices;m_vTmpNorm=r.sharedMesh.normals;}
+    public void FixBlendValues()
+    {smr_src.sharedMesh.vertices=m_vOriVert.Select((v,i)=>ExtraDelta==null?v:v+ExtraDelta[i]).ToArray();smr_src.sharedMesh.normals=m_vOriNorm.Select((v,i)=>ExtraNormalDelta==null?v:v+ExtraNormalDelta[i]).ToArray();}
+    public void RestoreTemporaryBuffers()
+    {if(m_bMorph){smr_src.sharedMesh.vertices=m_vTmpVert;smr_src.sharedMesh.normals=m_vTmpNorm;}}
+}
 public class TBody {public Maid maid;public List<TBodySkin> goSlot=new();public bool isLoadedBody=true;}
 namespace COM3D2.Pregnancy.Plugin
 {

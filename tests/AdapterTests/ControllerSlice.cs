@@ -220,7 +220,7 @@ namespace COM3D2.Pregnancy.Plugin
                 delta[i] = newVerts[i] - baseVerts[i];
             return delta;
         }
-        static List<int>[] BuildMeshNeighbors(Mesh mesh, int count)
+        static List<int>[] BuildMeshNeighbors(Mesh mesh, int count, int[] originalTopology = null)
         {
             List<int>[] neighbors = new List<int>[count];
             for (int i = 0; i < count; i++)
@@ -229,7 +229,7 @@ namespace COM3D2.Pregnancy.Plugin
             int[] triangles = null;
             try
             {
-                triangles = mesh.triangles;
+                triangles = originalTopology ?? mesh.triangles;
             }
             catch
             {
