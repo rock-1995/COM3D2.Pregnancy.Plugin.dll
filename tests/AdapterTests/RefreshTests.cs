@@ -17,79 +17,137 @@ public static partial class BellyMorphController
     {var mon=EnsureMonitor(m);for(int i=0;i<times;i++)typeof(BellyMonitor).GetMethod("LateUpdate",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(mon,null);}
     static void RunRefreshTests(string[] args)
     {
-        Shape=new();var (a,ab,ac)=LiveFixture();var originals=ab.sharedMesh.vertices;
-        ApplyProgress(a,1);var context=_alContexts[a.GetHashCode()];var binding=ActiveBinding(ab);var vertices=ab.sharedMesh.vertices;
-        int writes=ab.sharedMesh.VertexWrites;
-        ApplyProgress(a,1);
-        Check(_lastRefreshStats.Reused==2 && _lastRefreshStats.Rebuilt==0,"repeat apply reuses every mesh");
-        Check(_lastRefreshStats.ContextHits==1 && _lastRefreshStats.ContextBuilds==0,"repeat context hit");
-        Check(ab.sharedMesh.VertexWrites==writes && ActiveBinding(ab)==binding,"repeat avoids upload and palette rebuild");
+        Shape=new();
+        var (maid,body,cloth,bodyMorph,clothMorph)=NativeFixture();
+        var originalBody=body.sharedMesh.vertices;
+        var originalCloth=cloth.sharedMesh.vertices;
+        var originalBodyNormals=body.sharedMesh.normals;
+        var originalBodyTopology=(int[])bodyMorph.m_nSubMeshOriTri[0].Clone();
+        var originalClothTopology=(int[])clothMorph.m_nSubMeshOriTri[0].Clone();
+        cloth.enabled=false;
+        ApplyNativeAppearance(maid,1);
+        Check(_lastRefreshStats.Rebuilt==2,"initial native build includes hidden loaded clothing");
+        var context=_alContexts[maid.GetHashCode()];
+        var bodyBinding=ActiveBinding(body);
+        var clothBinding=ActiveBinding(cloth);
+        var expectedBody=body.sharedMesh.vertices;
+        var expectedCloth=cloth.sharedMesh.vertices;
+        var expectedBodyNormals=body.sharedMesh.normals;
+        int bodyWrites=body.sharedMesh.VertexWrites,clothWrites=cloth.sharedMesh.VertexWrites;
+        int normalWrites=body.sharedMesh.NormalWrites+cloth.sharedMesh.NormalWrites;
+        ApplyNativeAppearance(maid,1);
+        Check(_lastRefreshStats.ContextHits==1 && _lastRefreshStats.ContextBuilds==0,"repeat native build keeps context");
+        Check(_lastRefreshStats.Rebuilt==0 && _lastRefreshStats.Reused==2,"repeat native build reuses both results");
+        Check(body.sharedMesh.VertexWrites==bodyWrites && cloth.sharedMesh.VertexWrites==clothWrites,"cache hit does not upload vertices");
 
-        // Parameter editing and applying to another maid cannot change A's pose.
-        var (b,bb,bc)=LiveFixture();var ui=new PregnancyUI();ui._maids.AddRange(new[]{a,b});ui.Select(0);ui.Select(1);
-        Check(GetActiveProgress(a)==1 && ActiveBinding(ab)==binding,"UI selection keeps prior maid active");Same(vertices,ab.sharedMesh.vertices,"UI selection retains belly");
-        var pose=new Matrix4x4{Rows=System.Numerics.Matrix4x4.CreateRotationX(.45f)};
-        ab.bones[1].localToWorldMatrix=pose*ab.bones[1].localToWorldMatrix;UpdateALBindings(a);var renderedA=Rendered(ab);
-        Shape=new VtxSettings{BellySag=.2f,GrowthFullness=.4f,AxisPullLow=.05f,AxisPullHigh=.1f,VirtualAxisStrength=.25f};
-        PregnancyUI.TriggerApplyBelly(b,.67f);UpdateALBindings(a);
-        Same(renderedA,Rendered(ab),"B apply does not alter A pose");Same(vertices,ab.sharedMesh.vertices,"B apply keeps A geometry");
-        Check(_alContexts[a.GetHashCode()]==context,"separate maid contexts");
-        var bSettings=Shape.Copy();ui.Select(0);Check(ui._shape.BellySag==2 && ui._shape.VirtualAxisStrength==context.Settings.VirtualAxisStrength,"selection loads A settings");
-        ui.Select(1);Check(ui._shape.BellySag==bSettings.BellySag,"selection loads B settings");
+        // Render masks are temporary indices. They must not enter the shape,
+        // contact, normal, connectivity or context signatures.
+        var hiddenBody=HiddenFaces(originalBodyTopology,originalBody);
+        var hiddenCloth=HiddenFaces(originalClothTopology,originalCloth);
+        Check(!hiddenBody.SequenceEqual(originalBodyTopology),"body mask actually removes faces");
+        Check(!hiddenCloth.SequenceEqual(originalClothTopology),"clothing mask actually removes faces");
+        body.sharedMesh.triangles=hiddenBody;
+        cloth.sharedMesh.triangles=hiddenCloth;
+        cloth.enabled=true;
+        ApplyNativeAppearance(maid,1);
+        Check(_alContexts[maid.GetHashCode()]==context,"mask and clothing visibility keep the body context");
+        Check(_lastRefreshStats.ContextHits==1 && _lastRefreshStats.ContextBuilds==0 && _lastRefreshStats.Rebuilt==0 && _lastRefreshStats.Reused==2,"mask change is a pure geometry-cache hit");
+        Check(body.sharedMesh.VertexWrites==bodyWrites && cloth.sharedMesh.VertexWrites==clothWrites,"mask change does not upload vertices");
+        Check(body.sharedMesh.NormalWrites+cloth.sharedMesh.NormalWrites==normalWrites,"mask change does not upload normals");
+        Check(ActiveBinding(body)==bodyBinding && ActiveBinding(cloth)==clothBinding,"mask change keeps both palettes");
+        Check(ReferenceEquals(body.sharedMesh.triangles,hiddenBody) && ReferenceEquals(cloth.sharedMesh.triangles,hiddenCloth),"shape application never restores hidden rendered faces");
+        Check(NativeOriginalTopology(body).SequenceEqual(originalBodyTopology),"original topology remains available through native registration");
+        Check(NativeOriginalSubmesh(cloth,0).SequenceEqual(originalClothTopology),"native submesh lookup ignores rendered mask");
+        Same(originalBody,bodyMorph.m_vOriVert,"native original body array stays unchanged");
+        Same(originalBodyNormals,bodyMorph.m_vOriNorm,"native original authored normals stay unchanged");
+        var originalNeighbors=BuildMeshNeighbors(body.sharedMesh,originalBody.Length,NativeOriginalTopology(body));
+        var visibleNeighbors=BuildMeshNeighbors(body.sharedMesh,originalBody.Length);
+        int upperVertex=Array.FindIndex(originalBody,v=>v.y>2.5f);
+        Check(originalNeighbors[upperVertex].Count>0 && visibleNeighbors[upperVertex].Count==0,"original-topology neighbor path retains masked-region connectivity");
 
-        // Actual debounced monitor callbacks, with the editor still holding B.
-        ac.enabled=false;EnsureMonitor(a).RequestVisibilityApply(a.GetHashCode());Tick(a,2);
-        Check(ab.sharedMesh.VertexWrites==writes,"visibility waits for stable frames");Tick(a,1);
-        Check(_lastRefreshStats.Rebuilt==0 && _lastRefreshStats.Reused==1,"hidden clothing skipped");
-        Check(_alContexts[a.GetHashCode()]==context && ActiveBinding(ab)==binding,"clothing visibility keeps body cache");
-        Check(Shape.BellySag==bSettings.BellySag,"automatic refresh restores editor settings");
-        ac.enabled=true;EnsureMonitor(a).RequestVisibilityApply(a.GetHashCode());Tick(a,3);
-        Check(_lastRefreshStats.Reused==2 && _lastRefreshStats.Rebuilt==0,"show reuses clothing");
-        EnsureMonitor(a).TriggerFullRefresh();Tick(a,3);Check(_lastRefreshStats.Reused==2,"full refresh keeps unchanged results");
+        // The real integration writes the two private TMorph temporary buffers.
+        // This shim merely exposes those buffers as the native restore does.
+        body.sharedMesh.vertices=new Vector3[originalBody.Length];
+        body.sharedMesh.normals=new Vector3[originalBody.Length];
+        bodyMorph.RestoreTemporaryBuffers();
+        Same(expectedBody,body.sharedMesh.vertices,"native temporary vertex buffer contains final shape");
+        Same(expectedBodyNormals,body.sharedMesh.normals,"native temporary normal buffer contains final normals");
+        Check(ReferenceEquals(body.sharedMesh.triangles,hiddenBody),"buffer restoration leaves face mask untouched");
 
-        var (_,_,newCloth)=Fixture();a.Renderers.Add(newCloth);RefreshProgress(a,1);
-        Check(_lastRefreshStats.ContextHits==1 && _lastRefreshStats.Reused==2 && _lastRefreshStats.Rebuilt==1,"new garment rebuilds only itself");
-        Check(_alContexts[a.GetHashCode()]==context,"new clothing keeps body context");
-        a.Renderers.Remove(newCloth);RefreshProgress(a,1);Check(!context.Maps.ContainsKey(newCloth),"removed garment map pruned");
-        Check(ActiveBinding(newCloth)==null,"removed garment binding released");
-        a.Renderers.Add(newCloth);RefreshProgress(a,1);
-        Check(_lastRefreshStats.Rebuilt==1 && _lastRefreshStats.Reused==2,"reattach rebuilds only released garment");
-        Same(newCloth.sharedMesh.vertices,ac.sharedMesh.vertices,"reattach has no accumulated deformation");
-        a.Renderers.Remove(newCloth);RefreshProgress(a,1);
-        // Changing topology invalidates only this garment, even with identical positions.
-        ac.sharedMesh.triangles=ac.sharedMesh.triangles.Skip(3).ToArray();RefreshProgress(a,1);
-        Check(_lastRefreshStats.ContextHits==1 && _lastRefreshStats.Rebuilt==1 && _lastRefreshStats.Reused==1,"clothing topology invalidates clothing");
-        var cleanBody=(Vector3[])FindRecord(a,ab).OrigVerts.Clone();cleanBody[17].z+=.00001f;ab.sharedMesh.vertices=cleanBody;RefreshProgress(a,1);
-        Check(_lastRefreshStats.ContextBuilds==1 && _lastRefreshStats.Rebuilt==2,"small unsampled body edit invalidates body and clothes");
-        context=_alContexts[a.GetHashCode()];ab.sharedMesh.triangles=ab.sharedMesh.triangles.Skip(3).ToArray();RefreshProgress(a,1);
-        Check(_alContexts[a.GetHashCode()]!=context,"body topology invalidates context");
+        // Native boVisible is available before the GameObject activation at
+        // the end of loading. Contributors keep the original visibility rule;
+        // a later explicit build may change context when that rule changes.
+        var (owners,primary,garment,primaryMorph,garmentMorph)=NativeFixture();
+        primary.gameObject.activeInHierarchy=false;
+        Check(NativeBodyVisible(primary),"native body flag takes precedence over delayed object activation");
+        ApplyNativeAppearance(owners,.8f);
+        var ownerContext=_alContexts[owners.GetHashCode()];
+        var (_,secondary,_)=Fixture();
+        secondary.sharedMesh.name="body_overlay";
+        secondary.sharedMesh.vertices=secondary.sharedMesh.vertices.Select(v=>new Vector3(v.x*1.3f,v.y,v.z*1.4f)).ToArray();
+        owners.Renderers.Add(secondary);
+        var secondaryMorph=RegisterNativeMesh(owners,secondary);
+        secondaryMorph.bodyskin.boVisible=false;
+        Check(!NativeBodyVisible(secondary),"hidden body contributor remains excluded");
+        ApplyNativeAppearance(owners,.8f);
+        Check(_alContexts[owners.GetHashCode()]!=ownerContext,"body contributor inventory updates context signature");
+        ownerContext=_alContexts[owners.GetHashCode()];
+        Check(ownerContext.Surface.Meshes.Count==1,"hidden secondary body does not enter body contact surface");
+        secondaryMorph.bodyskin.boVisible=true;
+        ApplyNativeAppearance(owners,.8f);
+        Check(_alContexts[owners.GetHashCode()]!=ownerContext,"explicit build after contributor visibility change recalibrates context");
+        Check(_alContexts[owners.GetHashCode()].Surface.Meshes.Count==2,"visible secondary body enters contact surface");
+        primary.enabled=false;
+        Check(!NativeBodyVisible(primary),"native visibility still respects renderer enabled");
+        var (_,unregistered,_)=Fixture();unregistered.gameObject.activeInHierarchy=false;
+        Check(!NativeBodyVisible(unregistered),"unregistered renderers retain hierarchy fallback");
 
-        // Parameter/progress updates must equal a clean application, with no accumulation.
-        var(c,cb,cc)=LiveFixture();var(d,db,dc)=LiveFixture();
-        Shape=new();ApplyProgress(c,1);Shape.BellySag=.6f;Shape.GrowthFullness=.78f;ApplyProgress(c,.72f);ApplyProgress(d,.72f);
-        Same(cb.sharedMesh.vertices,db.sharedMesh.vertices,"changed settings equal cold body");Same(cc.sharedMesh.vertices,dc.sharedMesh.vertices,"changed settings equal cold clothing");
-        Shape.AxisPullHigh=.11f;ApplyProgress(c,.93f);Reset(d);ApplyProgress(d,.93f);
-        Same(cb.sharedMesh.vertices,db.sharedMesh.vertices,"later stage equal cold body");Same(cc.sharedMesh.vertices,dc.sharedMesh.vertices,"later stage equal cold clothing");
-        ApplyProgress(c,0);Same(cb.sharedMesh.vertices,originals,"zero progress restores base");
-        Check(GetActiveProgress(c)==0 && !_maidShapes.ContainsKey(c.GetHashCode()),"zero clears own saved state");
-        var aBeforeReset=ab.sharedMesh.vertices;Reset(b);Same(aBeforeReset,ab.sharedMesh.vertices,"reset B preserves A");Check(ActiveBinding(ab)!=null,"reset B preserves A binding");
+        // The first application while masked must equal a cold unmasked build.
+        var (masked,mb,mc,mbm,mcm)=NativeFixture();
+        var (full,fb,fc,fbm,fcm)=NativeFixture();
+        var maskedBodyFaces=HiddenFaces(mbm.m_nSubMeshOriTri[0],mb.sharedMesh.vertices);
+        var maskedClothFaces=HiddenFaces(mcm.m_nSubMeshOriTri[0],mc.sharedMesh.vertices);
+        mb.sharedMesh.triangles=maskedBodyFaces;
+        mc.sharedMesh.triangles=maskedClothFaces;
+        ApplyNativeAppearance(masked,.73f);ApplyNativeAppearance(full,.73f);
+        Same(fb.sharedMesh.vertices,mb.sharedMesh.vertices,"cold mask-independent body geometry");
+        Same(fc.sharedMesh.vertices,mc.sharedMesh.vertices,"cold mask-independent clothing contact and repair");
+        Same(fb.sharedMesh.normals,mb.sharedMesh.normals,"cold mask-independent body normals");
+        Same(fc.sharedMesh.normals,mc.sharedMesh.normals,"cold mask-independent clothing normals");
+        Check(ReferenceEquals(mb.sharedMesh.triangles,maskedBodyFaces) && ReferenceEquals(mc.sharedMesh.triangles,maskedClothFaces),"cold build preserves rendered masks");
 
-        // TMorph produces the same geometry, and its final Apply can reuse the bake.
-        Shape=new();var(e,eb,ec)=LiveFixture();var morph=new TMorph{m_vOriVert=eb.sharedMesh.vertices,m_vOriNorm=eb.sharedMesh.normals};morph.SetRenderer(eb);
-        Check(TryBakeRuntimeMorphBase(e,morph,1),"engine morph bake succeeds");var baked=eb.sharedMesh.vertices;var bakedBinding=ActiveBinding(eb);
-        Check(_maidShapes.ContainsKey(e.GetHashCode()),"first engine bake latches target settings");ApplyProgress(e,1);
-        Same(baked,eb.sharedMesh.vertices,"post-bake apply identity");Check(ActiveBinding(eb)==bakedBinding && _lastRefreshStats.Reused==1,"post-bake body reused");
-        Check(!TryBakeRuntimeMorphBase(e,morph,1),"identical baked morph skipped");Reset(e);Same(eb.sharedMesh.vertices,originals,"baked reset clean");
-        var(f,fb,fc)=LiveFixture();var extra=new Vector3[fb.sharedMesh.vertexCount];extra[17]=new Vector3(0,0,.0001f);
-        var morphExtra=new TMorph{m_vOriVert=fb.sharedMesh.vertices,m_vOriNorm=fb.sharedMesh.normals,ExtraDelta=extra};morphExtra.SetRenderer(fb);
-        Check(TryBakeRuntimeMorphBase(f,morphExtra,1),"engine bake with external morph");ApplyProgress(f,1);
-        Check(_lastRefreshStats.Rebuilt==2,"native extra morph cannot reuse stale bake");
-        Check(Vector3.Distance(FindRecord(f,fb).OrigVerts[17],originals[17]+extra[17])<2e-6f,"native extra morph preserved");
-        var(innerM,innerB,innerC)=LiveFixture();PrepareALContext(innerM,innerM.Renderers,1);
-        using(new RefreshTrace(innerM,"inner-cache-test"))ApplySMR(innerM,innerC,1,MeshMorphClass.InnerCloth,false);
-        Check(_lastRefreshStats.RestQueries>0 && _lastRefreshStats.RestHits>0,"inner shape and motion share rest-surface hits");
-        File.WriteAllText(args[1],JsonSerializer.Serialize(new{assertions=tests,scope="Production lifecycle + selection slices; Unity scene/engine shims",cases=new[]{"repeat apply","two maid selection/apply/pose/reset isolation","visibility/full-refresh debounce","new/hidden/removed garments","body/clothing topology","small native edit","settings/stage cold equivalence","zero reset","TMorph final reuse and extra native delta"}},new JsonSerializerOptions{WriteIndented=true}));
-        Console.WriteLine($"PASS: {tests} refresh and multi-maid assertions.");
+        // Genuine original topology changes still invalidate exactly the
+        // dependent meshes; this is different from temporary visibility masks.
+        clothMorph.m_nSubMeshOriTri[0]=originalClothTopology.Skip(3).ToArray();
+        ApplyNativeAppearance(maid,1);
+        Check(_alContexts[maid.GetHashCode()]==context && _lastRefreshStats.ContextHits==1,"garment original topology does not invalidate body context");
+        Check(_lastRefreshStats.Rebuilt==1 && _lastRefreshStats.Reused==1,"garment original topology rebuilds only that garment");
+        bodyMorph.m_nSubMeshOriTri[0]=originalBodyTopology.Skip(3).ToArray();
+        ApplyNativeAppearance(maid,1);
+        Check(_alContexts[maid.GetHashCode()]!=context && _lastRefreshStats.ContextBuilds==1,"body original topology invalidates contact context");
+        Check(_lastRefreshStats.Rebuilt==2,"body original topology rebuilds body and dependent clothing");
+        Check(ReferenceEquals(body.sharedMesh.triangles,hiddenBody),"original topology invalidation still leaves rendered mask unchanged");
+
+        // Stage/shape edits remain equivalent to a clean build and isolated.
+        var originalOther=mb.sharedMesh.vertices;
+        Shape.BellySag=.6f;Shape.GrowthFullness=.78f;
+        CaptureShapeForMaid(full);ApplyNativeAppearance(full,.91f);
+        var (cold,cb,cc,cbm,ccm)=NativeFixture();CaptureShapeForMaid(cold);ApplyNativeAppearance(cold,.91f);
+        Same(cb.sharedMesh.vertices,fb.sharedMesh.vertices,"stage and shape edit equals cold body");
+        Same(cc.sharedMesh.vertices,fc.sharedMesh.vertices,"stage and shape edit equals cold clothing");
+        Same(originalOther,mb.sharedMesh.vertices,"one maid edit leaves another maid unchanged");
+        ApplyNativeAppearance(maid,0);
+        Same(originalBody,body.sharedMesh.vertices,"zero belly restores native body base");
+        Same(originalCloth,cloth.sharedMesh.vertices,"zero belly restores native clothing base");
+        body.sharedMesh.vertices=new Vector3[originalBody.Length];bodyMorph.RestoreTemporaryBuffers();
+        Same(originalBody,body.sharedMesh.vertices,"zero belly also updates native restore buffer");
+
+        File.WriteAllText(args[1],JsonSerializer.Serialize(new {
+            assertions=tests,
+            scope="Offline geometry/cache tests. NativeMorphIntegration, ALRefresh, ALGrowthAdapter, clothing/skirt/normal algorithms are linked production source; Unity/TMorph, renderer discovery, ApplySMR and lifecycle helpers use explicit test shims or historical slices. Does not validate game scheduling, loading time, graphics or UI.",
+            cases=new[]{"hidden initial garment","unchanged reuse","body/clothing mask-independent context","native original submesh","original neighbor connectivity","native temporary buffers","native boVisible contributor semantics","cold masked/unmasked equivalence","genuine topology invalidation","stage/shape equivalence","maid isolation","zero reset"}
+        },new JsonSerializerOptions{WriteIndented=true}));
+        Console.WriteLine($"PASS: {tests} linked-source native topology, geometry and cache assertions.");
     }
 
     static void RunRefreshBenchmark(string[] args)

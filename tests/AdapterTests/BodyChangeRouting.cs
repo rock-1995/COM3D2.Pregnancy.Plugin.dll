@@ -10,8 +10,17 @@ static class BodyChanges
     internal static bool HasHistory(Maid m) => History.Contains(m);
     internal static State Prepare(Maid m, float p)
     { Progress[m] = p; return Pending.Remove(m) ? new State { Maid=m } : null; }
+    internal static State PrepareFactor(Maid m, float p) => Prepare(m,p);
+    internal static bool NeedsGeometryApply(State state) => state != null;
     internal static void Apply(State state) { Applied++; }
     internal static void Reset(Maid m) { Resets++; }
+}
+// Storage is an explicit boundary stub in this geometry harness. The actual
+// slot storage and preview transactions have their own linked-source tests.
+static class PregnancyAppearance
+{
+    internal struct Values {internal float Belly,Body;}
+    internal static Values Get(Maid maid) => new(){Belly=maid.Pregnant?maid.Progress:0,Body=maid.Pregnant?maid.Progress:0};
 }
 public static partial class BellyMorphController
 {
