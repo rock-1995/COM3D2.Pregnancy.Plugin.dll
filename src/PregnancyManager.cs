@@ -61,9 +61,11 @@ namespace COM3D2.Pregnancy.Plugin
 
         public static void SetPregnant(Maid maid, bool value)
         {
+            bool changed = GetPregnant(maid) != value;
             ExSaveDataBridge.Set(maid, "isPregnant", value ? "true" : "false");
             if (value && IsCyclicMode(GetCycleMode()))
                 SetCycleProgress(maid, GetPostOvulationSecondDayProgress(GetCycleMode()));
+            if (changed) PregnancyAppearance.RefreshFromSimulation(maid);
         }
 
         public static float GetProgress(Maid maid)
@@ -81,8 +83,11 @@ namespace COM3D2.Pregnancy.Plugin
         }
 
         public static void SetProgress(Maid maid, float value)
-            => ExSaveDataBridge.Set(maid, "progress",
-                value.ToString("F3", CultureInfo.InvariantCulture));
+        {
+            float previous = GetProgress(maid);
+            ExSaveDataBridge.Set(maid, "progress", value.ToString("F3", CultureInfo.InvariantCulture));
+            if (previous != GetProgress(maid)) PregnancyAppearance.RefreshFromSimulation(maid);
+        }
 
         public static FertilityCycleMode GetCycleMode()
         {

@@ -94,7 +94,7 @@ namespace COM3D2.Pregnancy.Plugin
                     {
                         signature=signature*31+r.GetHashCode();signature=signature*31+r.sharedMesh.GetInstanceID();
                         signature=signature*31+ComputeVertexSignature(v);signature=signature*31+MeshStructureSignature(r);
-                        signature=signature*31+ExactIndices(topology);signature=signature*31+(r.enabled&&r.gameObject.activeInHierarchy?1:0);
+                        signature=signature*31+ExactIndices(topology);signature=signature*31+(NativeBodyVisible(r)?1:0);
                     }
                 }
                 unchecked{signature=signature*31+(hasNavelAccessory?1:0);}
@@ -145,7 +145,7 @@ namespace COM3D2.Pregnancy.Plugin
                 if(chest<0 || chestY<=navelY)throw new InvalidOperationException("Upper-spine rest landmark missing.");
                 var points=new List<NVector>();
                 foreach(var r in bodies)
-                    if(r.enabled && r.gameObject.activeInHierarchy && context.Maps.TryGetValue(r,out var map))
+                    if(NativeBodyVisible(r) && context.Maps.TryGetValue(r,out var map))
                         AddTorsoSamples(points,r,originals[r],map*inv);
                 if(points.Count<50 || points.Min(v=>v.Y)>0 || points.Max(v=>v.Y)<chestY)
                 {
@@ -168,12 +168,13 @@ namespace COM3D2.Pregnancy.Plugin
                 // Build body correspondences before any clothing, independently of slot enumeration order.
                 foreach(var r in bodies)
                 {
-                    bool visible=r.enabled && r.gameObject.activeInHierarchy;
+                    bool visible=NativeBodyVisible(r);
                     if((!visible && !hasNavelAccessory) || !context.Maps.ContainsKey(r))continue;
-                    var record=new MeshRecord {SMR=r,Mesh=r.sharedMesh,OrigVerts=originals[r]};
+                    var record=new MeshRecord {SMR=r,Mesh=r.sharedMesh,OrigVerts=originals[r],NormalTriangles=topologies[r]};
                     if(!TryDeformAL(r,record,MeshMorphClass.Body,stage,out var morphed,out _))continue;
                     if(hasNavelAccessory)context.NavelBodies.Add(record);
-                    // Hidden-body support is scoped to the accessory; clothing behavior stays unchanged.
+                    // Preserve the original contributor set: hidden bodies only
+                    // support the navel accessory, not clothing calibration.
                     if(!visible)continue;
                     AddBodyAnchorMesh(context.Surface,r,record,null,morphed,frame,topologies[r]);
                     for(int i=0;i<record.OrigVerts.Length;i++)
@@ -207,7 +208,7 @@ namespace COM3D2.Pregnancy.Plugin
             for(int sub=0;sub<Math.Min(materials.Length,mesh.subMeshCount);sub++)
             {
                 if(materials[sub]==null || materials[sub].name.IndexOf("kupa",StringComparison.OrdinalIgnoreCase)<0)continue;
-                var triangles=mesh.GetTriangles(sub);var parent=new int[vertices.Length];
+                var triangles=NativeOriginalSubmesh(body,sub);var parent=new int[vertices.Length];
                 for(int i=0;i<parent.Length;i++)parent[i]=i;
                 int Root(int i){while(parent[i]!=i){parent[i]=parent[parent[i]];i=parent[i];}return i;}
                 void Join(int a,int b){a=Root(a);b=Root(b);if(a!=b)parent[b]=a;}
@@ -377,7 +378,7 @@ namespace COM3D2.Pregnancy.Plugin
                         changed[i]=Vector3.Lerp(changed[i],target,attachment);
                     moved[i]=(changed[i]-original[i]).sqrMagnitude>=1e-14f;
                 }
-                rec.Neighbors=rec.Neighbors??BuildMeshNeighbors(rec.Mesh,count);
+                rec.Neighbors=rec.Neighbors??BuildMeshNeighbors(rec.Mesh,count,rec.NormalTriangles);
                 RepairClothDistortion(original,changed,moved,context.Frame,rec.Neighbors);
             }
             ApplyThighGuard(rec,original,changed);

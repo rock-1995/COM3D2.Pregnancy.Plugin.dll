@@ -47,6 +47,9 @@ namespace COM3D2.Pregnancy.Plugin
             foreach (MaidProp original in baseProps)
             {
                 if (original.type != 1 && original.type != 2) continue;
+                // Pregnancy appearance has its own belly shape; leave the game's
+                // Hara parameter entirely under native/other-plugin control.
+                if (string.Equals(original.name, "hara", StringComparison.OrdinalIgnoreCase)) continue;
                 foreach (MaidProp reference in referenceProps)
                 {
                     if (!string.Equals(original.name, reference.name, StringComparison.OrdinalIgnoreCase)
