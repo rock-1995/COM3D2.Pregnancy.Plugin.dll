@@ -54,6 +54,8 @@ public class Maid
     public bool boMAN;
     public Status status = new();
     public Maid(string guid) { status.guid = guid; }
+    public static List<MaidProp> DeserializePropPre(BinaryReader reader) => throw new NotSupportedException();
+    public static MaidParts.PartsColor[] DeserializeMultiColorPre(BinaryReader reader) => throw new NotSupportedException();
     public class Status { public string guid; }
 }
 class CharacterMgr
@@ -135,6 +137,7 @@ namespace COM3D2.Pregnancy.Plugin
     {
         public static Config<float> CfgFertilityRate = new(.3f);
         public static Config<int> CfgPregnancyWeeks = new(40);
+        public static Config<int> CfgBodyChangeBirths = new(5);
         public static Config<FertilityCycleMode> CfgCycleMode = new(FertilityCycleMode.Simple);
     }
     static class ExSaveDataBridge
