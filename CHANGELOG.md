@@ -1,5 +1,17 @@
 # Changes
 
+## V17 — 2026-11-22
+
+Plugin version: **0.3.0**. See the [user guide](README.md) for saved appearance controls and [verification](VERIFICATION.md) for test scope.
+
+- Integrate pregnancy appearance with native character/clothing construction. Finish custom deformation once per construction transaction, keep the native original geometry clean, and reuse the final buffers for loaded garments' visibility changes.
+- Store independent belly and body/color progress per maid in each game save's ExSaveData XML. Initialize missing fields from existing pregnancy/birth history and preserve explicit zero values. These fields are not exported to global character presets.
+- Add two progress sliders to the native body-customization page, with preview, accepted-edit commit and cancellation. F8 Apply uses the same saved appearance values.
+- Exclude `Hara` from body-preset differences and stop installing the old AYS Hara-reset hooks. The old visibility-trigger mode is no longer active.
+- Keep clothing masks separate from the original mesh topology used for calibration and normals. Preserve the original visible-body contribution rules using native slot visibility after mask processing.
+- Retain other native slider inputs during unchanged outfit transactions, restore clean state on real body replacement, and release interrupted construction transactions without a per-frame retry loop.
+- Correct float-to-slider rounding at the body-overlay input. Builds now output locally by default; installing the compiled DLL is a separate step.
+
 ## V16 — 2026-11-16
 
 - Blend nipple color from each character's original color toward the reference preset's target color.
@@ -26,7 +38,7 @@ Plugin version: **0.2.3**. See the [user guide](README.md) for installation and 
 - Use English body-change controls and help. Existing values under the earlier Chinese setting names migrate automatically.
 - Set the 51 built-in shape parameters to the latest logged tuning, including upper transition width `0.4667925`. Existing saved shape settings remain in effect until **Reset Defaults**, then **Apply Belly**, is used.
 
-Build and verification details are in [BUILDING.md](BUILDING.md). The preceding body-change build was loaded and used locally; this English/defaults update still needs a separate in-game visual pass.
+Build and verification details are in [BUILDING.md](BUILDING.md).
 
 ## v13-20261010
 
