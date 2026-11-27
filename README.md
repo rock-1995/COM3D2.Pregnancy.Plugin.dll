@@ -32,7 +32,10 @@ BepInEx/plugins/
 
 The PDB is optional. The preset pair is required for the additional body/color changes. If the pair is missing or cannot be read, the plugin logs a warning and keeps the original belly feature available.
 
-The plugin runs through BepInEx. **BepInEx ConfigurationManager** provides F1, and **ExSaveData** stores pregnancy, childbirth history and the two appearance-progress values with each game save. Existing user settings are retained. The plugin migrates earlier body-change settings automatically.
+Requires **BepInEx**. Install **COM3D2 External Save Data** (ExSaveData) to save
+pregnancy, childbirth history, and appearance progress with the game. The optional
+**BepInEx Configuration Manager** provides the F1 settings menu. Saved settings
+from older builds migrate automatically.
 
 ## Quick start
 
