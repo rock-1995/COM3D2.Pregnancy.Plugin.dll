@@ -5,7 +5,7 @@ static class NippleColorTests
     public static void Run(Action<bool,string> check)
     {
         void Apply(Maid m,float p) { var next=BodyChanges.Prepare(m,p);if(next!=null)BodyChanges.Apply(next); }
-        int Brightness(Maid m)=>m.Parts.GetPartsColorTableTex(MaidParts.PARTS_COLOR.NIPPLE).Color.m_nMainBrightness;
+        int Brightness(Maid m)=>BodyChanges.RenderColorTexture(m.Parts,MaidParts.PARTS_COLOR.NIPPLE).Color.m_nMainBrightness;
         var dark=new Maid(13,35){Births=2};dark.Parts.Color.m_nMainBrightness=43;
         var light=new Maid(13,35){Births=2};light.Parts.Color.m_nMainBrightness=403;
         string darkSaved=dark.SaveShape(),lightSaved=light.SaveShape();
@@ -36,7 +36,7 @@ static class NippleColorTests
         light.Parts.Color.m_nMainBrightness=403;
         check(dark.SaveShape()==darkSaved && light.SaveShape()==lightSaved,"color blending never alters saved appearance settings");
         BodyChanges.Reset(dark);BodyChanges.Reset(light);
-        check(light.Parts.GetPartsColorTableTex(MaidParts.PARTS_COLOR.NIPPLE)==light.Parts.Original,"reset restores the native color table");
+        check(BodyChanges.RenderColorTexture(light.Parts,MaidParts.PARTS_COLOR.NIPPLE)==light.Parts.Original,"reset restores the native color table");
 
         // A base preset change must not affect the nipple destination or baseline.
         string basePath=Path.Combine(AppContext.BaseDirectory,"base.preset");

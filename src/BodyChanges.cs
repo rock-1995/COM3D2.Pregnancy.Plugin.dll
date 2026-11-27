@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection.Emit;
 using HarmonyLib;
 using UnityEngine;
 
@@ -28,6 +29,7 @@ namespace COM3D2.Pregnancy.Plugin
             internal readonly Dictionary<string, int> PreservedNative = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             internal readonly Dictionary<MaidParts.PARTS_COLOR, Texture2D> Textures = new Dictionary<MaidParts.PARTS_COLOR, Texture2D>();
             internal readonly Dictionary<MaidParts.PARTS_COLOR, MaidParts.PartsColor> TextureColors = new Dictionary<MaidParts.PARTS_COLOR, MaidParts.PartsColor>();
+            internal readonly Dictionary<MaidParts.PARTS_COLOR, MaidParts.PartsColor> AppliedColors = new Dictionary<MaidParts.PARTS_COLOR, MaidParts.PartsColor>();
             internal readonly Dictionary<string, BodyChangeProfile.Slider> PendingSliders = new Dictionary<string, BodyChangeProfile.Slider>(StringComparer.OrdinalIgnoreCase);
             internal readonly HashSet<MaidParts.PARTS_COLOR> PendingColors = new HashSet<MaidParts.PARTS_COLOR>();
             internal readonly HashSet<string> NativeSliders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -211,12 +213,15 @@ namespace COM3D2.Pregnancy.Plugin
                     if (prop != null && CanPreserveNative(previous, next, entry.Key, prop)) preserved[entry.Key] = previous.Applied[entry.Key];
                 }
             var colors = new HashSet<MaidParts.PARTS_COLOR>();
+            if (previous != null) foreach (var color in previous.PendingColors) colors.Add(color);
             if (Active(previous)) foreach (var entry in previous.Profile.Colors) colors.Add(entry.Key);
             if (Active(next)) foreach (var entry in next.Profile.Colors) colors.Add(entry.Key);
             if (previous != null && !object.ReferenceEquals(previous, next))
             {
                 if (previous.Body == next.Body)
                     foreach (var entry in previous.Applied) next.Applied[entry.Key] = entry.Value;
+                if (previous.Body == next.Body && previous.Parts == next.Parts)
+                    foreach (var entry in previous.AppliedColors) next.AppliedColors[entry.Key] = entry.Value;
                 Release(previous);
             }
             next.PendingSliders.Clear();
@@ -270,7 +275,7 @@ namespace COM3D2.Pregnancy.Plugin
                     long[] delta;
                     MaidParts.PartsColor previous;
                     if (!rebuildBody && Active(next) && next.Profile.Colors.TryGetValue(color, out delta)
-                        && next.TextureColors.TryGetValue(color, out previous)
+                        && next.AppliedColors.TryGetValue(color, out previous)
                         && previous.Equals(EffectiveColor(next, color, delta))) continue;
                     next.Body.UpdateInfinityColor(color);
                 }
@@ -314,9 +319,25 @@ namespace COM3D2.Pregnancy.Plugin
             {
                 MaidParts.PartsColor effective = EffectiveColor(state, entry.Key, entry.Value);
                 MaidParts.PartsColor previous;
-                if (!state.TextureColors.TryGetValue(entry.Key, out previous) || !previous.Equals(effective))
+                if (!state.AppliedColors.TryGetValue(entry.Key, out previous) || !previous.Equals(effective))
                     state.Body.UpdateInfinityColor(entry.Key);
             }
+        }
+
+        internal static void ColorApplied(TBody body, MaidParts.PARTS_COLOR kind)
+        {
+            State state;
+            if (body == null || body.maid == null || !States.TryGetValue(body.maid, out state)
+                || state.Body != body || state.Parts == null) return;
+            if (!state.PendingColors.Contains(kind)
+                && (state.Profile == null || !state.Profile.Colors.ContainsKey(kind))) return;
+            // Reading a palette (or coloring one newly loaded texture) does not
+            // update the already rendered textures. Only the native whole-group
+            // update also refreshes those targets and recomposites their layers.
+            long[] delta;
+            state.AppliedColors[kind] = Active(state) && state.Profile.Colors.TryGetValue(kind, out delta)
+                ? EffectiveColor(state, kind, delta) : state.Parts.GetPartsColor(kind);
+            if (state.NativeBuild) state.NativeColors.Add(kind);
         }
 
         internal static void ColorTexture(MaidParts parts, MaidParts.PARTS_COLOR kind, ref Texture2D texture)
@@ -324,7 +345,6 @@ namespace COM3D2.Pregnancy.Plugin
             State state;
             long[] delta;
             if (!PartStates.TryGetValue(parts, out state)) return;
-            if (state.NativeBuild) state.NativeColors.Add(kind);
             if (!Active(state) || !state.Profile.Colors.TryGetValue(kind, out delta)) return;
             MaidParts.PartsColor effective = EffectiveColor(state, kind, delta);
             Texture2D result;
@@ -343,6 +363,13 @@ namespace COM3D2.Pregnancy.Plugin
                 state.TextureColors[kind] = effective;
             }
             texture = result;
+        }
+
+        internal static Texture2D RenderColorTexture(MaidParts parts, MaidParts.PARTS_COLOR kind)
+        {
+            Texture2D texture = parts.GetPartsColorTableTex(kind);
+            ColorTexture(parts, kind, ref texture);
+            return texture;
         }
 
         static MaidParts.PartsColor EffectiveColor(State state, MaidParts.PARTS_COLOR kind, long[] delta)
@@ -387,16 +414,38 @@ namespace COM3D2.Pregnancy.Plugin
         static void Prefix(TBody __instance, string tag, ref float f) { BodyChanges.Transform(__instance, tag, ref f); }
     }
 
-    [HarmonyPatch(typeof(MaidParts), "GetPartsColorTableTex")]
+    [HarmonyPatch(typeof(InfinityColorTextureCache), "UpdateTexture",
+        new[] { typeof(Texture), typeof(MaidParts.PARTS_COLOR), typeof(RenderTexture) })]
     class Patch_BodyChangeColor
     {
-        static void Postfix(MaidParts __instance, MaidParts.PARTS_COLOR f_eColorType, ref Texture2D __result)
-        { BodyChanges.ColorTexture(__instance, f_eColorType, ref __result); }
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var getter = AccessTools.Method(typeof(MaidParts), "GetPartsColorTableTex");
+            var render = AccessTools.Method(typeof(BodyChanges), "RenderColorTexture");
+            foreach (var instruction in instructions)
+            {
+                // Replace the palette read at its actual rendering call site.
+                // This does not depend on the tiny getter remaining uninlined.
+                if (instruction.Calls(getter))
+                {
+                    instruction.opcode = OpCodes.Call;
+                    instruction.operand = render;
+                }
+                yield return instruction;
+            }
+        }
     }
 
     [HarmonyPatch(typeof(Maid), "Uninit")]
     class Patch_BodyChangeUnload
     {
         static void Prefix(Maid __instance) { NativeAppearanceRuntime.Forget(__instance); }
+    }
+
+    [HarmonyPatch(typeof(TBody), "UpdateInfinityColor")]
+    class Patch_BodyChangeColorApplied
+    {
+        static void Postfix(TBody __instance, MaidParts.PARTS_COLOR f_eColorType)
+        { BodyChanges.ColorApplied(__instance, f_eColorType); }
     }
 }

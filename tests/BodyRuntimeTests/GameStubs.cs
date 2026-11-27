@@ -3,7 +3,23 @@ using UnityEngine;
 
 namespace HarmonyLib
 {
-    [AttributeUsage(AttributeTargets.Class)] public class HarmonyPatch(Type type, string method) : Attribute { }
+    [AttributeUsage(AttributeTargets.Class)] public class HarmonyPatch : Attribute
+    {
+        public HarmonyPatch(Type type, string method) { }
+        public HarmonyPatch(Type type, string method, Type[] arguments) { }
+    }
+    public static class AccessTools
+    {
+        public static System.Reflection.MethodInfo Method(Type type, string name) => type.GetMethod(name,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Instance);
+    }
+    public class CodeInstruction
+    {
+        public System.Reflection.Emit.OpCode opcode;
+        public object operand;
+        public bool Calls(System.Reflection.MethodInfo method) => Equals(operand, method)
+            && (opcode == System.Reflection.Emit.OpCodes.Call || opcode == System.Reflection.Emit.OpCodes.Callvirt);
+    }
 }
 namespace BepInEx.Logging
 {
@@ -15,7 +31,9 @@ namespace UnityEngine
     public class Object { public static void Destroy(Object obj) { ((Texture2D)obj).Destroyed = true; } }
     public enum TextureFormat { RGBA32 }
     public enum TextureWrapMode { Clamp }
-    public class Texture2D(int w, int h, TextureFormat f, bool mip) : Object
+    public class Texture : Object { }
+    public class RenderTexture : Texture { }
+    public class Texture2D(int w, int h, TextureFormat f, bool mip) : Texture
     {
         public TextureWrapMode wrapMode;
         public bool Destroyed;
@@ -91,14 +109,19 @@ public class TBody
     public int Updates;
     public Texture2D LastColor;
     public Dictionary<MaidParts.PARTS_COLOR,Texture2D> LastColors = new();
+    // Native Graphics.Blit copies pixels into render targets. A later palette
+    // edit/read cannot retroactively change those already rendered pixels.
+    public Dictionary<MaidParts.PARTS_COLOR,MaidParts.PartsColor> RenderedColors = new();
     public int ColorUpdates;
     public void VertexMorph_FromProcItem(string tag, float f) { BodyChanges.Transform(this, tag, ref f); Values[tag] = f; Updates++; }
     public void BoneMorph_FromProcItem(string tag, float f) { BodyChanges.Transform(this, tag, ref f); Values[tag] = f; Updates++; }
     public void ItemScaleReset() { }
     public void UpdateInfinityColor(MaidParts.PARTS_COLOR kind)
     {
-        var texture=maid.Parts.GetPartsColorTableTex(kind);LastColors[kind]=texture;ColorUpdates++;
+        var texture=BodyChanges.RenderColorTexture(maid.Parts,kind);LastColors[kind]=texture;ColorUpdates++;
+        RenderedColors[kind] = texture == maid.Parts.Original ? maid.Parts.GetPartsColor(kind) : texture.Color;
         if(kind==MaidParts.PARTS_COLOR.NIPPLE)LastColor=texture;
+        BodyChanges.ColorApplied(this, kind);
     }
 }
 public class MaidParts
@@ -115,9 +138,10 @@ public class MaidParts
     public PartsColor GetPartsColor(PARTS_COLOR kind) => kind==PARTS_COLOR.NIPPLE ? Color : EyeColor;
     public Texture2D GetPartsColorTableTex(PARTS_COLOR kind)
     {
-        var result = Original; BodyChanges.ColorTexture(this, kind, ref result); return result;
+        return Original;
     }
 }
+public class InfinityColorTextureCache { }
 public static class UTY
 {
     public static void UpdateColorTableTexture(MaidParts.PartsColor c, ref Texture2D t) => t.Color = c;

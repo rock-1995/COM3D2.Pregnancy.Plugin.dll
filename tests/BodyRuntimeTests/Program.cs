@@ -51,10 +51,11 @@ Check(Near(first.body0.Values["RegMeet"], 2.15f), "expanding clamp restores base
 first.Parts.Color.m_nMainBrightness = 280; Apply(first, 0f);
 Check(first.body0.LastColor.Color.m_nMainBrightness == 163 && first.Parts.Color.m_nMainBrightness == 280, "live color edit still reaches the absolute target without changing saved color");
 BodyChanges.Forget(first);
-Check(first.Parts.GetPartsColorTableTex(MaidParts.PARTS_COLOR.NIPPLE) == first.Parts.Original, "unload removes runtime palette");
+Check(BodyChanges.RenderColorTexture(first.Parts,MaidParts.PARTS_COLOR.NIPPLE) == first.Parts.Original, "unload removes runtime palette");
 Apply(second, 0f);
 Check(Near(second.body0.Values["RegMeet"], .64f), "postpartum history works at zero pregnancy progress");
 NativeBuildTests.Run(Check);
+NativeColorTests.Run(Check);
 NippleColorTests.Run(Check);
 File.Delete(Path.Combine(folder, "reference.preset")); Apply(second, .8f);
 Check(Near(second.body0.Values["RegMeet"], .5f) && second.body0.LastColor == second.Parts.Original, "missing profile removes prior overlay safely");

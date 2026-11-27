@@ -133,7 +133,7 @@ static class NativeBuildTests
         typeof(Patch_BodyChangeUnload).GetMethod("Prefix", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)
             .Invoke(null, new object[] { sourceKind });
         check(NativeAppearanceRuntime.Forgotten == forgotten + 1
-            && sourceKind.Parts.GetPartsColorTableTex(MaidParts.PARTS_COLOR.NIPPLE) == sourceKind.Parts.Original,
+            && BodyChanges.RenderColorTexture(sourceKind.Parts,MaidParts.PARTS_COLOR.NIPPLE) == sourceKind.Parts.Original,
             "Maid.Uninit retires the complete runtime transaction, including its body palette");
     }
 }

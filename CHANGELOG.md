@@ -1,5 +1,9 @@
 # Changes
 
+## V18 (plugin 0.3.1)
+
+- Apply the native nipple-color change through the customized body appearance so that rebuilding or refreshing the character preserves the expected color.
+
 ## V17 — 2026-11-22
 
 Plugin version: **0.3.0**. See the [user guide](README.md) for saved appearance controls and [verification](VERIFICATION.md) for test scope.

@@ -10,7 +10,7 @@ namespace COM3D2.Pregnancy.Plugin
     {
         public const string PluginGuid = "com.pregnancymod.com3d2";
         public const string PluginName = "COM3D2 Pregnancy";
-        public const string PluginVersion = "0.3.0";
+        public const string PluginVersion = "0.3.1";
 
         internal static PregnancyPlugin Instance;
         internal static ConfigEntry<KeyCode> CfgToggleKey;
